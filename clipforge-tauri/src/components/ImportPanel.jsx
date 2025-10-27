@@ -4,7 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./ImportPanel.css";
 
-function ImportPanel() {
+function ImportPanel({ onImport }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -85,6 +85,11 @@ function ImportPanel() {
       setMessage(`Successfully imported ${result.length} video file(s)!`);
       setMessageType("success");
       console.log("Import result:", result);
+
+      // Call onImport callback with the imported video metadata
+      if (onImport && result.length > 0) {
+        onImport(result);
+      }
 
       setTimeout(() => {
         setMessage("");

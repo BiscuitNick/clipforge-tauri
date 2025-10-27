@@ -171,13 +171,13 @@
         "id": 4,
         "title": "Develop Timeline UI with Canvas Rendering",
         "description": "Create a timeline view to display imported video clips as visual blocks using HTML5 Canvas.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           3
         ],
         "priority": "medium",
-        "details": "Implement a `Timeline` React component using HTML5 Canvas for performance. Render clips as rectangles (min height 80px) with optional thumbnails (first frame or default icon). Display clip duration, position, and a playhead indicator. Add a time ruler with timestamps and grid lines. Enable horizontal scrolling for long sequences and default zoom to fit all clips. Use React hooks (`useTimeline.ts`) to manage state and canvas rendering loop for updates.",
+        "details": "Implement a `Timeline` React component using HTML5 Canvas for performance. Render clips as rectangles (min height 80px) with optional thumbnails (first frame or default icon). Display clip duration, position, and a playhead indicator. Add a time ruler with timestamps and grid lines. Enable horizontal scrolling for long sequences and default zoom to fit all clips. Use React hooks (`useTimeline.ts`) to manage state and canvas rendering loop for updates.\n<info added on 2025-10-27T22:02:46.094Z>\n```json\n\"Implementation is complete. The main UI is handled by the `Timeline.jsx` component, which uses an HTML5 Canvas for rendering. State management, including zoom, pan, and clip data, is encapsulated in the `src/hooks/useTimeline.js` hook. Styling is provided by `src/components/Timeline.css`.\\n\\nKey features implemented:\\n- A dynamic time ruler with adaptive major/minor ticks and MM:SS labels (implemented in `src/components/Timeline.jsx`, lines 66-103).\\n- Video clips are rendered as rectangles (min 80px height) showing filename and duration (`src/components/Timeline.jsx`, lines 105-140).\\n- Zoom functionality via Ctrl/Cmd + mouse wheel or UI buttons, with a 0.1x-10x range.\\n- Panning via mouse drag or horizontal scroll. Zoom/pan logic is in `src/components/Timeline.jsx`, lines 220-233.\\n- A draggable red playhead with a triangle handle (`src/components/Timeline.jsx`, lines 142-164).\\n- Clip selection with visual highlighting.\\n- Core coordinate transformation functions (`timeToPixel`, `pixelToTime`) are implemented in `Timeline.jsx` to manage view state.\"\n```\n</info added on 2025-10-27T22:02:46.094Z>",
         "testStrategy": "Verify clips appear on timeline post-import as visual blocks with correct duration/position. Check playhead visibility and movement. Test horizontal scrolling with multiple/long clips. Confirm timeline renders at 60fps using browser dev tools during interactions.",
         "subtasks": [
           {
@@ -186,7 +186,7 @@
             "description": "Create the `Timeline` React functional component, embed an HTML5 Canvas element within it, and initialize the custom `useTimeline` hook to manage canvas context, state, and the rendering loop.",
             "dependencies": [],
             "details": "Develop the `Timeline.tsx` file, set up the canvas element, and create `useTimeline.ts` to encapsulate canvas rendering logic, drawing functions, and state management (e.g., zoom, scroll position). Establish the basic render loop for canvas updates.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify that the `Timeline` component mounts successfully, displays a canvas element, and the `useTimeline` hook initializes without errors. Check that the canvas context is accessible within the hook."
           },
           {
@@ -197,7 +197,7 @@
               1
             ],
             "details": "Implement canvas drawing functions to render a static time ruler area. Calculate and draw grid lines (e.g., per second, per minute) and corresponding time labels (HH:MM:SS:FF or similar) dynamically based on the current zoom level and visible time range. Ensure readability and accurate time representation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Visually inspect the time ruler for correct timestamp formatting and placement. Zoom in/out and scroll horizontally to ensure grid lines and timestamps adjust accurately and remain legible. Check for consistent spacing and alignment."
           },
           {
@@ -209,7 +209,7 @@
               2
             ],
             "details": "Within the `useTimeline` hook's rendering function, iterate over the provided video clip data. For each clip, calculate its `x`, `y`, `width`, and `height` on the canvas based on its start time, duration, and the current zoom/scroll state. Draw a rectangle with a minimum height of 80px and optionally render a placeholder for thumbnails/icons.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Import several video clips with varying durations and start times. Verify that each clip appears as a distinct rectangular block on the timeline. Check that their horizontal positions and widths accurately reflect their start times and durations. Confirm minimum height is respected."
           },
           {
@@ -222,7 +222,7 @@
               3
             ],
             "details": "Integrate event listeners for mouse wheel (zoom) and mouse drag (scroll) or dedicated scrollbar/controls. Develop functions to update the `scrollOffset` and `zoomLevel` state variables within `useTimeline`. Crucially, implement time-to-pixel and pixel-to-time coordinate transformation methods that account for current zoom and scroll, ensuring all rendered elements (ruler, clips) respond correctly. Default zoom to fit all clips initially.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify that scrolling horizontally moves the timeline content without distorting elements. Test zooming in and out, observing that clips and ruler scale correctly around the mouse pointer or center. Confirm that the default zoom level correctly fits all imported clips into view on load."
           },
           {
@@ -234,7 +234,7 @@
               4
             ],
             "details": "Add a new drawing function to `useTimeline` to render a distinct vertical line (the playhead) at a specific time position on the canvas. This position needs to be translated from time (e.g., seconds) to canvas pixels using the implemented coordinate transformation logic. Create a method or expose a state update function for external components (like the video player) to set the playhead's current time, triggering a re-render.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Observe the playhead indicator on the timeline. Manually update its position (simulated playback) and verify it moves smoothly and accurately along the timeline. Confirm its position correctly corresponds to the provided time value, respecting zoom and scroll."
           }
         ]
@@ -346,7 +346,7 @@
         "id": 7,
         "title": "Integrate FFmpeg for Video Processing",
         "description": "Set up FFmpeg integration in the Tauri backend for video metadata extraction and processing.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           1
         ],
@@ -360,7 +360,7 @@
             "description": "Modify `tauri.conf.json` to include the FFmpeg/ffprobe binaries located in `src-tauri/resources/ffmpeg` in the final application bundle. This ensures the binaries are accessible at runtime.",
             "dependencies": [],
             "details": "Locate `src-tauri/tauri.conf.json`. Add the `src-tauri/resources/ffmpeg/*` path to the `bundle.resources` array. Ensure correct binaries (e.g., `ffmpeg`, `ffprobe` for macOS/Linux; `ffmpeg.exe`, `ffprobe.exe` for Windows) are placed in the specified directory. Document the process for obtaining and placing the correct architecture-specific binaries.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Build the Tauri application for at least one target (e.g., macOS or Windows). Inspect the application bundle contents (e.g., `.app/Contents/Resources` on macOS) to verify that `ffmpeg` and `ffprobe` binaries are correctly included in the resources folder. Attempt to locate and execute the bundled binary manually from the compiled app's resource path via a shell."
           },
           {
@@ -371,7 +371,7 @@
               1
             ],
             "details": "Create a new Rust module, e.g., `src-tauri/src/commands/metadata_extractor.rs`. Implement a private asynchronous function, `fn execute_ffprobe_json(file_path: &Path) -> Result<String, String>`. This function should: 1. Resolve the absolute path to the bundled `ffprobe` binary at runtime (e.g., using `tauri::api::path::resource_dir`). 2. Construct `std::process::Command` with arguments like `-v quiet -print_format json -show_format -show_streams <file_path>`. 3. Execute the command, handle `io::Error`, capture `stdout` and `stderr`. 4. Return the `stdout` as `Ok(json_string)` or an `Err(error_message)`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Write unit tests for the `execute_ffprobe_json` function. Use a known, small video file (e.g., a 5-second MP4). Mock or provide a temporary `ffprobe` binary if needed for isolated testing, or execute against a real bundled binary if built. Assert that the function returns a `Result::Ok` containing a valid JSON string and `Result::Err` for non-existent files or execution failures. Validate basic JSON structure."
           },
           {
@@ -382,7 +382,7 @@
               2
             ],
             "details": "In `src-tauri/src/commands/metadata_extractor.rs` (or similar), define a new `#[tauri::command]` function: `async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String>`. This function will: 1. Call `execute_ffprobe_json` with the provided `file_path`. 2. Use `serde_json` to deserialize the JSON string into a custom `VideoMetadata` struct. Define `VideoMetadata` to hold `duration`, `width`, `height`, and `avg_frame_rate`, making it `#[derive(Debug, serde::Serialize, serde::Deserialize)]`. 3. Implement robust error handling for JSON parsing failures or `ffprobe` execution errors. 4. Return the `VideoMetadata` struct on success or an appropriate error message.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integrate the `extract_metadata` command into the Tauri application and call it from a simple frontend component. Provide a known video file path. Verify that the frontend receives a structured object containing correct `duration`, `width`, `height`, and `avg_frame_rate` values by comparing against manually verified metadata for the test file. Test with various video formats (MP4, MOV) and edge cases like corrupted files to ensure graceful error handling."
           }
         ]
@@ -390,7 +390,7 @@
     ],
     "metadata": {
       "created": "2025-10-27T20:39:15.987Z",
-      "updated": "2025-10-27T21:27:47.744Z",
+      "updated": "2025-10-27T22:02:46.134Z",
       "description": "Tasks for master context"
     }
   }

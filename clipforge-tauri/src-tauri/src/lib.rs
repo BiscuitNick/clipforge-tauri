@@ -15,7 +15,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            commands::video_import::import_video
+            commands::video_import::import_video,
+            commands::metadata::extract_metadata
         ])
         .setup(|app| {
             // Create the menu

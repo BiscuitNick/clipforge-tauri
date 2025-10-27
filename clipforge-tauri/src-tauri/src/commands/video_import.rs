@@ -1,11 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VideoMetadata {
-    pub path: String,
-    pub filename: String,
-    pub size: u64,
-}
+use super::metadata::{extract_metadata, VideoMetadata};
 
 #[tauri::command]
 pub async fn import_video(paths: Vec<String>) -> Result<Vec<VideoMetadata>, String> {
@@ -16,27 +9,24 @@ pub async fn import_video(paths: Vec<String>) -> Result<Vec<VideoMetadata>, Stri
     for path in paths {
         println!("Processing file: {}", path);
 
-        // Extract filename from path
-        let filename = std::path::Path::new(&path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        // Get file size
-        let size = match std::fs::metadata(&path) {
-            Ok(metadata) => metadata.len(),
-            Err(e) => {
-                eprintln!("Failed to get file metadata for {}: {}", path, e);
-                0
+        // Extract metadata using ffprobe
+        match extract_metadata(path.clone()).await {
+            Ok(metadata) => {
+                println!(
+                    "Extracted metadata: {}s duration, {}x{}, {}fps",
+                    metadata.duration, metadata.width, metadata.height, metadata.frame_rate
+                );
+                metadata_list.push(metadata);
             }
-        };
+            Err(e) => {
+                eprintln!("Failed to extract metadata for {}: {}", path, e);
+                // Continue with next file rather than failing completely
+            }
+        }
+    }
 
-        metadata_list.push(VideoMetadata {
-            path: path.clone(),
-            filename,
-            size,
-        });
+    if metadata_list.is_empty() {
+        return Err("Failed to import any videos".to_string());
     }
 
     println!("Successfully imported {} files", metadata_list.len());
