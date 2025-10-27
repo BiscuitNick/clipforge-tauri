@@ -30,6 +30,11 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     if (isPlaying) {
       video.pause();
     } else {
+      // Before playing, ensure we're within the trimmed range
+      if (video.currentTime < effectiveTrimStart || video.currentTime >= effectiveTrimEnd) {
+        video.currentTime = effectiveTrimStart;
+        setCurrentTime(effectiveTrimStart);
+      }
       video.play();
     }
     setIsPlaying(!isPlaying);
@@ -43,6 +48,14 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     if (!video) return;
 
     const time = video.currentTime;
+
+    // If playing before trim start, jump to trim start
+    if (time < effectiveTrimStart) {
+      video.currentTime = effectiveTrimStart;
+      setCurrentTime(effectiveTrimStart);
+      onTimeUpdate?.(effectiveTrimStart);
+      return;
+    }
 
     // Stop playback if we've reached the trim end point
     if (effectiveTrimEnd && time >= effectiveTrimEnd) {
@@ -119,21 +132,24 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     const video = videoRef.current;
     if (!video || playheadPosition === undefined || playheadPosition === null) return;
 
+    // Clamp playhead position to trim range
+    const clampedPosition = Math.max(effectiveTrimStart, Math.min(playheadPosition, effectiveTrimEnd));
+
     // Check if the difference is significant enough to warrant a seek
-    const timeDiff = Math.abs(video.currentTime - playheadPosition);
+    const timeDiff = Math.abs(video.currentTime - clampedPosition);
 
     // Only seek if difference is > 0.5 seconds (avoids feedback loops)
     if (timeDiff > 0.5) {
       setIsExternalSeek(true);
-      video.currentTime = playheadPosition;
-      setCurrentTime(playheadPosition);
+      video.currentTime = clampedPosition;
+      setCurrentTime(clampedPosition);
 
       // Reset external seek flag after a brief delay
       setTimeout(() => {
         setIsExternalSeek(false);
       }, 100);
     }
-  }, [playheadPosition]);
+  }, [playheadPosition, effectiveTrimStart, effectiveTrimEnd]);
 
   // Reset when video source or trim points change
   useEffect(() => {
@@ -158,7 +174,7 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
 
   // Calculate progress percentage within trimmed range
   const trimmedDuration = effectiveTrimEnd - effectiveTrimStart;
-  const trimmedCurrentTime = currentTime - effectiveTrimStart;
+  const trimmedCurrentTime = Math.max(0, currentTime - effectiveTrimStart);
   const progressPercentage = trimmedDuration ? (trimmedCurrentTime / trimmedDuration) * 100 : 0;
 
   return (
