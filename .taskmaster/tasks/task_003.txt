@@ -1,0 +1,11 @@
+# Task ID: 3
+# Title: Implement Video Import via File Picker
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Allow users to import video files using a native macOS file picker triggered by an 'Import Video' button.
+# Details:
+Add an 'Import Video' button in the main UI, linked to Tauri’s `open` dialog API. Configure the file picker to filter for MP4 and MOV files and support multiple selections. On selection, invoke the same `import_video` Rust command as drag-and-drop to process files and return metadata to the frontend for display in the media library.
+
+# Test Strategy:
+Click 'Import Video' button and confirm native file picker opens with MP4/MOV filter. Select multiple files and verify all are imported correctly. Test rejection of unsupported formats. Ensure import time is <2s per file for typical sizes (100MB).

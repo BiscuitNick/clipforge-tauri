@@ -1,0 +1,11 @@
+# Task ID: 4
+# Title: Develop Timeline UI with Canvas Rendering
+# Status: pending
+# Dependencies: 2, 3
+# Priority: medium
+# Description: Create a timeline view to display imported video clips as visual blocks using HTML5 Canvas.
+# Details:
+Implement a `Timeline` React component using HTML5 Canvas for performance. Render clips as rectangles (min height 80px) with optional thumbnails (first frame or default icon). Display clip duration, position, and a playhead indicator. Add a time ruler with timestamps and grid lines. Enable horizontal scrolling for long sequences and default zoom to fit all clips. Use React hooks (`useTimeline.ts`) to manage state and canvas rendering loop for updates.
+
+# Test Strategy:
+Verify clips appear on timeline post-import as visual blocks with correct duration/position. Check playhead visibility and movement. Test horizontal scrolling with multiple/long clips. Confirm timeline renders at 60fps using browser dev tools during interactions.

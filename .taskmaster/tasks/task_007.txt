@@ -1,0 +1,11 @@
+# Task ID: 7
+# Title: Integrate FFmpeg for Video Processing
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Set up FFmpeg integration in the Tauri backend for video metadata extraction and processing.
+# Details:
+Bundle FFmpeg binary in `src-tauri/resources/ffmpeg` and configure Tauri to include it in the build (`tauri.conf.json`). Create Rust commands in `src-tauri/src/commands/` for metadata extraction (`metadata.rs`) using shell commands to FFmpeg. Handle duration, resolution, and frame rate extraction for imported clips. Use `std::process::Command` for execution and parse FFmpeg output. Fallback to `ffmpeg-sys-next` crate if binary approach fails.
+
+# Test Strategy:
+Import a video and verify metadata (duration, resolution, frame rate) is extracted correctly by cross-checking with known values (e.g., QuickTime info). Test with various MP4/MOV files for compatibility. Ensure extraction completes in <2s per file.

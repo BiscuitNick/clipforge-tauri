@@ -1,0 +1,11 @@
+# Task ID: 1
+# Title: Set Up Tauri Desktop Application
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Configure and launch ClipForge as a native macOS desktop application using Tauri 2.x.
+# Details:
+Ensure Tauri project is initialized with `npm create tauri-app`. Update `tauri.conf.json` with app metadata (name, version, icon paths) and macOS-specific settings like minimum system version (10.15). Set window dimensions to at least 1280x720. Configure menu bar with File, Edit, and View menus. Use `tauri build` to create an .app bundle, and test launching from the bundle (not dev mode). Implement code signing with a development certificate for macOS compatibility.
+
+# Test Strategy:
+Verify app launches successfully from .app bundle on macOS (Intel & Apple Silicon). Check window dimensions meet minimum requirements. Confirm menu bar displays correctly with expected options. Test launch time is under 5 seconds using Activity Monitor or manual timing.

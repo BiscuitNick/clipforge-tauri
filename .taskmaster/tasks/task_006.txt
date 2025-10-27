@@ -1,0 +1,11 @@
+# Task ID: 6
+# Title: Implement Basic Trim Functionality
+# Status: pending
+# Dependencies: 4, 5
+# Priority: medium
+# Description: Enable users to trim video clips by setting in and out points using draggable handles on the timeline.
+# Details:
+Add trim handles to the `Timeline` component, visible when a clip is selected. Implement drag logic in `TrimControls.tsx` to update `inPoint` and `outPoint` in clip state (non-destructive edit). Visually distinguish trimmed vs. untrimmed regions on canvas (e.g., color/pattern). Update preview to reflect trimmed segment only. Display numeric IN/OUT timecodes and provide a reset option to original length.
+
+# Test Strategy:
+Select a clip and verify trim handles appear. Drag left handle to set IN point and right for OUT point; confirm preview updates to trimmed segment. Check timeline visually reflects trim. Play trimmed clip to ensure correct start/end. Test reset functionality to original duration.

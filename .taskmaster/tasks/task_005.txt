@@ -1,0 +1,11 @@
+# Task ID: 5
+# Title: Integrate Video Preview Player
+# Status: pending
+# Dependencies: 4
+# Priority: high
+# Description: Add a video preview player to display and play selected clips from the timeline.
+# Details:
+Create a `PreviewPlayer` React component using the HTML5 `<video>` element as recommended for MVP. Use Tauri’s `convertFileSrc()` to generate a playable URL from the file path. Implement play/pause controls and ensure video maintains aspect ratio with synchronized audio. Load the clip into preview on timeline click. Sync playhead position with video `currentTime` for accurate playback feedback.
+
+# Test Strategy:
+Select a clip on timeline and confirm it loads in preview. Test play/pause functionality and verify audio sync with video. Check aspect ratio preservation (no stretching). Ensure playback achieves minimum 30fps for 1080p content using browser performance tools.

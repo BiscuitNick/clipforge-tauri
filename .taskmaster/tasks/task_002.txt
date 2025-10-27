@@ -1,0 +1,11 @@
+# Task ID: 2
+# Title: Implement Video Import via Drag & Drop
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Enable users to import video files (MP4/MOV) by dragging them from Finder into the app.
+# Details:
+Create an `ImportPanel` React component with a drag-and-drop zone using HTML5 drag events. Provide visual feedback (highlight drop zone) during drag. Validate file types to accept only MP4 and MOV formats, rejecting others with an error message. Display import progress or confirmation post-import. Use Tauri’s filesystem APIs to handle file paths and invoke a Rust command `import_video(path: String)` to process files and extract metadata.
+
+# Test Strategy:
+Test dragging MP4 and MOV files from Finder into the app; confirm visual feedback appears. Verify successful import with confirmation message and reject unsupported formats (e.g., .avi) with error. Check import works for single and multiple files, and test with large files (>500MB) for performance (<2s per file).
