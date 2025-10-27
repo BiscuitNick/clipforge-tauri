@@ -43,6 +43,7 @@ function App() {
           playheadPosition={timeline.playheadPosition}
           trimStart={selectedClip?.trimStart}
           trimEnd={selectedClip?.trimEnd}
+          clipStartTime={selectedClip?.startTime}
         />
       </div>
 

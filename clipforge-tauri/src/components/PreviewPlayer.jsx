@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import "./PreviewPlayer.css";
 
-function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0, trimEnd }) {
+function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0, trimEnd, clipStartTime = 0 }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -13,6 +13,12 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
   // Get effective trim points
   const effectiveTrimStart = trimStart || 0;
   const effectiveTrimEnd = trimEnd || duration;
+
+  // Convert video time to timeline position
+  const videoTimeToTimelinePosition = useCallback((videoTime) => {
+    // Timeline position = clip start time + (video time - trim start)
+    return clipStartTime + (videoTime - effectiveTrimStart);
+  }, [clipStartTime, effectiveTrimStart]);
 
   // Debug: Log the videoSrc prop
   useEffect(() => {
@@ -53,7 +59,7 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     if (time < effectiveTrimStart) {
       video.currentTime = effectiveTrimStart;
       setCurrentTime(effectiveTrimStart);
-      onTimeUpdate?.(effectiveTrimStart);
+      onTimeUpdate?.(videoTimeToTimelinePosition(effectiveTrimStart));
       return;
     }
 
@@ -63,12 +69,12 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
       video.currentTime = effectiveTrimEnd;
       setIsPlaying(false);
       setCurrentTime(effectiveTrimEnd);
-      onTimeUpdate?.(effectiveTrimEnd);
+      onTimeUpdate?.(videoTimeToTimelinePosition(effectiveTrimEnd));
       return;
     }
 
     setCurrentTime(time);
-    onTimeUpdate?.(time);
+    onTimeUpdate?.(videoTimeToTimelinePosition(time));
   };
 
   // Handle video metadata loaded
@@ -81,6 +87,8 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     const startTime = effectiveTrimStart || 0;
     video.currentTime = startTime;
     setCurrentTime(startTime);
+    // Notify parent of initial position (in timeline coordinates)
+    onTimeUpdate?.(videoTimeToTimelinePosition(startTime));
   };
 
   // Handle volume change
@@ -132,24 +140,28 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
     const video = videoRef.current;
     if (!video || playheadPosition === undefined || playheadPosition === null) return;
 
-    // Clamp playhead position to trim range
-    const clampedPosition = Math.max(effectiveTrimStart, Math.min(playheadPosition, effectiveTrimEnd));
+    // Convert timeline position to video time
+    // video_time = trimStart + (timeline_position - clipStartTime)
+    const videoTime = effectiveTrimStart + (playheadPosition - clipStartTime);
+
+    // Clamp video time to trim range
+    const clampedVideoTime = Math.max(effectiveTrimStart, Math.min(videoTime, effectiveTrimEnd));
 
     // Check if the difference is significant enough to warrant a seek
-    const timeDiff = Math.abs(video.currentTime - clampedPosition);
+    const timeDiff = Math.abs(video.currentTime - clampedVideoTime);
 
     // Only seek if difference is > 0.5 seconds (avoids feedback loops)
     if (timeDiff > 0.5) {
       setIsExternalSeek(true);
-      video.currentTime = clampedPosition;
-      setCurrentTime(clampedPosition);
+      video.currentTime = clampedVideoTime;
+      setCurrentTime(clampedVideoTime);
 
       // Reset external seek flag after a brief delay
       setTimeout(() => {
         setIsExternalSeek(false);
       }, 100);
     }
-  }, [playheadPosition, effectiveTrimStart, effectiveTrimEnd]);
+  }, [playheadPosition, effectiveTrimStart, effectiveTrimEnd, clipStartTime]);
 
   // Reset when video source or trim points change
   useEffect(() => {
@@ -161,8 +173,11 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
       const startTime = effectiveTrimStart || 0;
       video.currentTime = startTime;
       setCurrentTime(startTime);
+      // Notify parent of new position (in timeline coordinates)
+      onTimeUpdate?.(videoTimeToTimelinePosition(startTime));
     }
-  }, [videoSrc, trimStart, trimEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSrc, trimStart, trimEnd, effectiveTrimStart, videoTimeToTimelinePosition]);
 
   // Format time as MM:SS
   const formatTime = (time) => {

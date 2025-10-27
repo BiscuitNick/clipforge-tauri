@@ -23,7 +23,12 @@ export function useTimeline() {
       height: video.height,
       frameRate: video.frame_rate,
       startTime: clips.length > 0
-        ? Math.max(...clips.map(c => c.startTime + c.duration))
+        ? Math.max(...clips.map(c => {
+            const trimStart = c.trimStart || 0;
+            const trimEnd = c.trimEnd || c.duration;
+            const trimmedDuration = trimEnd - trimStart;
+            return c.startTime + trimmedDuration;
+          }))
         : 0,
       trimStart: 0,
       trimEnd: video.duration,
