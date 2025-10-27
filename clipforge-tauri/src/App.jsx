@@ -1,6 +1,9 @@
 import "./App.css";
+import { useMemo } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import ImportPanel from "./components/ImportPanel";
 import Timeline from "./components/Timeline";
+import PreviewPlayer from "./components/PreviewPlayer";
 import { useTimeline } from "./hooks/useTimeline";
 
 function App() {
@@ -11,11 +14,35 @@ function App() {
     timeline.addClips(videoMetadata);
   };
 
+  // Get the selected clip data
+  const selectedClip = useMemo(() => {
+    if (!timeline.selectedClipId) return null;
+    return timeline.clips.find(clip => clip.id === timeline.selectedClipId);
+  }, [timeline.selectedClipId, timeline.clips]);
+
+  // Convert file path to Tauri asset URL
+  const videoSrc = useMemo(() => {
+    if (!selectedClip?.videoPath) return null;
+    const assetUrl = convertFileSrc(selectedClip.videoPath);
+    console.log("Video path:", selectedClip.videoPath);
+    console.log("Asset URL:", assetUrl);
+    return assetUrl;
+  }, [selectedClip]);
+
   return (
     <main className="container">
       <h1>ClipForge</h1>
       <p className="subtitle">Video Editing Made Simple</p>
       <ImportPanel onImport={handleImport} />
+
+      <div className="preview-section">
+        <h2>Preview</h2>
+        <PreviewPlayer
+          videoSrc={videoSrc}
+          onTimeUpdate={timeline.setPlayheadPosition}
+          playheadPosition={timeline.playheadPosition}
+        />
+      </div>
 
       <div className="timeline-section">
         <h2>Timeline</h2>

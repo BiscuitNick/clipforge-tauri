@@ -123,6 +123,22 @@ button {
   }
 }
 
+.preview-section {
+  margin-top: 3rem;
+  width: 100%;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
+}
+
+.preview-section h2 {
+  text-align: left;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: #f6f6f6;
+}
+
 .timeline-section {
   margin-top: 3rem;
   width: 100%;
