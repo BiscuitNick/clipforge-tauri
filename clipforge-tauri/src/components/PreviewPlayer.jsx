@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import "./PreviewPlayer.css";
 
-function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
+function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0, trimEnd }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -9,6 +9,10 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
   const [volume, setVolume] = useState(1);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isExternalSeek, setIsExternalSeek] = useState(false);
+
+  // Get effective trim points
+  const effectiveTrimStart = trimStart || 0;
+  const effectiveTrimEnd = trimEnd || duration;
 
   // Debug: Log the videoSrc prop
   useEffect(() => {
@@ -39,6 +43,17 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
     if (!video) return;
 
     const time = video.currentTime;
+
+    // Stop playback if we've reached the trim end point
+    if (effectiveTrimEnd && time >= effectiveTrimEnd) {
+      video.pause();
+      video.currentTime = effectiveTrimEnd;
+      setIsPlaying(false);
+      setCurrentTime(effectiveTrimEnd);
+      onTimeUpdate?.(effectiveTrimEnd);
+      return;
+    }
+
     setCurrentTime(time);
     onTimeUpdate?.(time);
   };
@@ -49,7 +64,10 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
     if (!video) return;
 
     setDuration(video.duration);
-    setCurrentTime(0);
+    // Start at trim start point
+    const startTime = effectiveTrimStart || 0;
+    video.currentTime = startTime;
+    setCurrentTime(startTime);
   };
 
   // Handle volume change
@@ -70,8 +88,11 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const percentage = x / rect.width;
-    const newTime = percentage * duration;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+
+    // Map percentage to trimmed range
+    const trimmedDuration = effectiveTrimEnd - effectiveTrimStart;
+    const newTime = effectiveTrimStart + (percentage * trimmedDuration);
 
     setCurrentTime(newTime);
     video.currentTime = newTime;
@@ -114,16 +135,18 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
     }
   }, [playheadPosition]);
 
-  // Reset when video source changes
+  // Reset when video source or trim points change
   useEffect(() => {
     setIsPlaying(false);
-    setCurrentTime(0);
 
     const video = videoRef.current;
     if (video) {
       video.pause();
+      const startTime = effectiveTrimStart || 0;
+      video.currentTime = startTime;
+      setCurrentTime(startTime);
     }
-  }, [videoSrc]);
+  }, [videoSrc, trimStart, trimEnd]);
 
   // Format time as MM:SS
   const formatTime = (time) => {
@@ -133,8 +156,10 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress percentage
-  const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
+  // Calculate progress percentage within trimmed range
+  const trimmedDuration = effectiveTrimEnd - effectiveTrimStart;
+  const trimmedCurrentTime = currentTime - effectiveTrimStart;
+  const progressPercentage = trimmedDuration ? (trimmedCurrentTime / trimmedDuration) * 100 : 0;
 
   return (
     <div className="preview-player">
@@ -165,7 +190,7 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition }) {
         </button>
 
         <span className="time-display">
-          {formatTime(currentTime)} / {formatTime(duration)}
+          {formatTime(trimmedCurrentTime)} / {formatTime(trimmedDuration)}
         </span>
 
         <div

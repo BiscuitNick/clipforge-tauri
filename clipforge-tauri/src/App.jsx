@@ -41,6 +41,8 @@ function App() {
           videoSrc={videoSrc}
           onTimeUpdate={timeline.setPlayheadPosition}
           playheadPosition={timeline.playheadPosition}
+          trimStart={selectedClip?.trimStart}
+          trimEnd={selectedClip?.trimEnd}
         />
       </div>
 
@@ -56,6 +58,7 @@ function App() {
           onPlayheadMove={timeline.setPlayheadPosition}
           onZoom={timeline.zoom}
           onPan={timeline.pan}
+          onTrimUpdate={timeline.updateClipTrim}
         />
       </div>
     </main>

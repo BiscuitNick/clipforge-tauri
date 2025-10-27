@@ -50,6 +50,23 @@ export function useTimeline() {
     ));
   }, []);
 
+  // Update clip trim points
+  const updateClipTrim = useCallback((clipId, trimStart, trimEnd) => {
+    setClips(prev => prev.map(clip => {
+      if (clip.id !== clipId) return clip;
+
+      // Ensure trim points are within valid range
+      const validTrimStart = Math.max(0, Math.min(trimStart, clip.duration));
+      const validTrimEnd = Math.max(validTrimStart, Math.min(trimEnd, clip.duration));
+
+      return {
+        ...clip,
+        trimStart: validTrimStart,
+        trimEnd: validTrimEnd,
+      };
+    }));
+  }, []);
+
   // Handle zoom
   const zoom = useCallback((delta, mouseX) => {
     setZoomLevel(prev => {
@@ -105,6 +122,7 @@ export function useTimeline() {
     addClips,
     removeClip,
     updateClipPosition,
+    updateClipTrim,
     zoom,
     pan,
 

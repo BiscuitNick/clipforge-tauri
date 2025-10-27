@@ -4,13 +4,15 @@ import "./Timeline.css";
 const RULER_HEIGHT = 30;
 const TRACK_HEIGHT = 60;
 const TRACK_PADDING = 10;
+const TRIM_HANDLE_WIDTH = 8;
 
-function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan }) {
+function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
+  const [draggingTrimHandle, setDraggingTrimHandle] = useState(null); // { clipId, handle: 'start' | 'end' }
 
   // Calculate timeline width based on clips
   const getTotalDuration = () => {
@@ -112,15 +114,73 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
     if (startX + clipWidth < 0 || startX > canvasWidth) return;
 
     const isSelected = clip.id === selectedClipId;
+    const trimStart = clip.trimStart || 0;
+    const trimEnd = clip.trimEnd || clip.duration;
 
-    // Draw clip background
+    // Calculate trim positions
+    const trimStartX = startX + (trimStart * zoomLevel);
+    const trimEndX = startX + (trimEnd * zoomLevel);
+    const trimmedWidth = (trimEnd - trimStart) * zoomLevel;
+
+    // Draw trimmed-out regions (darker/grayed out)
+    if (trimStart > 0) {
+      ctx.fillStyle = isSelected ? "#2a3f57" : "#1a2f3d";
+      ctx.fillRect(startX, y, trimStart * zoomLevel, clipHeight);
+    }
+    if (trimEnd < clip.duration) {
+      const untrimmedStartX = startX + (trimEnd * zoomLevel);
+      const untrimmedWidth = (clip.duration - trimEnd) * zoomLevel;
+      ctx.fillStyle = isSelected ? "#2a3f57" : "#1a2f3d";
+      ctx.fillRect(untrimmedStartX, y, untrimmedWidth, clipHeight);
+    }
+
+    // Draw active (trimmed) region
     ctx.fillStyle = isSelected ? "#4a7ba7" : "#3a5f7d";
-    ctx.fillRect(startX, y, clipWidth, clipHeight);
+    ctx.fillRect(trimStartX, y, trimmedWidth, clipHeight);
 
     // Draw clip border
     ctx.strokeStyle = isSelected ? "#6a9bc7" : "#4a6f8d";
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.strokeRect(startX, y, clipWidth, clipHeight);
+
+    // Draw trim handles for selected clip
+    if (isSelected) {
+      // Left trim handle
+      ctx.fillStyle = "#ffcc00";
+      ctx.fillRect(trimStartX, y, TRIM_HANDLE_WIDTH, clipHeight);
+      ctx.strokeStyle = "#ffaa00";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(trimStartX, y, TRIM_HANDLE_WIDTH, clipHeight);
+
+      // Right trim handle
+      ctx.fillStyle = "#ffcc00";
+      ctx.fillRect(trimEndX - TRIM_HANDLE_WIDTH, y, TRIM_HANDLE_WIDTH, clipHeight);
+      ctx.strokeStyle = "#ffaa00";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(trimEndX - TRIM_HANDLE_WIDTH, y, TRIM_HANDLE_WIDTH, clipHeight);
+
+      // Draw vertical lines on handles for grip
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      const gripY1 = y + clipHeight / 3;
+      const gripY2 = y + (clipHeight * 2) / 3;
+
+      // Left handle grips
+      ctx.beginPath();
+      ctx.moveTo(trimStartX + 3, gripY1);
+      ctx.lineTo(trimStartX + 3, gripY2);
+      ctx.moveTo(trimStartX + 5, gripY1);
+      ctx.lineTo(trimStartX + 5, gripY2);
+      ctx.stroke();
+
+      // Right handle grips
+      ctx.beginPath();
+      ctx.moveTo(trimEndX - 3, gripY1);
+      ctx.lineTo(trimEndX - 3, gripY2);
+      ctx.moveTo(trimEndX - 5, gripY1);
+      ctx.lineTo(trimEndX - 5, gripY2);
+      ctx.stroke();
+    }
 
     // Draw clip label
     ctx.fillStyle = "#fff";
@@ -130,11 +190,12 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
     // Clip text to clip bounds
     ctx.save();
     ctx.beginPath();
-    ctx.rect(startX + 5, y, clipWidth - 10, clipHeight);
+    ctx.rect(trimStartX + TRIM_HANDLE_WIDTH + 2, y, trimmedWidth - TRIM_HANDLE_WIDTH * 2 - 4, clipHeight);
     ctx.clip();
 
-    ctx.fillText(clip.filename, startX + 8, y + 18);
-    ctx.fillText(`${clip.duration.toFixed(2)}s`, startX + 8, y + 33);
+    ctx.fillText(clip.filename, trimStartX + TRIM_HANDLE_WIDTH + 5, y + 18);
+    const trimDuration = trimEnd - trimStart;
+    ctx.fillText(`${trimDuration.toFixed(2)}s`, trimStartX + TRIM_HANDLE_WIDTH + 5, y + 33);
 
     ctx.restore();
   };
@@ -176,6 +237,30 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
       return;
     }
 
+    // Check if clicking on trim handles (only for selected clip)
+    if (selectedClipId && y > RULER_HEIGHT && y < RULER_HEIGHT + TRACK_HEIGHT) {
+      const selectedClip = clips?.find(c => c.id === selectedClipId);
+      if (selectedClip) {
+        const startX = timeToPixel(selectedClip.startTime);
+        const trimStart = selectedClip.trimStart || 0;
+        const trimEnd = selectedClip.trimEnd || selectedClip.duration;
+        const trimStartX = startX + (trimStart * zoomLevel);
+        const trimEndX = startX + (trimEnd * zoomLevel);
+
+        // Check left trim handle
+        if (x >= trimStartX && x <= trimStartX + TRIM_HANDLE_WIDTH) {
+          setDraggingTrimHandle({ clipId: selectedClipId, handle: 'start' });
+          return;
+        }
+
+        // Check right trim handle
+        if (x >= trimEndX - TRIM_HANDLE_WIDTH && x <= trimEndX) {
+          setDraggingTrimHandle({ clipId: selectedClipId, handle: 'end' });
+          return;
+        }
+      }
+    }
+
     // Check if clicking on a clip
     if (y > RULER_HEIGHT && y < RULER_HEIGHT + TRACK_HEIGHT) {
       const clickTime = pixelToTime(x);
@@ -205,6 +290,24 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
     if (isDraggingPlayhead) {
       const newTime = Math.max(0, pixelToTime(x));
       onPlayheadMove?.(newTime);
+    } else if (draggingTrimHandle) {
+      // Handle trim handle dragging
+      const clip = clips?.find(c => c.id === draggingTrimHandle.clipId);
+      if (clip) {
+        const clipStartX = timeToPixel(clip.startTime);
+        const relativeX = x - clipStartX;
+        const newTrimTime = relativeX / zoomLevel;
+
+        if (draggingTrimHandle.handle === 'start') {
+          // Dragging left trim handle
+          const newTrimStart = Math.max(0, Math.min(newTrimTime, clip.trimEnd || clip.duration));
+          onTrimUpdate?.(clip.id, newTrimStart, clip.trimEnd || clip.duration);
+        } else if (draggingTrimHandle.handle === 'end') {
+          // Dragging right trim handle
+          const newTrimEnd = Math.max(clip.trimStart || 0, Math.min(newTrimTime, clip.duration));
+          onTrimUpdate?.(clip.id, clip.trimStart || 0, newTrimEnd);
+        }
+      }
     } else if (isPanning) {
       const deltaX = lastMouseX - x;
       onPan?.(deltaX);
@@ -215,6 +318,7 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
   const handleMouseUp = () => {
     setIsDraggingPlayhead(false);
     setIsPanning(false);
+    setDraggingTrimHandle(null);
   };
 
   const handleWheel = (e) => {
