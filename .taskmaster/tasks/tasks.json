@@ -5,7 +5,7 @@
         "id": 1,
         "title": "Set Up Tauri Desktop Application",
         "description": "Configure and launch ClipForge as a native macOS desktop application using Tauri 2.x.",
-        "status": "pending",
+        "status": "review",
         "dependencies": [],
         "priority": "high",
         "details": "Ensure Tauri project is initialized with `npm create tauri-app`. Update `tauri.conf.json` with app metadata (name, version, icon paths) and macOS-specific settings like minimum system version (10.15). Set window dimensions to at least 1280x720. Configure menu bar with File, Edit, and View menus. Use `tauri build` to create an .app bundle, and test launching from the bundle (not dev mode). Implement code signing with a development certificate for macOS compatibility.",
@@ -17,7 +17,7 @@
             "description": "Set up the basic project structure for the ClipForge desktop application using the official Tauri CLI tool.",
             "dependencies": [],
             "details": "Run `npm create tauri-app@latest` and follow the prompts to create a new project. Select the appropriate frontend framework (React) and Rust as the backend language. Ensure all initial dependencies are installed correctly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify the project directory is created with `src`, `src-tauri`, `package.json`, and `Cargo.toml`. Run `npm run tauri dev` to confirm the default application window opens without errors."
           },
           {
@@ -28,7 +28,7 @@
               1
             ],
             "details": "Edit `src-tauri/tauri.conf.json`. Set the `productName` to \"ClipForge\", update version number, and provide paths for app icons. Configure the main window to have a minimum dimension of 1280x720. Set the `macOS.minimumSystemVersion` to \"10.15\".",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `npm run tauri dev`. Check if the application window title is 'ClipForge' and if its initial size is at least 1280x720. Verify the application icon appears correctly in the dock (if configured)."
           },
           {
@@ -38,8 +38,8 @@
             "dependencies": [
               1
             ],
-            "details": "In `src-tauri/src/main.rs`, use the `tauri::Menu` builder to construct the menu structure. Create submenus for File, Edit, and View with standard items like 'Quit', 'Copy', 'Paste', etc. Attach the created menu to the application builder.",
-            "status": "pending",
+            "details": "In `src-tauri/src/main.rs`, use the `tauri::Menu` builder to construct the menu structure. Create submenus for File, Edit, and View with standard items like 'Quit', 'Copy', 'Paste', etc. Attach the created menu to the application builder.\n<info added on 2025-10-27T21:19:11.456Z>\n```json\n\"Successfully implemented the native macOS menu bar in `src-tauri/src/lib.rs` (lines 1-75). The menu includes 'File' (New, Open, Save), 'Edit' (Cut, Copy, Paste), and 'View' (zoom controls) with standard items. A minor unused import warning was also resolved. The application compiles and runs successfully in dev mode.\"\n```\n</info added on 2025-10-27T21:19:11.456Z>",
+            "status": "done",
             "testStrategy": "Launch the application in development mode (`npm run tauri dev`) on macOS. Verify that the custom 'File', 'Edit', and 'View' menus appear in the top menu bar instead of the default Tauri menu. Check that basic actions like 'Quit' work."
           },
           {
@@ -60,7 +60,7 @@
         "id": 2,
         "title": "Implement Video Import via Drag & Drop",
         "description": "Enable users to import video files (MP4/MOV) by dragging them from Finder into the app.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           1
         ],
@@ -74,7 +74,7 @@
             "description": "Develop the `ImportPanel` React component, including a designated drag-and-drop zone. Implement HTML5 drag events (`dragenter`, `dragleave`, `dragover`, `drop`) to detect files being dragged and dropped. Provide clear visual feedback to the user, such as highlighting the drop zone when files are dragged over it.",
             "dependencies": [],
             "details": "Use React hooks for state management of drag/drop events. Style the drop zone to clearly indicate its purpose. Implement CSS for visual feedback, e.g., adding a border or changing background color on `dragenter`/`dragover` and removing it on `dragleave`/`drop`. Ensure `preventDefault()` is called for `dragover` and `drop` events to prevent default browser behavior.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test by dragging various files (supported and unsupported) over the component to verify visual feedback (e.g., highlight appears/disappears). Confirm that dropping files does not trigger default browser navigation or file opening."
           },
           {
@@ -83,7 +83,7 @@
             "description": "Implement the `import_video` command in the Rust backend of the Tauri application. This command will be responsible for receiving an array of file paths (strings) from the frontend for subsequent video processing.",
             "dependencies": [],
             "details": "Create a new Rust module (e.g., `src-tauri/src/commands/video_import.rs`) and define a public `#[tauri::command]` function named `import_video`. This function should accept a `Vec<String>` argument representing the file paths. Initially, it can just log the received paths and return a success `Result` or a dummy value.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Use `tauri::Invoke` from the Rust side or a simple frontend call (e.g., via `window.__TAURI__.invoke`) to test if the command can be called successfully. Pass various arrays of dummy file paths and verify that the Rust backend correctly receives and logs them."
           },
           {
@@ -94,8 +94,8 @@
               1,
               2
             ],
-            "details": "On the `drop` event, access `event.dataTransfer.files`. Iterate through the files, checking their `type` property or file extension (`.mp4`, `.mov`). For valid files, extract their paths. Use `window.__TAURI__.invoke('import_video', { paths: [...] })` to call the backend command. Update the UI to show 'Importing...', 'Import successful!', or 'Error: Unsupported file type.' messages.",
-            "status": "pending",
+            "details": "On the `drop` event, access `event.dataTransfer.files`. Iterate through the files, checking their `type` property or file extension (`.mp4`, `.mov`). For valid files, extract their paths. Use `window.__TAURI__.invoke('import_video', { paths: [...] })` to call the backend command. Update the UI to show 'Importing...', 'Import successful!', or 'Error: Unsupported file type.' messages.\n<info added on 2025-10-27T21:23:55.567Z>\n{\n  \"content\": \"File validation for MP4/MOV extensions has been successfully implemented. The frontend invokes the `import_video` Rust command, located at `clipforge-tauri/src-tauri/src/commands/video_import.rs`, with the extracted file paths. The backend returns `VideoMetadata` objects containing the path, filename, and size. UI states for loading, success, and errors are now in place with appropriate styling.\"\n}\n</info added on 2025-10-27T21:23:55.567Z>",
+            "status": "done",
             "testStrategy": "Drag and drop MP4 and MOV files from Finder; verify they are processed, and the `import_video` command is invoked. Drag and drop unsupported files (e.g., .txt, .avi); verify an appropriate error message is displayed. Test with multiple valid files dropped simultaneously and ensure all are handled. Test with large files to observe initial UI state changes."
           }
         ]
@@ -104,7 +104,7 @@
         "id": 3,
         "title": "Implement Video Import via File Picker",
         "description": "Allow users to import video files using a native macOS file picker triggered by an 'Import Video' button.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           1
         ],
@@ -118,7 +118,7 @@
             "description": "Develop a React component for the 'Import Video' button and integrate it into the main application UI, ensuring it's visible and clickable.",
             "dependencies": [],
             "details": "Implement a new React button component (e.g., <ImportVideoButton>) or integrate a standard button into an existing UI panel. Place it logically, perhaps near other import/add actions. Ensure basic styling and accessibility for the button.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Visually confirm the 'Import Video' button appears in the main UI. Check that it is clickable (even if no action yet) and not disabled."
           },
           {
@@ -129,7 +129,7 @@
               1
             ],
             "details": "Modify the <ImportVideoButton> component or the parent component containing it to include an `onClick` prop. Inside the handler function, add a `console.log(\"Import Video button clicked\")` statement to confirm interaction.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Click the 'Import Video' button and verify that the console log message 'Import Video button clicked' appears in the browser's developer console."
           },
           {
@@ -140,7 +140,7 @@
               2
             ],
             "details": "Import the `dialog` module from `@tauri-apps/api`. Within the `onClick` handler, call `dialog.open()` and await its result. Log the result (selected file paths or null) to the console to confirm basic file picker interaction.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Click the 'Import Video' button and confirm that the native macOS file picker dialog appears. Select any file and verify its path (or null if canceled) is logged to the console."
           },
           {
@@ -151,7 +151,7 @@
               3
             ],
             "details": "Pass an options object to `dialog.open()` including `multiple: true` and `filters: [{ name: 'Video', extensions: ['mp4', 'mov'] }]`. Ensure the dialog title is descriptive, e.g., 'Select Video Files to Import'.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Click the button, verify the file picker dialog's title and that only MP4/MOV files are selectable (or prominently displayed). Test selecting multiple files (e.g., using Cmd/Ctrl+click) and confirm the `dialog.open` result returns an array of paths."
           },
           {
@@ -161,8 +161,8 @@
             "dependencies": [
               4
             ],
-            "details": "Import `invoke` from `@tauri-apps/api/core`. Iterate over the array of selected file paths (if not null or empty) and call `invoke('import_video', { path: singleFilePath })` for each. Handle success and error responses, updating the media library display accordingly.",
-            "status": "pending",
+            "details": "Import `invoke` from `@tauri-apps/api/core`. Iterate over the array of selected file paths (if not null or empty) and call `invoke('import_video', { path: singleFilePath })` for each. Handle success and error responses, updating the media library display accordingly.\n<info added on 2025-10-27T21:29:09.529Z>\n{\n  \"update_text\": \"An 'Import Video' button was added to ImportPanel.jsx, using the @tauri-apps/plugin-dialog to open the native file picker. The dialog is configured for MP4/MOV files and multiple selections. The import logic was refactored to be shared with the drag-and-drop feature, and the button displays a loading state during import. The dialog plugin dependency was added to both Rust (Cargo.toml, lib.rs) and the frontend (package.json).\"\n}\n</info added on 2025-10-27T21:29:09.529Z>",
+            "status": "done",
             "testStrategy": "Click the button, select one or more MP4/MOV files. Verify that the files are processed (e.g., appear in the media library as per Task 2's `import_video` functionality). Test error handling for import failures and confirm performance for multiple files."
           }
         ]
@@ -390,7 +390,7 @@
     ],
     "metadata": {
       "created": "2025-10-27T20:39:15.987Z",
-      "updated": "2025-10-27T20:39:15.987Z",
+      "updated": "2025-10-27T21:27:47.744Z",
       "description": "Tasks for master context"
     }
   }
