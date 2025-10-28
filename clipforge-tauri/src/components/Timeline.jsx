@@ -40,7 +40,7 @@ function Timeline({
   const [isPanning, setIsPanning] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
   const [draggingTrimHandle, setDraggingTrimHandle] = useState(null); // { clipId, handle: 'start' | 'end' }
-  const [draggingClip, setDraggingClip] = useState(null); // { clipId, originalPosition, currentPosition }
+  const [draggingClip, setDraggingClip] = useState(null); // { clipId, originalPosition, currentPosition, clickOffset }
 
   // Make timeline a drop zone for media items
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -112,6 +112,9 @@ function Timeline({
       if (draggingClipData) {
         const tempClip = { ...draggingClipData, startTime: draggingClip.currentPosition };
         drawClip(ctx, tempClip, width, 0.5); // 50% opacity
+
+        // Draw blue vertical line at clip drop position
+        drawClipDropLine(ctx, draggingClip.currentPosition, height);
       }
     }
 
@@ -327,6 +330,27 @@ function Timeline({
     ctx.setLineDash([]); // Reset line dash
   };
 
+  const drawClipDropLine = (ctx, position, height) => {
+    const x = timeToPixel(position);
+
+    // Draw blue vertical line at clip drop position
+    ctx.strokeStyle = "#4a9eff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, RULER_HEIGHT);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+
+    // Draw handle at top (similar to playhead)
+    ctx.fillStyle = "#4a9eff";
+    ctx.beginPath();
+    ctx.moveTo(x, RULER_HEIGHT);
+    ctx.lineTo(x - 6, RULER_HEIGHT - 8);
+    ctx.lineTo(x + 6, RULER_HEIGHT - 8);
+    ctx.closePath();
+    ctx.fill();
+  };
+
   const drawDropPreview = (ctx, preview, canvasWidth) => {
     const { position, duration, snapType, snapToClipId } = preview;
     const startX = timeToPixel(position);
@@ -453,10 +477,14 @@ function Timeline({
             (x >= startX + clipWidth - TRIM_HANDLE_WIDTH && x <= startX + clipWidth);
 
           if (!isOnTrimHandle) {
+            // Calculate the offset from the clip's start to where user clicked
+            const clickOffset = clickTime - clickedClip.startTime;
+
             setDraggingClip({
               clipId: clickedClip.id,
               originalPosition: clickedClip.startTime,
-              currentPosition: clickedClip.startTime
+              currentPosition: clickedClip.startTime,
+              clickOffset: clickOffset
             });
             return;
           }
@@ -510,14 +538,16 @@ function Timeline({
       // Handle clip dragging/reordering
       const clip = clips?.find(c => c.id === draggingClip.clipId);
       if (clip) {
-        const newPosition = Math.max(0, pixelToTime(x));
+        // Calculate new position based on cursor and click offset
+        const cursorTime = pixelToTime(x);
+        const newPosition = Math.max(0, cursorTime - draggingClip.clickOffset);
 
         // Get clip duration for snap calculation
         const trimStart = clip.trimStart || 0;
         const trimEnd = clip.trimEnd || clip.duration;
         const duration = trimEnd - trimStart;
 
-        // Apply snap logic
+        // Apply snap logic to the offset-adjusted position
         if (calculateSnapPosition) {
           const snapResult = calculateSnapPosition(newPosition, duration, clip.id);
           setDraggingClip(prev => ({
