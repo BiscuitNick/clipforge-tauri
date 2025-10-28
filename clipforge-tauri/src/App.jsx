@@ -12,6 +12,7 @@ function App() {
   const timeline = useTimeline();
   const mediaLibrary = useMediaLibrary();
   const [selectedMedia, setSelectedMedia] = React.useState(null);
+  const [previewMode, setPreviewMode] = React.useState("library");
   const [dropTimePosition, setDropTimePosition] = React.useState(null);
   const [canDrop, setCanDrop] = React.useState(true);
   const timelineRef = React.useRef(null);
@@ -24,8 +25,10 @@ function App() {
 
   // Handle media selection from Media Library
   const handleMediaSelect = (mediaItem) => {
-    console.log("App - Media selected:", mediaItem);
+    console.log("[App] Media selected:", mediaItem);
+    console.log("[App] Setting previewMode to: library");
     setSelectedMedia(mediaItem);
+    setPreviewMode("library");
   };
 
   // Handle drag move - track position for drop calculation
@@ -107,8 +110,8 @@ function App() {
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
-          mode={timeline.clips.length > 0 ? "timeline" : "library"}
-          timelineState={timeline.clips.length > 0 ? {
+          mode={previewMode}
+          timelineState={previewMode === "timeline" ? {
             playheadPosition: timeline.playheadPosition,
             getClipAtTime: timeline.getClipAtTime,
             isPlaying: timeline.isPlaying
@@ -133,15 +136,25 @@ function App() {
           selectedClipId={timeline.selectedClipId}
           onClipSelect={timeline.setSelectedClipId}
           onPlayheadMove={(pos) => {
+            setPreviewMode("timeline");
             timeline.pause(); // Pause when manually moving playhead
             timeline.setPlayheadPosition(pos);
           }}
-          onZoom={timeline.zoom}
-          onPan={timeline.pan}
+          onZoom={(delta) => {
+            setPreviewMode("timeline");
+            timeline.zoom(delta);
+          }}
+          onPan={(delta) => {
+            setPreviewMode("timeline");
+            timeline.pan(delta);
+          }}
           onTrimUpdate={timeline.updateClipTrim}
           canDrop={canDrop}
           isPlaying={timeline.isPlaying}
-          onTogglePlayback={timeline.togglePlayback}
+          onTogglePlayback={() => {
+            setPreviewMode("timeline");
+            timeline.togglePlayback();
+          }}
           onCopyClip={timeline.copyClip}
           onPasteClip={timeline.pasteClip}
           onDeleteClip={timeline.removeClip}

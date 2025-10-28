@@ -146,13 +146,16 @@
 
 /* Media item styles */
 .media-library-panel .media-item {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.75rem;
   background-color: #222;
   border-radius: 6px;
   border: 1px solid #333;
   transition: all 0.2s ease;
+}
+
+.media-library-panel .media-item-content {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
   cursor: pointer;
 }
 
@@ -171,10 +174,6 @@
   cursor: grabbing;
 }
 
-.media-library-panel .media-item {
-  cursor: grab;
-}
-
 .media-library-panel .media-thumbnail {
   width: 60px;
   height: 60px;
@@ -185,6 +184,11 @@
   align-items: center;
   justify-content: center;
   color: #666;
+  cursor: grab;
+}
+
+.media-library-panel .media-thumbnail:active {
+  cursor: grabbing;
 }
 
 .media-library-panel .media-thumbnail svg {

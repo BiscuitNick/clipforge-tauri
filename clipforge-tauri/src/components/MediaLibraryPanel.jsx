@@ -38,50 +38,62 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
     opacity: isDragging ? 0.5 : 1,
   } : undefined;
 
+  const handleClick = (e) => {
+    console.log("[MediaLibraryPanel] Media item clicked:", item);
+    // Stop event propagation to prevent drag handlers from interfering
+    e.stopPropagation();
+    if (onSelect) {
+      onSelect(item);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`media-item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
-      onClick={() => onSelect && onSelect(item)}
-      {...listeners}
       {...attributes}
     >
-      <div className="media-thumbnail">
-        <svg
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <div className="media-info">
-        <div className="media-title-row">
-          <span className="media-filename" title={item.filename}>
-            {item.filename}
-          </span>
-          {item.usedInTimeline && (
-            <span className="usage-indicator" title="Used in timeline">
-              ●
-            </span>
-          )}
+      <div
+        className="media-item-content"
+        onClick={handleClick}
+      >
+        <div className="media-thumbnail" {...listeners}>
+          <svg
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
         </div>
-        <div className="media-metadata">
-          <span className="media-duration">
-            {formatDuration(item.duration)}
-          </span>
-          {item.width && item.height && (
-            <span className="media-resolution">
-              {item.width}×{item.height}
+        <div className="media-info">
+          <div className="media-title-row">
+            <span className="media-filename" title={item.filename}>
+              {item.filename}
             </span>
-          )}
+            {item.usedInTimeline && (
+              <span className="usage-indicator" title="Used in timeline">
+                ●
+              </span>
+            )}
+          </div>
+          <div className="media-metadata">
+            <span className="media-duration">
+              {formatDuration(item.duration)}
+            </span>
+            {item.width && item.height && (
+              <span className="media-resolution">
+                {item.width}×{item.height}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

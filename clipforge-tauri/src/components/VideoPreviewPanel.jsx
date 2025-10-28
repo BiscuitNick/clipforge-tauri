@@ -29,9 +29,27 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const [videoSrc, setVideoSrc] = useState(null);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
 
+  // Debug: Log props changes
+  useEffect(() => {
+    console.log("[VideoPreview] Props changed:", {
+      mode,
+      selectedMedia: selectedMedia ? {
+        id: selectedMedia.id,
+        filename: selectedMedia.filename,
+        filepath: selectedMedia.filepath
+      } : null,
+      hasTimelineState: !!timelineState
+    });
+  }, [selectedMedia, mode, timelineState]);
+
+  // Debug: Log videoSrc changes
+  useEffect(() => {
+    console.log("[VideoPreview] videoSrc changed to:", videoSrc);
+  }, [videoSrc]);
+
   // Handle timeline playback mode
   useEffect(() => {
-    if (mode !== "timeline" || !timelineState || !videoRef.current) {
+    if (mode !== "timeline" || !timelineState) {
       return;
     }
 
@@ -79,10 +97,18 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Load video when selectedMedia changes (library mode)
   useEffect(() => {
-    if (mode !== "library") return;
+    console.log("[VideoPreview] useEffect triggered - mode:", mode, "selectedMedia:", selectedMedia);
 
-    if (!selectedMedia || !videoRef.current) {
+    if (mode !== "library") {
+      console.log("[VideoPreview] Not in library mode, skipping");
+      return;
+    }
+
+    if (!selectedMedia) {
+      console.log("[VideoPreview] No selectedMedia, clearing video");
       setVideoSrc(null);
+      setDuration(0);
+      setCurrentTime(0);
       setIsPlaying(false);
       setShowBlackScreen(false);
       return;
@@ -90,8 +116,16 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
     // Convert filepath to Tauri asset URL
     const assetUrl = convertFileSrc(selectedMedia.filepath);
-    console.log("Loading video:", selectedMedia.filepath, "->", assetUrl);
+    console.log("[VideoPreview] Loading video:", selectedMedia.filepath, "->", assetUrl);
+
+    // Set duration from media metadata (FFprobe) immediately
+    if (selectedMedia.duration) {
+      console.log("[VideoPreview] Setting duration from selectedMedia:", selectedMedia.duration);
+      setDuration(selectedMedia.duration);
+    }
+
     setVideoSrc(assetUrl);
+    setCurrentTime(0);
     setIsPlaying(false);
     setShowBlackScreen(false);
   }, [selectedMedia, mode]);
@@ -102,13 +136,53 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     if (!video) return;
 
     const handleLoadedMetadata = () => {
-      console.log("Video metadata loaded, duration:", video.duration);
-      setDuration(video.duration);
+      console.log("[VideoPreview] Video metadata loaded");
+      console.log("[VideoPreview] Duration:", video.duration);
+      console.log("[VideoPreview] ReadyState:", video.readyState);
+      console.log("[VideoPreview] VideoWidth:", video.videoWidth);
+      console.log("[VideoPreview] VideoHeight:", video.videoHeight);
+
+      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+        setDuration(video.duration);
+        console.log("[VideoPreview] Duration set to:", video.duration);
+      } else {
+        console.warn("[VideoPreview] Invalid duration:", video.duration);
+      }
+
       setCurrentTime(0);
       video.currentTime = 0;
       // Ensure video is paused on load
       video.pause();
       setIsPlaying(false);
+    };
+
+    const handleError = (e) => {
+      console.error("[VideoPreview] Video error:", e);
+      console.error("[VideoPreview] Video src:", video.src);
+      console.error("[VideoPreview] Video error code:", video.error?.code);
+      console.error("[VideoPreview] Video error message:", video.error?.message);
+    };
+
+    const handleLoadStart = () => {
+      console.log("[VideoPreview] Video load started, src:", video.src);
+    };
+
+    const handleCanPlay = () => {
+      console.log("[VideoPreview] Video can play");
+      // Sometimes duration is only available after canplay
+      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+        if (duration === 0) {
+          console.log("[VideoPreview] Setting duration from canplay:", video.duration);
+          setDuration(video.duration);
+        }
+      }
+    };
+
+    const handleDurationChange = () => {
+      console.log("[VideoPreview] Duration changed:", video.duration);
+      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+        setDuration(video.duration);
+      }
     };
 
     const handleTimeUpdate = () => {
@@ -117,11 +191,11 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       }
     };
 
-    const handlePlay = () => {
+    const handlePlayEvent = () => {
       setIsPlaying(true);
     };
 
-    const handlePause = () => {
+    const handlePauseEvent = () => {
       setIsPlaying(false);
     };
 
@@ -136,29 +210,46 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     };
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('durationchange', handleDurationChange);
     video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
+    video.addEventListener('play', handlePlayEvent);
+    video.addEventListener('pause', handlePauseEvent);
     video.addEventListener('ended', handleEnded);
+    video.addEventListener('error', handleError);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('canplay', handleCanPlay);
 
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('durationchange', handleDurationChange);
       video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('play', handlePlayEvent);
+      video.removeEventListener('pause', handlePauseEvent);
       video.removeEventListener('ended', handleEnded);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('canplay', handleCanPlay);
     };
-  }, [isSeeking, mode]);
+  }, [isSeeking, mode, duration]);
 
-  // Handle play/pause toggle
-  const togglePlayPause = () => {
+  // Handle play
+  const handlePlay = () => {
     if (!videoRef.current) return;
+    videoRef.current.play();
+  };
 
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
-    }
+  // Handle pause
+  const handlePause = () => {
+    if (!videoRef.current) return;
+    videoRef.current.pause();
+  };
+
+  // Handle stop (pause and seek to beginning)
+  const handleStop = () => {
+    if (!videoRef.current) return;
+    videoRef.current.pause();
+    videoRef.current.currentTime = 0;
+    setCurrentTime(0);
   };
 
   // Handle scrubber change
@@ -187,17 +278,16 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       </div>
 
       <div className="panel-content">
-        {showBlackScreen ? (
-          <div className="video-player">
-            <div className="video-container black-screen">
-              <div className="black-screen-message">Gap in Timeline</div>
-            </div>
-          </div>
-        ) : videoSrc ? (
-          <div className="video-player">
-            <div className="video-container">
+        <div className="video-player">
+          <div className="video-container">
+            {showBlackScreen ? (
+              <div className="black-screen">
+                <div className="black-screen-message">Gap in Timeline</div>
+              </div>
+            ) : videoSrc ? (
               <video
                 ref={videoRef}
+                key={videoSrc}
                 className="video-element"
                 src={videoSrc}
                 preload="metadata"
@@ -205,65 +295,78 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
               >
                 Your browser does not support the video tag.
               </video>
-            </div>
-
-            <div className="video-controls">
-              <button
-                className="play-pause-button"
-                onClick={togglePlayPause}
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? (
-                  // Pause icon
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                  </svg>
-                ) : (
-                  // Play icon
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </button>
-
-              <div className="time-display">
-                {formatTime(currentTime)} / {formatTime(duration)}
+            ) : (
+              <div className="preview-placeholder">
+                <svg
+                  className="placeholder-icon"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                <p className="placeholder-text">Select media to preview</p>
+                <p className="placeholder-hint">Click a media item in the library</p>
               </div>
+            )}
+          </div>
 
-              <input
-                type="range"
-                className="scrubber"
-                min="0"
-                max={duration || 0}
-                step="0.1"
-                value={currentTime}
-                onChange={handleScrubberChange}
-                onMouseDown={handleScrubberMouseDown}
-                onMouseUp={handleScrubberMouseUp}
-                onTouchStart={handleScrubberMouseDown}
-                onTouchEnd={handleScrubberMouseUp}
-              />
+          <div className="timeline-scrubber">
+            <input
+              type="range"
+              className="scrubber"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={currentTime}
+              onChange={handleScrubberChange}
+              onMouseDown={handleScrubberMouseDown}
+              onMouseUp={handleScrubberMouseUp}
+              onTouchStart={handleScrubberMouseDown}
+              onTouchEnd={handleScrubberMouseUp}
+              disabled={!videoSrc}
+            />
+          </div>
+
+          <div className="video-controls">
+            <button
+              className="play-pause-btn"
+              onClick={handleStop}
+              disabled={!videoSrc}
+              title="Stop"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 6h12v12H6z" />
+              </svg>
+            </button>
+
+            <button
+              className={`play-pause-btn ${isPlaying ? 'playing' : ''}`}
+              onClick={isPlaying ? handlePause : handlePlay}
+              disabled={!videoSrc}
+              title={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? (
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            <div className="time-display">
+              {formatTime(currentTime)} / {formatTime(duration)}
             </div>
           </div>
-        ) : (
-          <div className="preview-placeholder">
-            <svg
-              className="placeholder-icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="placeholder-text">Select media to preview</p>
-            <p className="placeholder-hint">Click a media item in the library</p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
