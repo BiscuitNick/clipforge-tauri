@@ -84,18 +84,24 @@ impl ScreenCaptureSession {
         command.arg("-framerate").arg(self.config.frame_rate.to_string());
 
         // Parse source ID to determine capture type
+        println!("[ScreenCapture] Source ID: {}", self.source_id);
+
         if self.source_id.starts_with("screen_") {
             // Screen capture: use display number
             let display_id = self.source_id.strip_prefix("screen_").unwrap_or("0");
+            println!("[ScreenCapture] Extracted display_id: {}", display_id);
 
-            if include_audio {
+            let input_device = if include_audio {
                 // Format: "<screen>:<audio device>"
                 // Use ":0" for default audio device
-                command.arg("-i").arg(format!("{}:0", display_id));
+                format!("{}:0", display_id)
             } else {
                 // Screen only, no audio
-                command.arg("-i").arg(format!("{}:", display_id));
-            }
+                format!("{}:", display_id)
+            };
+
+            println!("[ScreenCapture] FFmpeg input device: {}", input_device);
+            command.arg("-i").arg(input_device);
         } else if self.source_id.starts_with("window_") {
             // Window capture is more complex with AVFoundation
             // For now, fall back to full screen capture
@@ -155,22 +161,53 @@ impl ScreenCaptureSession {
     /// Stop the screen capture
     pub fn stop(&mut self) -> Result<PathBuf, RecordingError> {
         if let Some(mut child) = self.ffmpeg_process.take() {
-            // Send 'q' to stdin to gracefully stop FFmpeg
-            // Since we're using Stdio::null() for stdin, we'll use kill instead
-            child.kill()
-                .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
-
-            // Wait for process to finish
-            let status = child.wait()
-                .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
-
-            if !status.success() {
-                // Check if file was created despite non-zero exit
-                if !self.output_path.exists() {
-                    return Err(RecordingError::CaptureStopFailed(
-                        format!("FFmpeg exited with status: {}", status)
-                    ));
+            // Send SIGINT (Ctrl+C) to gracefully stop FFmpeg
+            // This allows FFmpeg to properly finalize the MP4 file
+            #[cfg(unix)]
+            {
+                let pid = child.id() as i32;
+                unsafe {
+                    libc::kill(pid, libc::SIGINT);
                 }
+            }
+
+            #[cfg(not(unix))]
+            {
+                // On non-Unix systems, use kill (not ideal but works)
+                child.kill()
+                    .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
+            }
+
+            // Wait for process to finish (with timeout)
+            use std::time::Duration;
+            use std::thread;
+
+            // Give FFmpeg up to 5 seconds to finish gracefully
+            for _ in 0..50 {
+                match child.try_wait() {
+                    Ok(Some(_status)) => {
+                        // Process has exited
+                        break;
+                    }
+                    Ok(None) => {
+                        // Still running, wait a bit more
+                        thread::sleep(Duration::from_millis(100));
+                    }
+                    Err(e) => {
+                        return Err(RecordingError::CaptureStopFailed(e.to_string()));
+                    }
+                }
+            }
+
+            // Force kill if still running after timeout
+            let _ = child.kill();
+            let _ = child.wait();
+
+            // Verify the file exists and has content
+            if !self.output_path.exists() {
+                return Err(RecordingError::CaptureStopFailed(
+                    "Output file was not created".to_string()
+                ));
             }
 
             Ok(self.output_path.clone())

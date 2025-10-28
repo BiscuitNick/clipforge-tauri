@@ -16,11 +16,12 @@ function formatTime(seconds) {
  * Video Preview Panel - Central playback area
  * Loads selected media and provides playback controls
  * Videos remain paused on load until user clicks play
- * Supports two modes:
+ * Supports three modes:
  * - library: Preview a single media item from the library
  * - timeline: Play back the timeline with clips and gaps
+ * - recording: Show live recording preview and controls
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -329,17 +330,46 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     setIsSeeking(false);
   };
 
+  // Get mode display text
+  const getModeText = () => {
+    if (mode === "recording") return "Recording";
+    if (mode === "timeline") return "Timeline";
+    return "Library";
+  };
+
   return (
     <div className="video-preview-panel">
       <div className="panel-header">
         <h2>Video Preview</h2>
-        <span className="preview-mode-indicator">{mode === "library" ? "Library" : "Timeline"}</span>
+        <span className="preview-mode-indicator">{getModeText()}</span>
       </div>
 
       <div className="panel-content">
         <div className="video-player">
           <div className="video-container">
-            {showBlackScreen ? (
+            {mode === "recording" && recordingState ? (
+              <div className="recording-preview">
+                <div className="recording-preview-content">
+                  <div className="recording-indicator-large">
+                    <div className="recording-dot-large"></div>
+                    <span className="recording-text">Recording in Progress</span>
+                  </div>
+                  <div className="recording-timer-large">
+                    {formatTime(recordingState.duration)}
+                  </div>
+                  <p className="recording-info">Your screen is being recorded</p>
+                  <button
+                    className="stop-recording-btn"
+                    onClick={onStopRecording}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                      <path d="M6 6h12v12H6z" />
+                    </svg>
+                    Stop Recording
+                  </button>
+                </div>
+              </div>
+            ) : showBlackScreen ? (
               <div className="black-screen">
                 <div className="black-screen-message">Gap in Timeline</div>
               </div>

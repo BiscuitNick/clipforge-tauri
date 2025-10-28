@@ -21,6 +21,7 @@ function App() {
   const [dragPreview, setDragPreview] = React.useState(null);
   const [isExporting, setIsExporting] = React.useState(false);
   const [exportProgress, setExportProgress] = React.useState(null);
+  const [recordingState, setRecordingState] = React.useState(null);
   const timelineRef = React.useRef(null);
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
@@ -60,6 +61,41 @@ function App() {
     console.log("[App] Setting previewMode to: library");
     setSelectedMedia(mediaItem);
     setPreviewMode("library");
+  };
+
+  // Handle recording state changes (start and complete)
+  const handleRecordingStateChange = (state) => {
+    console.log("[App] Recording state changed:", state);
+
+    if (state.isRecording) {
+      // Recording just started - show live preview
+      setRecordingState(state);
+      setPreviewMode("recording");
+      setSelectedMedia(null);
+    } else if (state.file_path) {
+      // Recording completed - import the video
+      setRecordingState(null);
+      invoke("import_video", { paths: [state.file_path] })
+        .then((result) => {
+          console.log("[App] Recording imported:", result);
+          mediaLibrary.addMediaItems(result);
+          setPreviewMode("library");
+        })
+        .catch((error) => {
+          console.error("[App] Failed to import recording:", error);
+        });
+    }
+  };
+
+  // Handle stop recording
+  const handleStopRecording = async () => {
+    try {
+      const result = await invoke('stop_recording');
+      console.log("[App] Recording stopped:", result);
+      handleRecordingStateChange(result);
+    } catch (error) {
+      console.error("[App] Failed to stop recording:", error);
+    }
   };
 
   // Handle drag move - track position for drop calculation
@@ -207,6 +243,18 @@ function App() {
     };
   }, []);
 
+  // Listen for recording duration updates
+  React.useEffect(() => {
+    const unlisten = listen('recording:duration-update', (event) => {
+      console.log("[App] Recording duration update:", event.payload);
+      setRecordingState(event.payload);
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
+
   // Keyboard shortcuts for undo/redo
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -237,11 +285,14 @@ function App() {
           onMediaImport={handleMediaImport}
           onMediaSelect={handleMediaSelect}
           selectedMediaId={selectedMedia?.id}
+          onRecordingStateChange={handleRecordingStateChange}
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
           mode={previewMode}
           timelineState={timelineState}
+          recordingState={recordingState}
+          onStopRecording={handleStopRecording}
         />
         <TimelineClipsPanel
           clips={timeline.clips}

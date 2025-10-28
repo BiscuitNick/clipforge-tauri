@@ -248,7 +248,7 @@
         "dependencies": [
           3
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -256,7 +256,7 @@
             "description": "Add a recording button to the MediaLibraryPanel component that triggers the screen recording modal and follows existing UI patterns",
             "dependencies": [],
             "details": "Create a RecordButton component using existing button styles from the codebase. Add the button to the MediaLibraryPanel toolbar section next to existing media controls. Implement onClick handler to trigger modal opening. Use existing icon system for recording icon (red circle or similar). Ensure button follows disabled state when recording is active. Add tooltip text 'Start Screen Recording' for better UX.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test button renders correctly in MediaLibraryPanel. Verify onClick triggers modal open event. Test disabled state during active recording. Validate tooltip displays on hover."
           },
           {
@@ -267,7 +267,7 @@
               1
             ],
             "details": "Build ScreenSelectionModal component using existing modal patterns from the codebase. Create a thumbnail grid layout displaying screens/windows from backend enumeration (task 2). Implement thumbnail hover effects and selection highlighting. Add title bars showing screen/window names below thumbnails. Include 'Select Screen' and 'Select Window' tab navigation if both types available. Add Cancel and Continue buttons at modal footer. Style grid to be responsive and handle varying numbers of sources.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test modal displays all available screens/windows from backend. Verify thumbnail selection highlights correctly. Test tab switching between screens and windows. Validate Cancel closes modal and Continue proceeds with selection."
           },
           {
@@ -278,7 +278,7 @@
               2
             ],
             "details": "Build RecordingStatusIndicator component with pulsing red dot animation using CSS. Implement timer logic using useEffect and setInterval to update every second. Format time display as MM:SS using padStart for consistent formatting. Position indicator in a non-intrusive but visible location (e.g., top bar or floating corner). Add recording duration state management in parent component. Include smooth fade-in animation when recording starts. Ensure timer stops and resets when recording ends.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test timer increments accurately every second. Verify MM:SS formatting handles single and double digits correctly. Test pulsing animation renders smoothly. Validate timer stops on recording end."
           },
           {
@@ -289,7 +289,7 @@
               3
             ],
             "details": "Create AudioControls component with checkbox for 'Include System Audio' option. Implement Start Recording and Stop Recording buttons with appropriate icons. Add loading states for buttons during recording initialization. Build ErrorMessage component for displaying recording errors (permissions, failures). Include proper error boundaries and fallback UI. Style all controls to match existing form elements and buttons. Add confirmation dialog for stop recording action. Integrate audio preference into recording configuration state.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test audio checkbox toggles recording configuration correctly. Verify start/stop buttons trigger appropriate recording actions. Test error messages display for various failure scenarios. Validate confirmation dialog prevents accidental recording stops."
           }
         ]
@@ -710,7 +710,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-28T22:33:06.516Z",
+      "updated": "2025-10-28T22:39:43.286Z",
       "description": "Tasks for master context"
     }
   }

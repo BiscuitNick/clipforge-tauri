@@ -22,6 +22,33 @@
   color: #f6f6f6;
 }
 
+.media-library-panel .header-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.media-library-panel .mode-selector {
+  background-color: #2a2a2a;
+  color: #f6f6f6;
+  border: 1px solid #444;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-library-panel .mode-selector:hover {
+  background-color: #333;
+  border-color: #555;
+}
+
+.media-library-panel .mode-selector:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
 .media-library-panel .media-count {
   font-size: 0.85rem;
   color: #888;
@@ -39,6 +66,45 @@
 }
 
 /* Drop zone styles */
+/* Media actions toolbar */
+.media-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+/* Record button */
+.record-button {
+  background-color: #c0392b;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.record-button:hover:not(:disabled) {
+  background-color: #e74c3c;
+  transform: translateY(-1px);
+}
+
+.record-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.record-button.compact {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+}
+
+.record-button svg {
+  flex-shrink: 0;
+}
+
 .media-library-panel .drop-zone {
   flex: 1;
   display: flex;
@@ -277,6 +343,55 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Recording mode view */
+.media-library-panel .recording-mode-view {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.media-library-panel .recording-mode-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 400px;
+}
+
+.media-library-panel .recording-mode-icon {
+  width: 80px;
+  height: 80px;
+  color: #555;
+  margin-bottom: 1.5rem;
+}
+
+.media-library-panel .recording-mode-content h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f6f6f6;
+}
+
+.media-library-panel .recording-mode-content p {
+  margin: 0 0 2rem 0;
+  font-size: 0.95rem;
+  color: #999;
+}
+
+.media-library-panel .record-button.large {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.media-library-panel .record-button.large:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
 }
 
 /* Responsive adjustments */

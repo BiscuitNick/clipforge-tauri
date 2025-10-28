@@ -89,18 +89,52 @@ impl PlatformEnumerator {
 
     /// Capture thumbnail for a window by window ID
     fn capture_window_thumbnail(window_id: u32) -> Option<String> {
-        // Note: Thumbnail generation for windows is complex and may fail
-        // We'll return None for now and implement a simpler approach
-        // TODO: Implement actual window thumbnail capture using CGWindowListCreateImage
+        // Window thumbnails not implemented yet
         None
     }
 
-    /// Capture thumbnail for a screen by display ID
-    fn capture_screen_thumbnail(display_id: u32) -> Option<String> {
-        // Note: Thumbnail generation for screens is complex and may fail
-        // We'll return None for now and implement a simpler approach
-        // TODO: Implement actual screen thumbnail capture using CGDisplayCreateImage
-        None
+    /// Capture thumbnail for a screen by AVFoundation device index
+    fn capture_screen_thumbnail(avf_device_index: usize) -> Option<String> {
+        use std::process::Command;
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Find FFmpeg
+        let ffmpeg_path = super::super::ffmpeg_utils::find_ffmpeg()?;
+
+        // Create temp file path
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        let temp_path = format!("/tmp/screen_thumb_{}_{}.png", avf_device_index, timestamp);
+
+        // Capture single frame using FFmpeg with AVFoundation device index
+        let output = Command::new(&ffmpeg_path)
+            .arg("-f").arg("avfoundation")
+            .arg("-framerate").arg("30") // Use 30fps for screen capture
+            .arg("-i").arg(format!("{}:", avf_device_index)) // No audio
+            .arg("-frames:v").arg("1") // Single frame
+            .arg("-vf").arg("scale=200:-1") // Scale to width 200, maintain aspect ratio
+            .arg("-y") // Overwrite
+            .arg(&temp_path)
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            println!("[ScreenThumbnail] FFmpeg failed for device {}: {:?}",
+                avf_device_index, String::from_utf8_lossy(&output.stderr));
+            return None;
+        }
+
+        // Read PNG file and base64 encode
+        let png_data = fs::read(&temp_path).ok()?;
+        let base64_string = base64::engine::general_purpose::STANDARD.encode(&png_data);
+
+        // Clean up temp file
+        let _ = fs::remove_file(&temp_path);
+
+        Some(base64_string)
     }
 
     /// Filter window - return true if window should be included
@@ -170,11 +204,22 @@ impl SourceEnumerator for PlatformEnumerator {
                 let display_id_value: id = msg_send![device_desc, objectForKey: display_id_key];
                 let display_id: u32 = msg_send![display_id_value, unsignedIntValue];
 
-                // Generate thumbnail for the screen
-                let thumbnail = Self::capture_screen_thumbnail(display_id);
+                // IMPORTANT: For AVFoundation, we need to count all video input devices
+                // (cameras) before screens. Use ffmpeg -f avfoundation -list_devices true -i ""
+                // to see the device list. Screens come after all cameras.
+                // We'll need to detect this dynamically, but for now use a common offset.
+                // TODO: Dynamically detect number of camera devices
+                let camera_count = 4; // Common setup: built-in camera + continuity cameras
+                let avf_device_index = i + camera_count;
+
+                // Generate thumbnail using AVFoundation device index
+                let thumbnail = Self::capture_screen_thumbnail(avf_device_index);
+
+                let screen_id = format!("screen_{}", avf_device_index);
+                println!("[ScreenEnumeration] Screen {} -> ID: {} (display_id: {})", i, screen_id, display_id);
 
                 let mut source = ScreenSource::new(
-                    format!("screen_{}", display_id),
+                    screen_id,
                     format!("Display {}", i + 1),
                     SourceType::Screen,
                     (frame.size.width * scale_factor) as u32,

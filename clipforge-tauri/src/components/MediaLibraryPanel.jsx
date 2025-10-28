@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useDraggable } from "@dnd-kit/core";
+import ScreenRecordingModal from "./ScreenRecordingModal";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -104,11 +105,13 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
+  const [mode, setMode] = useState("media"); // "media", "record-screen", "record-video"
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -236,20 +239,105 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     }
   };
 
+  const handleRecordingStateChange = (recordingState) => {
+    console.log("[MediaLibraryPanel] Recording state changed:", recordingState);
+
+    // Pass recording state to parent (App.jsx) for handling
+    if (onRecordingStateChange) {
+      onRecordingStateChange(recordingState);
+    }
+
+    // Switch back to media mode after recording starts
+    // (user will see live preview in VideoPreviewPanel)
+    if (recordingState.isRecording) {
+      setMode("media");
+    }
+  };
+
   return (
     <div className="media-library-panel">
       <div className="panel-header">
         <h2>Media Library</h2>
-        <span className="media-count">{mediaItems.length} items</span>
+        <div className="header-controls">
+          <select
+            className="mode-selector"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+          >
+            <option value="media">Media Files</option>
+            <option value="record-screen">Record Screen</option>
+            <option value="record-video">Record Video</option>
+          </select>
+          {mode === "media" && (
+            <span className="media-count">{mediaItems.length} items</span>
+          )}
+        </div>
       </div>
 
       <div className="panel-content">
-        {mediaItems.length === 0 ? (
-          // Show drop zone when no media is imported
-          <div className={`drop-zone ${isDragging ? "dragging" : ""}`}>
-            <div className="drop-zone-content">
+        {mode === "media" && (
+          <>
+            {mediaItems.length === 0 ? (
+              // Show drop zone when no media is imported
+              <div className={`drop-zone ${isDragging ? "dragging" : ""}`}>
+                <div className="drop-zone-content">
+                  <svg
+                    className="drop-zone-icon"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  <h3>Drop Media Here</h3>
+                  <p>Supports MP4 and MOV</p>
+                  <button
+                    className="import-button"
+                    onClick={handleImportClick}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Importing...' : 'Browse Files'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Show media list when items exist
+              <div className="media-list">
+                <div className="media-actions">
+                  <button
+                    className="import-button compact"
+                    onClick={handleImportClick}
+                    disabled={isLoading}
+                  >
+                    + Add Media
+                  </button>
+                </div>
+                <div className="media-items">
+                  {mediaItems.map((item) => (
+                    <DraggableMediaItem
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedMediaId === item.id}
+                      onSelect={onMediaSelect}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {mode === "record-screen" && (
+          <div className="recording-mode-view">
+            <div className="recording-mode-content">
               <svg
-                className="drop-zone-icon"
+                className="recording-mode-icon"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -259,39 +347,44 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                 />
               </svg>
-              <h3>Drop Media Here</h3>
-              <p>Supports MP4 and MOV</p>
+              <h3>Screen Recording</h3>
+              <p>Capture your screen or specific windows</p>
               <button
-                className="import-button"
-                onClick={handleImportClick}
+                className="record-button large"
+                onClick={() => setIsRecordingModalOpen(true)}
                 disabled={isLoading}
               >
-                {isLoading ? 'Importing...' : 'Browse Files'}
+                <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                  <circle cx="10" cy="10" r="6" />
+                </svg>
+                Start Recording
               </button>
             </div>
           </div>
-        ) : (
-          // Show media list when items exist
-          <div className="media-list">
-            <button
-              className="import-button compact"
-              onClick={handleImportClick}
-              disabled={isLoading}
-            >
-              + Add Media
-            </button>
-            <div className="media-items">
-              {mediaItems.map((item) => (
-                <DraggableMediaItem
-                  key={item.id}
-                  item={item}
-                  isSelected={selectedMediaId === item.id}
-                  onSelect={onMediaSelect}
+        )}
+
+        {mode === "record-video" && (
+          <div className="recording-mode-view">
+            <div className="recording-mode-content">
+              <svg
+                className="recording-mode-icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                 />
-              ))}
+              </svg>
+              <h3>Webcam Recording</h3>
+              <p>Coming soon...</p>
             </div>
           </div>
         )}
@@ -302,6 +395,12 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
           </div>
         )}
       </div>
+
+      <ScreenRecordingModal
+        isOpen={isRecordingModalOpen}
+        onClose={() => setIsRecordingModalOpen(false)}
+        onRecordingComplete={handleRecordingStateChange}
+      />
     </div>
   );
 }
