@@ -386,11 +386,73 @@ function Timeline({
         e.preventDefault();
         onTogglePlayback?.();
       }
+      // Seek backward 5s: J
+      else if (e.key === 'j') {
+        e.preventDefault();
+        const newTime = Math.max(0, playheadPosition - 5);
+        onPlayheadMove?.(newTime);
+      }
+      // Seek forward 5s: L
+      else if (e.key === 'l') {
+        e.preventDefault();
+        const totalDuration = getTotalDuration();
+        const newTime = Math.min(totalDuration, playheadPosition + 5);
+        onPlayheadMove?.(newTime);
+      }
+      // Frame step backward: ArrowLeft
+      else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const frameTime = 1 / 30; // Assume 30fps for frame stepping
+        const newTime = Math.max(0, playheadPosition - frameTime);
+        onPlayheadMove?.(newTime);
+      }
+      // Frame step forward: ArrowRight
+      else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const frameTime = 1 / 30; // Assume 30fps for frame stepping
+        const totalDuration = getTotalDuration();
+        const newTime = Math.min(totalDuration, playheadPosition + frameTime);
+        onPlayheadMove?.(newTime);
+      }
+      // Cycle through clips: Tab
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (!clips || clips.length === 0) return;
+
+        // Sort clips by position
+        const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime);
+
+        if (!selectedClipId) {
+          // No selection, select first clip
+          onClipSelect?.(sortedClips[0].id);
+        } else {
+          // Find current index and move to next (or previous if Shift+Tab)
+          const currentIndex = sortedClips.findIndex(c => c.id === selectedClipId);
+          if (currentIndex !== -1) {
+            let nextIndex;
+            if (e.shiftKey) {
+              // Shift+Tab: previous clip
+              nextIndex = currentIndex - 1;
+              if (nextIndex < 0) nextIndex = sortedClips.length - 1; // Wrap to end
+            } else {
+              // Tab: next clip
+              nextIndex = currentIndex + 1;
+              if (nextIndex >= sortedClips.length) nextIndex = 0; // Wrap to start
+            }
+            onClipSelect?.(sortedClips[nextIndex].id);
+          }
+        }
+      }
+      // Clear selection: Escape
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClipSelect?.(null);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedClipId, onCopyClip, onPasteClip, onDeleteClip, onTogglePlayback]);
+  }, [selectedClipId, clips, playheadPosition, onCopyClip, onPasteClip, onDeleteClip, onTogglePlayback, onPlayheadMove, onClipSelect, getTotalDuration]);
 
   return (
     <div className="timeline-container" ref={containerRef}>
