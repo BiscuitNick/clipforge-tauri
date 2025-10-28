@@ -142,6 +142,10 @@ function App() {
           canDrop={canDrop}
           isPlaying={timeline.isPlaying}
           onTogglePlayback={timeline.togglePlayback}
+          onCopyClip={timeline.copyClip}
+          onPasteClip={timeline.pasteClip}
+          onDeleteClip={timeline.removeClip}
+          hasClipboard={!!timeline.clipboardClip}
         />
       </div>
     </div>

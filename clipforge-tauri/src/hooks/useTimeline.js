@@ -12,6 +12,7 @@ export function useTimeline() {
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [clipboardClip, setClipboardClip] = useState(null); // Clipboard for copy/paste
   const animationFrameRef = useRef(null);
   const lastTimeRef = useRef(null);
 
@@ -266,6 +267,55 @@ export function useTimeline() {
     setIsPlaying(false);
   }, []);
 
+  // Copy selected clip to clipboard
+  const copyClip = useCallback(() => {
+    if (!selectedClipId) {
+      console.warn("No clip selected to copy");
+      return false;
+    }
+
+    const clipToCopy = clips.find(c => c.id === selectedClipId);
+    if (!clipToCopy) {
+      console.warn("Selected clip not found");
+      return false;
+    }
+
+    // Store clip data without the unique ID
+    const { id, ...clipData } = clipToCopy;
+    setClipboardClip(clipData);
+    console.log("Clip copied to clipboard:", clipData.filename);
+    return true;
+  }, [selectedClipId, clips]);
+
+  // Paste clip from clipboard
+  const pasteClip = useCallback(() => {
+    if (!clipboardClip) {
+      console.warn("No clip in clipboard to paste");
+      return null;
+    }
+
+    // Calculate position to append at end of timeline
+    const endPosition = clips.length > 0
+      ? Math.max(...clips.map(c => {
+          const trimStart = c.trimStart || 0;
+          const trimEnd = c.trimEnd || c.duration;
+          const trimmedDuration = trimEnd - trimStart;
+          return c.startTime + trimmedDuration;
+        }))
+      : 0;
+
+    // Create new clip with unique ID and clipboard data
+    const newClip = {
+      ...clipboardClip,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      startTime: endPosition,
+    };
+
+    setClips(prev => [...prev, newClip]);
+    console.log("Clip pasted at position:", endPosition);
+    return newClip;
+  }, [clipboardClip, clips]);
+
   return {
     // State
     clips,
@@ -275,6 +325,7 @@ export function useTimeline() {
     selectedClipId,
     isPanning,
     isPlaying,
+    clipboardClip,
 
     // Setters
     setPlayheadPosition,
@@ -289,6 +340,10 @@ export function useTimeline() {
     updateClipTrim,
     zoom,
     pan,
+
+    // Clipboard
+    copyClip,
+    pasteClip,
 
     // Playback
     togglePlayback,

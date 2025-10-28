@@ -7,7 +7,25 @@ const TRACK_HEIGHT = 60;
 const TRACK_PADDING = 10;
 const TRIM_HANDLE_WIDTH = 8;
 
-function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate, canDrop = true, isPlaying = false, onTogglePlayback }) {
+function Timeline({
+  clips,
+  playheadPosition,
+  zoomLevel,
+  panOffset,
+  selectedClipId,
+  onClipSelect,
+  onPlayheadMove,
+  onZoom,
+  onPan,
+  onTrimUpdate,
+  canDrop = true,
+  isPlaying = false,
+  onTogglePlayback,
+  onCopyClip,
+  onPasteClip,
+  onDeleteClip,
+  hasClipboard
+}) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -338,6 +356,42 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
     }
   };
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if typing in an input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Copy: Cmd/Ctrl+C
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        e.preventDefault();
+        onCopyClip?.();
+      }
+      // Paste: Cmd/Ctrl+V
+      else if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        e.preventDefault();
+        onPasteClip?.();
+      }
+      // Delete: Delete or Backspace
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (selectedClipId) {
+          onDeleteClip?.(selectedClipId);
+        }
+      }
+      // Play/Pause: Space or K
+      else if (e.key === ' ' || e.key === 'k') {
+        e.preventDefault();
+        onTogglePlayback?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedClipId, onCopyClip, onPasteClip, onDeleteClip, onTogglePlayback]);
+
   return (
     <div className="timeline-container" ref={containerRef}>
       <div
@@ -369,9 +423,27 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
           <span className="zoom-level">Zoom: {zoomLevel.toFixed(1)}x</span>
         </div>
         <div className="toolbar-section">
-          <button disabled title="Copy clip (Cmd/Ctrl+C)">Copy</button>
-          <button disabled title="Paste clip (Cmd/Ctrl+V)">Paste</button>
-          <button disabled title="Delete clip (Delete/Backspace)">Delete</button>
+          <button
+            onClick={onCopyClip}
+            disabled={!selectedClipId}
+            title="Copy clip (Cmd/Ctrl+C)"
+          >
+            Copy
+          </button>
+          <button
+            onClick={onPasteClip}
+            disabled={!hasClipboard}
+            title="Paste clip (Cmd/Ctrl+V)"
+          >
+            Paste
+          </button>
+          <button
+            onClick={() => selectedClipId && onDeleteClip?.(selectedClipId)}
+            disabled={!selectedClipId}
+            title="Delete clip (Delete/Backspace)"
+          >
+            Delete
+          </button>
         </div>
       </div>
       <canvas
