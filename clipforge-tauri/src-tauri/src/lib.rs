@@ -1,4 +1,5 @@
 use tauri::menu::*;
+use std::sync::{Arc, Mutex};
 
 mod commands;
 
@@ -10,7 +11,11 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize recording manager state
+    let recording_manager = Arc::new(Mutex::new(commands::recording::RecordingManager::new()));
+
     tauri::Builder::default()
+        .manage(recording_manager)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -18,7 +23,22 @@ pub fn run() {
             greet,
             commands::video_import::import_video,
             commands::metadata::extract_metadata,
-            commands::export::export_timeline
+            commands::export::export_timeline,
+            commands::recording::check_permission,
+            commands::recording::request_permission,
+            commands::recording::get_recording_state,
+            commands::recording::start_recording,
+            commands::recording::stop_recording,
+            commands::recording::pause_recording,
+            commands::recording::resume_recording,
+            commands::recording::validate_config,
+            commands::recording::get_preset_config,
+            commands::recording::list_quality_presets,
+            commands::recording::get_supported_codecs,
+            commands::recording::cleanup_orphaned_files,
+            commands::recording::cleanup_temp_files,
+            commands::recording::check_disk_space,
+            commands::recording::get_error_details
         ])
         .setup(|app| {
             // Create the menu
