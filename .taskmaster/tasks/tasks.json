@@ -5,7 +5,7 @@
         "id": "1",
         "title": "Set Up Tauri Desktop Application",
         "description": "Configure and launch ClipForge as a native macOS desktop application using Tauri 2.x.",
-        "status": "review",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "details": "Ensure Tauri project is initialized with `npm create tauri-app`. Update `tauri.conf.json` with app metadata (name, version, icon paths) and macOS-specific settings like minimum system version (10.15). Set window dimensions to at least 1280x720. Configure menu bar with File, Edit, and View menus. Use `tauri build` to create an .app bundle, and test launching from the bundle (not dev mode). Implement code signing with a development certificate for macOS compatibility.",
@@ -54,14 +54,16 @@
               3
             ],
             "details": "Set up macOS code signing environment variables (`APPLE_DEVELOPMENT_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`). Use `tauri build` to generate the `.app` bundle in `src-tauri/target/release/bundle/macos/`. Do not use the `--debug` flag.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Locate the `ClipForge.app` file in the build output directory. Double-click to launch it outside of the development environment. Confirm the app starts, window dimensions are correct, and the native menu bar is present. Ensure there are no Gatekeeper warnings about the app being from an unidentified developer.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-28T00:28:02.205Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down the Tauri setup into distinct steps: 1) Project initialization using `create-tauri-app`. 2) `tauri.conf.json` configuration for app metadata, window settings, and icons. 3) Rust-side implementation of the native menu bar. 4) A dedicated task for building the app, handling macOS code signing, and verifying the final `.app` bundle."
+        "expansionPrompt": "Break down the Tauri setup into distinct steps: 1) Project initialization using `create-tauri-app`. 2) `tauri.conf.json` configuration for app metadata, window settings, and icons. 3) Rust-side implementation of the native menu bar. 4) A dedicated task for building the app, handling macOS code signing, and verifying the final `.app` bundle.",
+        "updatedAt": "2025-10-28T00:28:02.205Z"
       },
       {
         "id": "2",
@@ -443,9 +445,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-27T22:53:27.858Z",
+      "lastModified": "2025-10-28T00:28:02.206Z",
       "taskCount": 7,
-      "completedCount": 6,
+      "completedCount": 7,
       "tags": [
         "master"
       ]
