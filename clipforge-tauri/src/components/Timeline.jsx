@@ -7,7 +7,7 @@ const TRACK_HEIGHT = 60;
 const TRACK_PADDING = 10;
 const TRIM_HANDLE_WIDTH = 8;
 
-function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate, canDrop = true }) {
+function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate, canDrop = true, isPlaying = false, onTogglePlayback }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -347,6 +347,23 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
       />
       <div className="timeline-controls">
         <div className="toolbar-section">
+          <button
+            className={`play-pause-btn ${isPlaying ? 'playing' : ''}`}
+            onClick={onTogglePlayback}
+            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          >
+            {isPlaying ? (
+              // Pause icon
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+              </svg>
+            ) : (
+              // Play icon
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
           <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>
           <span className="zoom-level">Zoom: {zoomLevel.toFixed(1)}x</span>

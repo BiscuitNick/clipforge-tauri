@@ -81,6 +81,19 @@ function App() {
     }
   };
 
+  // Handle clip updates from Timeline Clips Panel
+  const handleClipUpdate = (clipId, updates) => {
+    // Update trim points if provided
+    if (updates.trimStart !== undefined && updates.trimEnd !== undefined) {
+      timeline.updateClipTrim(clipId, updates.trimStart, updates.trimEnd);
+    }
+
+    // Update position if provided
+    if (updates.startTime !== undefined) {
+      timeline.updateClipPosition(clipId, updates.startTime);
+    }
+  };
+
   return (
     <DndContext onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="app-layout">
@@ -94,9 +107,20 @@ function App() {
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
-          mode="library"
+          mode={timeline.clips.length > 0 ? "timeline" : "library"}
+          timelineState={timeline.clips.length > 0 ? {
+            playheadPosition: timeline.playheadPosition,
+            getClipAtTime: timeline.getClipAtTime,
+            isPlaying: timeline.isPlaying
+          } : null}
         />
-        <TimelineClipsPanel />
+        <TimelineClipsPanel
+          clips={timeline.clips}
+          selectedClipId={timeline.selectedClipId}
+          onClipSelect={timeline.setSelectedClipId}
+          onClipUpdate={handleClipUpdate}
+          onClipRemove={timeline.removeClip}
+        />
       </div>
 
       {/* Bottom section: Timeline */}
@@ -108,11 +132,16 @@ function App() {
           panOffset={timeline.panOffset}
           selectedClipId={timeline.selectedClipId}
           onClipSelect={timeline.setSelectedClipId}
-          onPlayheadMove={timeline.setPlayheadPosition}
+          onPlayheadMove={(pos) => {
+            timeline.pause(); // Pause when manually moving playhead
+            timeline.setPlayheadPosition(pos);
+          }}
           onZoom={timeline.zoom}
           onPan={timeline.pan}
           onTrimUpdate={timeline.updateClipTrim}
           canDrop={canDrop}
+          isPlaying={timeline.isPlaying}
+          onTogglePlayback={timeline.togglePlayback}
         />
       </div>
     </div>

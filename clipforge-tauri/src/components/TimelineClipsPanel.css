@@ -9,6 +9,9 @@
 .timeline-clips-panel .panel-header {
   padding: 1rem;
   border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .timeline-clips-panel .panel-header h2 {
@@ -18,41 +21,251 @@
   color: #f6f6f6;
 }
 
+.timeline-clips-panel .clip-count {
+  font-size: 0.85rem;
+  color: #888;
+  background: #2a2a2a;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
 .timeline-clips-panel .panel-content {
   flex: 1;
+  overflow-y: auto;
+}
+
+/* Empty state */
+.timeline-clips-panel .panel-content.empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  overflow-y: auto;
 }
 
-.timeline-clips-panel .placeholder-text {
-  font-size: 1.2rem;
+.timeline-clips-panel .empty-message {
+  font-size: 1.1rem;
   color: #888;
   margin: 0;
 }
 
-.timeline-clips-panel .placeholder-hint {
+.timeline-clips-panel .empty-hint {
   font-size: 0.9rem;
   color: #666;
   margin-top: 0.5rem;
 }
 
+/* Clips list */
+.clips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+/* Clip item */
+.clip-item {
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.clip-item:hover {
+  border-color: #444;
+}
+
+.clip-item.selected {
+  border-color: #4a9eff;
+  background: #2a3040;
+}
+
+.clip-item.expanded {
+  background: #2a2a2a;
+}
+
+/* Clip header */
+.clip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.clip-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.clip-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.clip-number {
+  font-size: 0.75rem;
+  color: #888;
+  font-weight: 600;
+  min-width: 2rem;
+}
+
+.clip-filename {
+  font-size: 0.875rem;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clip-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.clip-position {
+  font-size: 0.75rem;
+  color: #999;
+  font-family: monospace;
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  transition: color 0.2s;
+}
+
+.expand-button:hover {
+  color: #e0e0e0;
+}
+
+/* Clip details (expanded state) */
+.clip-details {
+  padding: 0 0.75rem 0.75rem 0.75rem;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-row label {
+  font-size: 0.8rem;
+  color: #aaa;
+  min-width: 120px;
+}
+
+.detail-row input {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.detail-row input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.detail-row.info {
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.detail-row.info span {
+  font-family: monospace;
+}
+
+/* Detail actions */
+.detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.detail-actions button {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.apply-button {
+  background: #4a9eff;
+  color: white;
+}
+
+.apply-button:hover {
+  background: #3a8eef;
+}
+
+.cancel-button {
+  background: #444;
+  color: #e0e0e0;
+}
+
+.cancel-button:hover {
+  background: #555;
+}
+
+.remove-button {
+  background: #d64545;
+  color: white;
+}
+
+.remove-button:hover {
+  background: #c63535;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
   .timeline-clips-panel {
-    min-height: 200px; /* Ensure minimum height when stacked */
+    min-height: 200px;
   }
 
-  .timeline-clips-panel .panel-content {
-    padding: 1rem;
+  .clip-header {
+    padding: 0.5rem;
+  }
+
+  .detail-row label {
+    min-width: 80px;
+    font-size: 0.75rem;
+  }
+
+  .detail-actions {
+    flex-direction: column;
   }
 }
 
 @media (max-width: 479px) {
-  .timeline-clips-panel .placeholder-text {
-    font-size: 1rem;
+  .clips-list {
+    padding: 0.25rem;
+  }
+
+  .clip-filename {
+    font-size: 0.8rem;
   }
 }

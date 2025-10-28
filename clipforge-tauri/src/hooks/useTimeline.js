@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 /**
  * Custom hook for managing timeline state
@@ -11,6 +11,9 @@ export function useTimeline() {
   const [panOffset, setPanOffset] = useState(0); // horizontal pan in pixels
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const animationFrameRef = useRef(null);
+  const lastTimeRef = useRef(null);
 
   // Check if a position would cause collision with existing clips
   const canDropAtPosition = useCallback((position, duration, excludeClipId = null) => {
@@ -176,6 +179,93 @@ export function useTimeline() {
     return (pixel + panOffset) / zoomLevel;
   }, [zoomLevel, panOffset]);
 
+  // Find the active clip at a given time position
+  const getClipAtTime = useCallback((time) => {
+    for (const clip of clips) {
+      const clipStart = clip.startTime;
+      const trimStart = clip.trimStart || 0;
+      const trimEnd = clip.trimEnd || clip.duration;
+      const trimmedDuration = trimEnd - trimStart;
+      const clipEnd = clipStart + trimmedDuration;
+
+      if (time >= clipStart && time < clipEnd) {
+        // Calculate the source media time accounting for trim
+        const offsetInClip = time - clipStart;
+        const sourceTime = trimStart + offsetInClip;
+        return { clip, sourceTime };
+      }
+    }
+    return null; // Gap or outside timeline
+  }, [clips]);
+
+  // Playback loop using requestAnimationFrame
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      lastTimeRef.current = null;
+      return;
+    }
+
+    const animate = (timestamp) => {
+      if (!lastTimeRef.current) {
+        lastTimeRef.current = timestamp;
+      }
+
+      const deltaTime = (timestamp - lastTimeRef.current) / 1000; // Convert to seconds
+      lastTimeRef.current = timestamp;
+
+      setPlayheadPosition(prev => {
+        const newPosition = prev + deltaTime;
+
+        // Get total timeline duration
+        const totalDuration = clips.length > 0
+          ? Math.max(...clips.map(c => {
+              const trimStart = c.trimStart || 0;
+              const trimEnd = c.trimEnd || c.duration;
+              const trimmedDuration = trimEnd - trimStart;
+              return c.startTime + trimmedDuration;
+            }))
+          : 0;
+
+        // Stop at end of timeline
+        if (newPosition >= totalDuration) {
+          setIsPlaying(false);
+          return totalDuration;
+        }
+
+        return newPosition;
+      });
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isPlaying, clips]);
+
+  // Toggle play/pause
+  const togglePlayback = useCallback(() => {
+    setIsPlaying(prev => !prev);
+  }, []);
+
+  // Play
+  const play = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  // Pause
+  const pause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
   return {
     // State
     clips,
@@ -184,6 +274,7 @@ export function useTimeline() {
     panOffset,
     selectedClipId,
     isPanning,
+    isPlaying,
 
     // Setters
     setPlayheadPosition,
@@ -198,6 +289,12 @@ export function useTimeline() {
     updateClipTrim,
     zoom,
     pan,
+
+    // Playback
+    togglePlayback,
+    play,
+    pause,
+    getClipAtTime,
 
     // Validation
     canDropAtPosition,

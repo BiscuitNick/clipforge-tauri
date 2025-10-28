@@ -81,6 +81,26 @@
   background-color: #333;
 }
 
+.timeline-controls .play-pause-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  background-color: #28a745;
+}
+
+.timeline-controls .play-pause-btn:hover {
+  background-color: #218838;
+}
+
+.timeline-controls .play-pause-btn.playing {
+  background-color: #ffc107;
+}
+
+.timeline-controls .play-pause-btn.playing:hover {
+  background-color: #e0a800;
+}
+
 .zoom-level {
   font-size: 0.875rem;
   color: #aaa;

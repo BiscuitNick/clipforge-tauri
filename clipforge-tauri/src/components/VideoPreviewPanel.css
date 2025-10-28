@@ -66,6 +66,19 @@
   object-fit: contain;
 }
 
+.video-preview-panel .black-screen {
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-preview-panel .black-screen-message {
+  color: #666;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
 /* Video controls styles */
 .video-preview-panel .video-controls {
   display: flex;

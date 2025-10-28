@@ -16,20 +16,75 @@ function formatTime(seconds) {
  * Video Preview Panel - Central playback area
  * Loads selected media and provides playback controls
  * Videos remain paused on load until user clicks play
+ * Supports two modes:
+ * - library: Preview a single media item from the library
+ * - timeline: Play back the timeline with clips and gaps
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library" }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [videoSrc, setVideoSrc] = useState(null);
+  const [showBlackScreen, setShowBlackScreen] = useState(false);
 
-  // Load video when selectedMedia changes
+  // Handle timeline playback mode
   useEffect(() => {
+    if (mode !== "timeline" || !timelineState || !videoRef.current) {
+      return;
+    }
+
+    const { playheadPosition, getClipAtTime, isPlaying: timelinePlaying } = timelineState;
+    const activeClipData = getClipAtTime(playheadPosition);
+
+    if (!activeClipData) {
+      // In a gap - show black screen
+      setShowBlackScreen(true);
+      setVideoSrc(null);
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+      return;
+    }
+
+    const { clip, sourceTime } = activeClipData;
+    setShowBlackScreen(false);
+
+    // Load the clip's video if not already loaded
+    const assetUrl = convertFileSrc(clip.videoPath);
+    if (videoSrc !== assetUrl) {
+      console.log("Timeline - Loading clip:", clip.filename);
+      setVideoSrc(assetUrl);
+    }
+
+    // Sync video time with timeline
+    if (videoRef.current && videoRef.current.readyState >= 2) {
+      const videoTime = videoRef.current.currentTime;
+      const timeDiff = Math.abs(videoTime - sourceTime);
+
+      // Only seek if significantly out of sync (> 0.1s)
+      if (timeDiff > 0.1) {
+        videoRef.current.currentTime = sourceTime;
+      }
+
+      // Sync play/pause state
+      if (timelinePlaying && videoRef.current.paused) {
+        videoRef.current.play();
+      } else if (!timelinePlaying && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+    }
+  }, [mode, timelineState, videoSrc]);
+
+  // Load video when selectedMedia changes (library mode)
+  useEffect(() => {
+    if (mode !== "library") return;
+
     if (!selectedMedia || !videoRef.current) {
       setVideoSrc(null);
       setIsPlaying(false);
+      setShowBlackScreen(false);
       return;
     }
 
@@ -38,7 +93,8 @@ function VideoPreviewPanel({ selectedMedia, mode = "library" }) {
     console.log("Loading video:", selectedMedia.filepath, "->", assetUrl);
     setVideoSrc(assetUrl);
     setIsPlaying(false);
-  }, [selectedMedia]);
+    setShowBlackScreen(false);
+  }, [selectedMedia, mode]);
 
   // Setup video event listeners
   useEffect(() => {
@@ -131,7 +187,13 @@ function VideoPreviewPanel({ selectedMedia, mode = "library" }) {
       </div>
 
       <div className="panel-content">
-        {videoSrc ? (
+        {showBlackScreen ? (
+          <div className="video-player">
+            <div className="video-container black-screen">
+              <div className="black-screen-message">Gap in Timeline</div>
+            </div>
+          </div>
+        ) : videoSrc ? (
           <div className="video-player">
             <div className="video-container">
               <video
