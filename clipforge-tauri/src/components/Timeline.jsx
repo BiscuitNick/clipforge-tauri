@@ -335,9 +335,16 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
   return (
     <div className="timeline-container" ref={containerRef}>
       <div className="timeline-controls">
-        <button onClick={() => onZoom?.(0.5)}>Zoom In</button>
-        <button onClick={() => onZoom?.(-0.5)}>Zoom Out</button>
-        <span className="zoom-level">Zoom: {zoomLevel.toFixed(1)}x</span>
+        <div className="toolbar-section">
+          <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
+          <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>
+          <span className="zoom-level">Zoom: {zoomLevel.toFixed(1)}x</span>
+        </div>
+        <div className="toolbar-section">
+          <button disabled title="Copy clip (Cmd/Ctrl+C)">Copy</button>
+          <button disabled title="Paste clip (Cmd/Ctrl+V)">Paste</button>
+          <button disabled title="Delete clip (Delete/Backspace)">Delete</button>
+        </div>
       </div>
       <canvas
         ref={canvasRef}

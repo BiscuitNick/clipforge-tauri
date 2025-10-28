@@ -161,6 +161,11 @@
   border-color: #444;
 }
 
+.media-library-panel .media-item.selected {
+  background-color: #1a2a3a;
+  border-color: #007bff;
+}
+
 .media-library-panel .media-thumbnail {
   width: 60px;
   height: 60px;

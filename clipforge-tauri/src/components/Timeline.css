@@ -12,10 +12,17 @@
 .timeline-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.75rem 1rem;
   background-color: #2a2a2a;
   border-bottom: 1px solid #333;
+}
+
+.timeline-controls .toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .timeline-controls button {
@@ -36,6 +43,17 @@
 
 .timeline-controls button:active {
   background-color: #2a4f6d;
+}
+
+.timeline-controls button:disabled {
+  background-color: #333;
+  color: #666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.timeline-controls button:disabled:hover {
+  background-color: #333;
 }
 
 .zoom-level {

@@ -18,7 +18,7 @@ function formatDuration(seconds) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -199,7 +199,11 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport }) {
             </button>
             <div className="media-items">
               {mediaItems.map((item) => (
-                <div key={item.id} className="media-item">
+                <div
+                  key={item.id}
+                  className={`media-item ${selectedMediaId === item.id ? 'selected' : ''}`}
+                  onClick={() => onMediaSelect && onMediaSelect(item)}
+                >
                   <div className="media-thumbnail">
                     {/* Placeholder thumbnail - TODO: Implement actual thumbnail generation */}
                     <svg
