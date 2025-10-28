@@ -14,6 +14,53 @@ function App() {
     timeline.addClips(videoMetadata);
   };
 
+  const handleExport = async () => {
+    if (timeline.clips.length === 0) {
+      alert("No clips to export");
+      return;
+    }
+
+    try {
+      // Import the invoke function
+      const { invoke } = await import("@tauri-apps/api/core");
+      const { save } = await import("@tauri-apps/plugin-dialog");
+
+      // Show save dialog
+      const savePath = await save({
+        defaultPath: "export.mp4",
+        filters: [{
+          name: "Video",
+          extensions: ["mp4"]
+        }]
+      });
+
+      if (!savePath) return; // User cancelled
+
+      // Prepare clips data for export
+      const clipsData = timeline.clips.map(clip => ({
+        videoPath: clip.videoPath,
+        startTime: clip.startTime,
+        trimStart: clip.trimStart || 0,
+        trimEnd: clip.trimEnd || clip.duration,
+        duration: clip.duration
+      }));
+
+      console.log("Exporting clips:", clipsData);
+      console.log("Output path:", savePath);
+
+      // Call the export command
+      await invoke("export_timeline", {
+        clips: clipsData,
+        outputPath: savePath
+      });
+
+      alert("Export completed successfully!");
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert(`Export failed: ${error}`);
+    }
+  };
+
   // Get the selected clip data
   const selectedClip = useMemo(() => {
     if (!timeline.selectedClipId) return null;
@@ -48,7 +95,25 @@ function App() {
       </div>
 
       <div className="timeline-section">
-        <h2>Timeline</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h2 style={{ margin: 0 }}>Timeline</h2>
+          <button
+            onClick={handleExport}
+            disabled={timeline.clips.length === 0}
+            style={{
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              backgroundColor: timeline.clips.length === 0 ? '#666' : '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: timeline.clips.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Export Video
+          </button>
+        </div>
         <Timeline
           clips={timeline.clips}
           playheadPosition={timeline.playheadPosition}

@@ -16,7 +16,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::video_import::import_video,
-            commands::metadata::extract_metadata
+            commands::metadata::extract_metadata,
+            commands::export::export_timeline
         ])
         .setup(|app| {
             // Create the menu
