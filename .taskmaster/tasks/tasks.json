@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Set Up Tauri Desktop Application",
         "description": "Configure and launch ClipForge as a native macOS desktop application using Tauri 2.x.",
         "status": "review",
@@ -18,7 +18,8 @@
             "dependencies": [],
             "details": "Run `npm create tauri-app@latest` and follow the prompts to create a new project. Select the appropriate frontend framework (React) and Rust as the backend language. Ensure all initial dependencies are installed correctly.",
             "status": "done",
-            "testStrategy": "Verify the project directory is created with `src`, `src-tauri`, `package.json`, and `Cargo.toml`. Run `npm run tauri dev` to confirm the default application window opens without errors."
+            "testStrategy": "Verify the project directory is created with `src`, `src-tauri`, `package.json`, and `Cargo.toml`. Run `npm run tauri dev` to confirm the default application window opens without errors.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -29,7 +30,8 @@
             ],
             "details": "Edit `src-tauri/tauri.conf.json`. Set the `productName` to \"ClipForge\", update version number, and provide paths for app icons. Configure the main window to have a minimum dimension of 1280x720. Set the `macOS.minimumSystemVersion` to \"10.15\".",
             "status": "done",
-            "testStrategy": "Run `npm run tauri dev`. Check if the application window title is 'ClipForge' and if its initial size is at least 1280x720. Verify the application icon appears correctly in the dock (if configured)."
+            "testStrategy": "Run `npm run tauri dev`. Check if the application window title is 'ClipForge' and if its initial size is at least 1280x720. Verify the application icon appears correctly in the dock (if configured).",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -40,7 +42,8 @@
             ],
             "details": "In `src-tauri/src/main.rs`, use the `tauri::Menu` builder to construct the menu structure. Create submenus for File, Edit, and View with standard items like 'Quit', 'Copy', 'Paste', etc. Attach the created menu to the application builder.\n<info added on 2025-10-27T21:19:11.456Z>\n```json\n\"Successfully implemented the native macOS menu bar in `src-tauri/src/lib.rs` (lines 1-75). The menu includes 'File' (New, Open, Save), 'Edit' (Cut, Copy, Paste), and 'View' (zoom controls) with standard items. A minor unused import warning was also resolved. The application compiles and runs successfully in dev mode.\"\n```\n</info added on 2025-10-27T21:19:11.456Z>",
             "status": "done",
-            "testStrategy": "Launch the application in development mode (`npm run tauri dev`) on macOS. Verify that the custom 'File', 'Edit', and 'View' menus appear in the top menu bar instead of the default Tauri menu. Check that basic actions like 'Quit' work."
+            "testStrategy": "Launch the application in development mode (`npm run tauri dev`) on macOS. Verify that the custom 'File', 'Edit', and 'View' menus appear in the top menu bar instead of the default Tauri menu. Check that basic actions like 'Quit' work.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -52,17 +55,21 @@
             ],
             "details": "Set up macOS code signing environment variables (`APPLE_DEVELOPMENT_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`). Use `tauri build` to generate the `.app` bundle in `src-tauri/target/release/bundle/macos/`. Do not use the `--debug` flag.",
             "status": "pending",
-            "testStrategy": "Locate the `ClipForge.app` file in the build output directory. Double-click to launch it outside of the development environment. Confirm the app starts, window dimensions are correct, and the native menu bar is present. Ensure there are no Gatekeeper warnings about the app being from an unidentified developer."
+            "testStrategy": "Locate the `ClipForge.app` file in the build output directory. Double-click to launch it outside of the development environment. Confirm the app starts, window dimensions are correct, and the native menu bar is present. Ensure there are no Gatekeeper warnings about the app being from an unidentified developer.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down the Tauri setup into distinct steps: 1) Project initialization using `create-tauri-app`. 2) `tauri.conf.json` configuration for app metadata, window settings, and icons. 3) Rust-side implementation of the native menu bar. 4) A dedicated task for building the app, handling macOS code signing, and verifying the final `.app` bundle."
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Implement Video Import via Drag & Drop",
         "description": "Enable users to import video files (MP4/MOV) by dragging them from Finder into the app.",
         "status": "done",
         "dependencies": [
-          1
+          "1"
         ],
         "priority": "high",
         "details": "Create an `ImportPanel` React component with a drag-and-drop zone using HTML5 drag events. Provide visual feedback (highlight drop zone) during drag. Validate file types to accept only MP4 and MOV formats, rejecting others with an error message. Display import progress or confirmation post-import. Use Tauri’s filesystem APIs to handle file paths and invoke a Rust command `import_video(path: String)` to process files and extract metadata.",
@@ -75,7 +82,8 @@
             "dependencies": [],
             "details": "Use React hooks for state management of drag/drop events. Style the drop zone to clearly indicate its purpose. Implement CSS for visual feedback, e.g., adding a border or changing background color on `dragenter`/`dragover` and removing it on `dragleave`/`drop`. Ensure `preventDefault()` is called for `dragover` and `drop` events to prevent default browser behavior.",
             "status": "done",
-            "testStrategy": "Test by dragging various files (supported and unsupported) over the component to verify visual feedback (e.g., highlight appears/disappears). Confirm that dropping files does not trigger default browser navigation or file opening."
+            "testStrategy": "Test by dragging various files (supported and unsupported) over the component to verify visual feedback (e.g., highlight appears/disappears). Confirm that dropping files does not trigger default browser navigation or file opening.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -84,7 +92,8 @@
             "dependencies": [],
             "details": "Create a new Rust module (e.g., `src-tauri/src/commands/video_import.rs`) and define a public `#[tauri::command]` function named `import_video`. This function should accept a `Vec<String>` argument representing the file paths. Initially, it can just log the received paths and return a success `Result` or a dummy value.",
             "status": "done",
-            "testStrategy": "Use `tauri::Invoke` from the Rust side or a simple frontend call (e.g., via `window.__TAURI__.invoke`) to test if the command can be called successfully. Pass various arrays of dummy file paths and verify that the Rust backend correctly receives and logs them."
+            "testStrategy": "Use `tauri::Invoke` from the Rust side or a simple frontend call (e.g., via `window.__TAURI__.invoke`) to test if the command can be called successfully. Pass various arrays of dummy file paths and verify that the Rust backend correctly receives and logs them.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -96,17 +105,21 @@
             ],
             "details": "On the `drop` event, access `event.dataTransfer.files`. Iterate through the files, checking their `type` property or file extension (`.mp4`, `.mov`). For valid files, extract their paths. Use `window.__TAURI__.invoke('import_video', { paths: [...] })` to call the backend command. Update the UI to show 'Importing...', 'Import successful!', or 'Error: Unsupported file type.' messages.\n<info added on 2025-10-27T21:23:55.567Z>\n{\n  \"content\": \"File validation for MP4/MOV extensions has been successfully implemented. The frontend invokes the `import_video` Rust command, located at `clipforge-tauri/src-tauri/src/commands/video_import.rs`, with the extracted file paths. The backend returns `VideoMetadata` objects containing the path, filename, and size. UI states for loading, success, and errors are now in place with appropriate styling.\"\n}\n</info added on 2025-10-27T21:23:55.567Z>",
             "status": "done",
-            "testStrategy": "Drag and drop MP4 and MOV files from Finder; verify they are processed, and the `import_video` command is invoked. Drag and drop unsupported files (e.g., .txt, .avi); verify an appropriate error message is displayed. Test with multiple valid files dropped simultaneously and ensure all are handled. Test with large files to observe initial UI state changes."
+            "testStrategy": "Drag and drop MP4 and MOV files from Finder; verify they are processed, and the `import_video` command is invoked. Drag and drop unsupported files (e.g., .txt, .avi); verify an appropriate error message is displayed. Test with multiple valid files dropped simultaneously and ensure all are handled. Test with large files to observe initial UI state changes.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Decompose the drag & drop feature into three subtasks: 1) Create the `ImportPanel` React component with HTML5 drag/drop event handlers and visual feedback (e.g., highlighting). 2) Define the `import_video` Tauri command in Rust to receive file paths from the frontend. 3) Implement the frontend logic to invoke the command on file drop, perform file type validation, and manage loading/error UI states."
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Implement Video Import via File Picker",
         "description": "Allow users to import video files using a native macOS file picker triggered by an 'Import Video' button.",
         "status": "done",
         "dependencies": [
-          1
+          "1"
         ],
         "priority": "high",
         "details": "Add an 'Import Video' button in the main UI, linked to Tauri’s `open` dialog API. Configure the file picker to filter for MP4 and MOV files and support multiple selections. On selection, invoke the same `import_video` Rust command as drag-and-drop to process files and return metadata to the frontend for display in the media library.",
@@ -119,7 +132,8 @@
             "dependencies": [],
             "details": "Implement a new React button component (e.g., <ImportVideoButton>) or integrate a standard button into an existing UI panel. Place it logically, perhaps near other import/add actions. Ensure basic styling and accessibility for the button.",
             "status": "done",
-            "testStrategy": "Visually confirm the 'Import Video' button appears in the main UI. Check that it is clickable (even if no action yet) and not disabled."
+            "testStrategy": "Visually confirm the 'Import Video' button appears in the main UI. Check that it is clickable (even if no action yet) and not disabled.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -130,7 +144,8 @@
             ],
             "details": "Modify the <ImportVideoButton> component or the parent component containing it to include an `onClick` prop. Inside the handler function, add a `console.log(\"Import Video button clicked\")` statement to confirm interaction.",
             "status": "done",
-            "testStrategy": "Click the 'Import Video' button and verify that the console log message 'Import Video button clicked' appears in the browser's developer console."
+            "testStrategy": "Click the 'Import Video' button and verify that the console log message 'Import Video button clicked' appears in the browser's developer console.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -141,7 +156,8 @@
             ],
             "details": "Import the `dialog` module from `@tauri-apps/api`. Within the `onClick` handler, call `dialog.open()` and await its result. Log the result (selected file paths or null) to the console to confirm basic file picker interaction.",
             "status": "done",
-            "testStrategy": "Click the 'Import Video' button and confirm that the native macOS file picker dialog appears. Select any file and verify its path (or null if canceled) is logged to the console."
+            "testStrategy": "Click the 'Import Video' button and confirm that the native macOS file picker dialog appears. Select any file and verify its path (or null if canceled) is logged to the console.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -152,7 +168,8 @@
             ],
             "details": "Pass an options object to `dialog.open()` including `multiple: true` and `filters: [{ name: 'Video', extensions: ['mp4', 'mov'] }]`. Ensure the dialog title is descriptive, e.g., 'Select Video Files to Import'.",
             "status": "done",
-            "testStrategy": "Click the button, verify the file picker dialog's title and that only MP4/MOV files are selectable (or prominently displayed). Test selecting multiple files (e.g., using Cmd/Ctrl+click) and confirm the `dialog.open` result returns an array of paths."
+            "testStrategy": "Click the button, verify the file picker dialog's title and that only MP4/MOV files are selectable (or prominently displayed). Test selecting multiple files (e.g., using Cmd/Ctrl+click) and confirm the `dialog.open` result returns an array of paths.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -163,18 +180,22 @@
             ],
             "details": "Import `invoke` from `@tauri-apps/api/core`. Iterate over the array of selected file paths (if not null or empty) and call `invoke('import_video', { path: singleFilePath })` for each. Handle success and error responses, updating the media library display accordingly.\n<info added on 2025-10-27T21:29:09.529Z>\n{\n  \"update_text\": \"An 'Import Video' button was added to ImportPanel.jsx, using the @tauri-apps/plugin-dialog to open the native file picker. The dialog is configured for MP4/MOV files and multiple selections. The import logic was refactored to be shared with the drag-and-drop feature, and the button displays a loading state during import. The dialog plugin dependency was added to both Rust (Cargo.toml, lib.rs) and the frontend (package.json).\"\n}\n</info added on 2025-10-27T21:29:09.529Z>",
             "status": "done",
-            "testStrategy": "Click the button, select one or more MP4/MOV files. Verify that the files are processed (e.g., appear in the media library as per Task 2's `import_video` functionality). Test error handling for import failures and confirm performance for multiple files."
+            "testStrategy": "Click the button, select one or more MP4/MOV files. Verify that the files are processed (e.g., appear in the media library as per Task 2's `import_video` functionality). Test error handling for import failures and confirm performance for multiple files.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 2,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "Break down the file picker import into two steps: 1) Add an 'Import Video' button to the UI. 2) Implement the `onClick` handler to call Tauri's `open` dialog API, configure it for video files, and pass the selected file paths to the existing `import_video` command."
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Develop Timeline UI with Canvas Rendering",
         "description": "Create a timeline view to display imported video clips as visual blocks using HTML5 Canvas.",
         "status": "done",
         "dependencies": [
-          2,
-          3
+          "2",
+          "3"
         ],
         "priority": "medium",
         "details": "Implement a `Timeline` React component using HTML5 Canvas for performance. Render clips as rectangles (min height 80px) with optional thumbnails (first frame or default icon). Display clip duration, position, and a playhead indicator. Add a time ruler with timestamps and grid lines. Enable horizontal scrolling for long sequences and default zoom to fit all clips. Use React hooks (`useTimeline.ts`) to manage state and canvas rendering loop for updates.\n<info added on 2025-10-27T22:02:46.094Z>\n```json\n\"Implementation is complete. The main UI is handled by the `Timeline.jsx` component, which uses an HTML5 Canvas for rendering. State management, including zoom, pan, and clip data, is encapsulated in the `src/hooks/useTimeline.js` hook. Styling is provided by `src/components/Timeline.css`.\\n\\nKey features implemented:\\n- A dynamic time ruler with adaptive major/minor ticks and MM:SS labels (implemented in `src/components/Timeline.jsx`, lines 66-103).\\n- Video clips are rendered as rectangles (min 80px height) showing filename and duration (`src/components/Timeline.jsx`, lines 105-140).\\n- Zoom functionality via Ctrl/Cmd + mouse wheel or UI buttons, with a 0.1x-10x range.\\n- Panning via mouse drag or horizontal scroll. Zoom/pan logic is in `src/components/Timeline.jsx`, lines 220-233.\\n- A draggable red playhead with a triangle handle (`src/components/Timeline.jsx`, lines 142-164).\\n- Clip selection with visual highlighting.\\n- Core coordinate transformation functions (`timeToPixel`, `pixelToTime`) are implemented in `Timeline.jsx` to manage view state.\"\n```\n</info added on 2025-10-27T22:02:46.094Z>",
@@ -187,7 +208,8 @@
             "dependencies": [],
             "details": "Develop the `Timeline.tsx` file, set up the canvas element, and create `useTimeline.ts` to encapsulate canvas rendering logic, drawing functions, and state management (e.g., zoom, scroll position). Establish the basic render loop for canvas updates.",
             "status": "done",
-            "testStrategy": "Verify that the `Timeline` component mounts successfully, displays a canvas element, and the `useTimeline` hook initializes without errors. Check that the canvas context is accessible within the hook."
+            "testStrategy": "Verify that the `Timeline` component mounts successfully, displays a canvas element, and the `useTimeline` hook initializes without errors. Check that the canvas context is accessible within the hook.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -198,7 +220,8 @@
             ],
             "details": "Implement canvas drawing functions to render a static time ruler area. Calculate and draw grid lines (e.g., per second, per minute) and corresponding time labels (HH:MM:SS:FF or similar) dynamically based on the current zoom level and visible time range. Ensure readability and accurate time representation.",
             "status": "done",
-            "testStrategy": "Visually inspect the time ruler for correct timestamp formatting and placement. Zoom in/out and scroll horizontally to ensure grid lines and timestamps adjust accurately and remain legible. Check for consistent spacing and alignment."
+            "testStrategy": "Visually inspect the time ruler for correct timestamp formatting and placement. Zoom in/out and scroll horizontally to ensure grid lines and timestamps adjust accurately and remain legible. Check for consistent spacing and alignment.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -210,7 +233,8 @@
             ],
             "details": "Within the `useTimeline` hook's rendering function, iterate over the provided video clip data. For each clip, calculate its `x`, `y`, `width`, and `height` on the canvas based on its start time, duration, and the current zoom/scroll state. Draw a rectangle with a minimum height of 80px and optionally render a placeholder for thumbnails/icons.",
             "status": "done",
-            "testStrategy": "Import several video clips with varying durations and start times. Verify that each clip appears as a distinct rectangular block on the timeline. Check that their horizontal positions and widths accurately reflect their start times and durations. Confirm minimum height is respected."
+            "testStrategy": "Import several video clips with varying durations and start times. Verify that each clip appears as a distinct rectangular block on the timeline. Check that their horizontal positions and widths accurately reflect their start times and durations. Confirm minimum height is respected.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -223,7 +247,8 @@
             ],
             "details": "Integrate event listeners for mouse wheel (zoom) and mouse drag (scroll) or dedicated scrollbar/controls. Develop functions to update the `scrollOffset` and `zoomLevel` state variables within `useTimeline`. Crucially, implement time-to-pixel and pixel-to-time coordinate transformation methods that account for current zoom and scroll, ensuring all rendered elements (ruler, clips) respond correctly. Default zoom to fit all clips initially.",
             "status": "done",
-            "testStrategy": "Verify that scrolling horizontally moves the timeline content without distorting elements. Test zooming in and out, observing that clips and ruler scale correctly around the mouse pointer or center. Confirm that the default zoom level correctly fits all imported clips into view on load."
+            "testStrategy": "Verify that scrolling horizontally moves the timeline content without distorting elements. Test zooming in and out, observing that clips and ruler scale correctly around the mouse pointer or center. Confirm that the default zoom level correctly fits all imported clips into view on load.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -235,20 +260,24 @@
             ],
             "details": "Add a new drawing function to `useTimeline` to render a distinct vertical line (the playhead) at a specific time position on the canvas. This position needs to be translated from time (e.g., seconds) to canvas pixels using the implemented coordinate transformation logic. Create a method or expose a state update function for external components (like the video player) to set the playhead's current time, triggering a re-render.",
             "status": "done",
-            "testStrategy": "Observe the playhead indicator on the timeline. Manually update its position (simulated playback) and verify it moves smoothly and accurately along the timeline. Confirm its position correctly corresponds to the provided time value, respecting zoom and scroll."
+            "testStrategy": "Observe the playhead indicator on the timeline. Manually update its position (simulated playback) and verify it moves smoothly and accurately along the timeline. Confirm its position correctly corresponds to the provided time value, respecting zoom and scroll.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Decompose the timeline development into several key features: 1) Create the base `Timeline` component with a Canvas element and a custom hook (`useTimeline`) for state. 2) Implement the time ruler rendering logic, including timestamps and grid lines. 3) Implement rendering for video clips as rectangles based on their metadata. 4) Add horizontal scrolling and zoom functionality, including the coordinate transformation logic. 5) Implement the playhead indicator and a mechanism to update its position."
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Integrate Video Preview Player",
         "description": "Add a video preview player to display and play selected clips from the timeline.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          4
+          "4"
         ],
         "priority": "high",
-        "details": "Create a `PreviewPlayer` React component using the HTML5 `<video>` element as recommended for MVP. Use Tauri’s `convertFileSrc()` to generate a playable URL from the file path. Implement play/pause controls and ensure video maintains aspect ratio with synchronized audio. Load the clip into preview on timeline click. Sync playhead position with video `currentTime` for accurate playback feedback.",
+        "details": "Create a `PreviewPlayer` React component using the HTML5 `<video>` element as recommended for MVP. Use Tauri’s `convertFileSrc()` to generate a playable URL from the file path. Implement play/pause controls and ensure video maintains aspect ratio with synchronized audio. Load the clip into preview on timeline click. Sync playhead position with video `currentTime` for accurate playback feedback.\n<info added on 2025-10-27T22:09:42.299Z>\n\"Implementation Summary:\\nThe feature is complete, implemented via `clipforge-tauri/src/components/PreviewPlayer.jsx` (193 lines) and styled with `clipforge-tauri/src/components/PreviewPlayer.css` (223 lines).\\n\\nKey Features & Logic:\\n- An HTML5 video element with `object-fit: contain` maintains the correct aspect ratio.\\n- Custom controls were built, including a play/pause button, a seekable progress bar, a volume slider, and a time display showing current/total duration in MM:SS format.\\n- Local file playback is enabled by logic in `clipforge-tauri/src/App.jsx` (lines 17-27) which uses Tauri's `convertFileSrc()` to generate a playable URL for the selected clip.\\n- Two-way playhead synchronization is managed in `App.jsx` and `PreviewPlayer.jsx`:\\n  - Video → Timeline: The player's `onTimeUpdate` callback sends `currentTime` to `App.jsx`, which then calls `timeline.setPlayheadPosition`.\\n  - Timeline → Video: The `playheadPosition` prop passed to `PreviewPlayer` (from `App.jsx`, lines 37-41) triggers a `video.currentTime` update. The external seek handling logic is located in `PreviewPlayer.jsx` at lines 88-107.\\n  - A 0.5s threshold and separate seeking flags (`isSeeking`, `isExternalSeek`) are used to prevent update conflicts and feedback loops.\"\n</info added on 2025-10-27T22:09:42.299Z>",
         "testStrategy": "Select a clip on timeline and confirm it loads in preview. Test play/pause functionality and verify audio sync with video. Check aspect ratio preservation (no stretching). Ensure playback achieves minimum 30fps for 1080p content using browser performance tools.",
         "subtasks": [
           {
@@ -257,8 +286,9 @@
             "description": "Develop a React component named `PreviewPlayer` that encapsulates an HTML5 `<video>` element. This component will include essential user interface controls for playback, such as play/pause, volume adjustment, and a visual progress bar. The implementation must ensure that the video's aspect ratio is correctly maintained and that audio playback is synchronized with the video frames.",
             "dependencies": [],
             "details": "Create `src/components/PreviewPlayer.tsx`. Use an HTML5 `<video>` element with `controls` attribute set to false, and implement custom controls. Add React state for managing play/pause status and volume level. Implement event handlers for play/pause buttons, volume slider, and a custom progress bar. Use CSS properties like `object-fit: contain` to preserve aspect ratio. Initial player should load a placeholder or be ready for dynamic URL.",
-            "status": "pending",
-            "testStrategy": "Manually mount the `PreviewPlayer` component in a test environment (e.g., Storybook or isolated React app) with a hardcoded, local video URL. Verify that play/pause, volume control, and progress bar interact correctly. Confirm that the video's aspect ratio is preserved and audio is synchronized."
+            "status": "done",
+            "testStrategy": "Manually mount the `PreviewPlayer` component in a test environment (e.g., Storybook or isolated React app) with a hardcoded, local video URL. Verify that play/pause, volume control, and progress bar interact correctly. Confirm that the video's aspect ratio is preserved and audio is synchronized.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -268,8 +298,9 @@
               1
             ],
             "details": "Modify the `PreviewPlayer` to accept a `filePath` prop. In the `Timeline` component or a managing parent component (e.g., `App.tsx`), implement a state variable to track the `selectedClipFilePath`. When a clip is clicked in the timeline, update this state. Pass the `selectedClipFilePath` to the `PreviewPlayer`. Inside `PreviewPlayer`, use `tauri::convertFileSrc(props.filePath)` to generate the `src` attribute for the `<video>` element. Handle cases where no clip is selected by displaying a default message or placeholder.",
-            "status": "pending",
-            "testStrategy": "After mounting the timeline and `PreviewPlayer`, import several video clips. Click on various clips in the timeline and observe if the corresponding video correctly loads and becomes playable (or starts playing) in the `PreviewPlayer`. Test with different video formats (MP4, MOV) to ensure `convertFileSrc` handles them properly."
+            "status": "done",
+            "testStrategy": "After mounting the timeline and `PreviewPlayer`, import several video clips. Click on various clips in the timeline and observe if the corresponding video correctly loads and becomes playable (or starts playing) in the `PreviewPlayer`. Test with different video formats (MP4, MOV) to ensure `convertFileSrc` handles them properly.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -280,19 +311,23 @@
               2
             ],
             "details": "In `PreviewPlayer`, implement an `onTimeUpdate` prop that triggers periodically as the video plays, emitting the current video `currentTime`. In the `Timeline` component, subscribe to this `onTimeUpdate` event and update the visual playhead's position accordingly. For seeking, implement an `onSeek` prop in `PreviewPlayer` that accepts a time in seconds. When the user scrubs the timeline playhead, calculate the corresponding time and call `PreviewPlayer`'s `onSeek` function, which will set the video element's `currentTime`. Consider debouncing or throttling `onTimeUpdate` events to optimize performance, especially during scrubbing.",
-            "status": "pending",
-            "testStrategy": "Load a video and play it; verify that the timeline playhead moves smoothly and accurately in sync with the video. Pause the video and confirm the playhead stops. Drag the timeline playhead to different positions (scrubbing) and ensure the video seeks precisely to the new time. Test repeated seeking operations and confirm audio/video synchronization is maintained."
+            "status": "done",
+            "testStrategy": "Load a video and play it; verify that the timeline playhead moves smoothly and accurately in sync with the video. Pause the video and confirm the playhead stops. Drag the timeline playhead to different positions (scrubbing) and ensure the video seeks precisely to the new time. Test repeated seeking operations and confirm audio/video synchronization is maintained.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down the video preview integration into three parts: 1) Create the `PreviewPlayer` React component using an HTML5 `<video>` tag and basic play/pause controls. 2) Implement logic to load a video when a clip is selected on the timeline, using Tauri's `convertFileSrc` API. 3) Implement two-way state synchronization: updating the timeline's playhead based on the video's `currentTime`, and seeking the video when the timeline playhead is scrubbed."
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Implement Basic Trim Functionality",
         "description": "Enable users to trim video clips by setting in and out points using draggable handles on the timeline.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          4,
-          5
+          "4",
+          "5"
         ],
         "priority": "medium",
         "details": "Add trim handles to the `Timeline` component, visible when a clip is selected. Implement drag logic in `TrimControls.tsx` to update `inPoint` and `outPoint` in clip state (non-destructive edit). Visually distinguish trimmed vs. untrimmed regions on canvas (e.g., color/pattern). Update preview to reflect trimmed segment only. Display numeric IN/OUT timecodes and provide a reset option to original length.",
@@ -304,8 +339,10 @@
             "description": "Add visual, draggable 'in' and 'out' handles to the representation of a selected video clip within the Timeline component. These handles will be the primary interface for users to define trim points.",
             "dependencies": [],
             "details": "Modify the `Timeline` component to render specific UI elements (e.g., styled `div` elements with resize cursors) at the start and end of a visually selected clip. Ensure these handles are styled to be clearly distinguishable and are only rendered when a video clip on the timeline is actively selected. Consider placing them within a new `TrimControls` sub-component.",
-            "status": "pending",
-            "testStrategy": "Select various clips on the timeline and verify that 'in' and 'out' trim handles appear correctly on the selected clip's visual representation and disappear when no clip is selected or a different clip is selected. Check for correct positioning and basic styling."
+            "status": "done",
+            "testStrategy": "Select various clips on the timeline and verify that 'in' and 'out' trim handles appear correctly on the selected clip's visual representation and disappear when no clip is selected or a different clip is selected. Check for correct positioning and basic styling.",
+            "updatedAt": "2025-10-27T22:53:25.073Z",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -315,8 +352,10 @@
               1
             ],
             "details": "In `TrimControls.tsx` (or a dedicated hook), implement `mousedown`, `mousemove`, and `mouseup` event listeners for the 'in' and 'out' handles. During a `mousemove` event when dragging, calculate the potential new `inPoint` or `outPoint` based on the mouse's horizontal position relative to the timeline's scale. Manage a drag state to indicate which handle is being dragged and update its temporary visual position during the drag operation.",
-            "status": "pending",
-            "testStrategy": "With a clip selected, attempt to drag the 'in' handle and then the 'out' handle. Verify that the handles visually move with the mouse pointer during the drag. Test dragging beyond clip boundaries and ensuring the handle visually clamps to valid ranges (start of clip for in-point, end for out-point)."
+            "status": "done",
+            "testStrategy": "With a clip selected, attempt to drag the 'in' handle and then the 'out' handle. Verify that the handles visually move with the mouse pointer during the drag. Test dragging beyond clip boundaries and ensuring the handle visually clamps to valid ranges (start of clip for in-point, end for out-point).",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-27T22:53:25.961Z"
           },
           {
             "id": 3,
@@ -326,8 +365,10 @@
               2
             ],
             "details": "Upon `mouseup` after a handle drag (or possibly debounced during drag), dispatch an action to update the `inPoint` or `outPoint` property of the currently selected clip in the application's global state. These updates must preserve the original media duration (non-destructive). Enhance the `Timeline` component's clip rendering to visually differentiate the 'trimmed' (active) and 'untrimmed' (inactive/cut-off) portions of the clip, perhaps with different colors, transparency, or a hatched pattern.",
-            "status": "pending",
-            "testStrategy": "Drag 'in' and 'out' handles for a selected clip. After releasing, verify that the visual representation of the clip on the timeline updates immediately, clearly showing the trimmed and untrimmed regions. Check the application state (e.g., Redux DevTools) to confirm `inPoint` and `outPoint` values are updated correctly and non-destructively."
+            "status": "done",
+            "testStrategy": "Drag 'in' and 'out' handles for a selected clip. After releasing, verify that the visual representation of the clip on the timeline updates immediately, clearly showing the trimmed and untrimmed regions. Check the application state (e.g., Redux DevTools) to confirm `inPoint` and `outPoint` values are updated correctly and non-destructively.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-27T22:53:26.797Z"
           },
           {
             "id": 4,
@@ -337,18 +378,24 @@
               3
             ],
             "details": "Modify the `PreviewPlayer` component to use the selected clip's `inPoint` as the effective start time for playback and seeking, and its `outPoint` as the effective end time. Add UI elements near the timeline or player to display the current numeric `inPoint` and `outPoint` as formatted timecodes (e.g., MM:SS.ms). Implement a 'Reset Trim' button that, when clicked, reverts the selected clip's `inPoint` to 0 and `outPoint` to its original untrimmed duration, updating both the state and visual feedback.",
-            "status": "pending",
-            "testStrategy": "Select a clip, trim it using the handles, and then play it in the `PreviewPlayer`. Verify playback starts precisely at the `inPoint` and ends precisely at the `outPoint`. Check that the displayed numeric timecodes update correctly as handles are dragged. Test the 'Reset Trim' button: confirm it restores the clip to its original length both visually and in the preview, and that timecodes reset."
+            "status": "done",
+            "testStrategy": "Select a clip, trim it using the handles, and then play it in the `PreviewPlayer`. Verify playback starts precisely at the `inPoint` and ends precisely at the `outPoint`. Check that the displayed numeric timecodes update correctly as handles are dragged. Test the 'Reset Trim' button: confirm it restores the clip to its original length both visually and in the preview, and that timecodes reset.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-27T22:53:27.857Z"
           }
-        ]
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Decompose trim functionality: 1) Update timeline rendering to draw draggable 'in' and 'out' handles on a selected clip. 2) Implement mouse event handling (hit detection, drag state management) for the handles. 3) Update the application state with the non-destructive `inPoint` and `outPoint` values. 4) Modify the `PreviewPlayer` to respect the clip's trim points during playback and seeking.",
+        "updatedAt": "2025-10-27T22:53:27.857Z"
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Integrate FFmpeg for Video Processing",
         "description": "Set up FFmpeg integration in the Tauri backend for video metadata extraction and processing.",
         "status": "done",
         "dependencies": [
-          1
+          "1"
         ],
         "priority": "high",
         "details": "Bundle FFmpeg binary in `src-tauri/resources/ffmpeg` and configure Tauri to include it in the build (`tauri.conf.json`). Create Rust commands in `src-tauri/src/commands/` for metadata extraction (`metadata.rs`) using shell commands to FFmpeg. Handle duration, resolution, and frame rate extraction for imported clips. Use `std::process::Command` for execution and parse FFmpeg output. Fallback to `ffmpeg-sys-next` crate if binary approach fails.",
@@ -361,7 +408,8 @@
             "dependencies": [],
             "details": "Locate `src-tauri/tauri.conf.json`. Add the `src-tauri/resources/ffmpeg/*` path to the `bundle.resources` array. Ensure correct binaries (e.g., `ffmpeg`, `ffprobe` for macOS/Linux; `ffmpeg.exe`, `ffprobe.exe` for Windows) are placed in the specified directory. Document the process for obtaining and placing the correct architecture-specific binaries.",
             "status": "done",
-            "testStrategy": "Build the Tauri application for at least one target (e.g., macOS or Windows). Inspect the application bundle contents (e.g., `.app/Contents/Resources` on macOS) to verify that `ffmpeg` and `ffprobe` binaries are correctly included in the resources folder. Attempt to locate and execute the bundled binary manually from the compiled app's resource path via a shell."
+            "testStrategy": "Build the Tauri application for at least one target (e.g., macOS or Windows). Inspect the application bundle contents (e.g., `.app/Contents/Resources` on macOS) to verify that `ffmpeg` and `ffprobe` binaries are correctly included in the resources folder. Attempt to locate and execute the bundled binary manually from the compiled app's resource path via a shell.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -372,7 +420,8 @@
             ],
             "details": "Create a new Rust module, e.g., `src-tauri/src/commands/metadata_extractor.rs`. Implement a private asynchronous function, `fn execute_ffprobe_json(file_path: &Path) -> Result<String, String>`. This function should: 1. Resolve the absolute path to the bundled `ffprobe` binary at runtime (e.g., using `tauri::api::path::resource_dir`). 2. Construct `std::process::Command` with arguments like `-v quiet -print_format json -show_format -show_streams <file_path>`. 3. Execute the command, handle `io::Error`, capture `stdout` and `stderr`. 4. Return the `stdout` as `Ok(json_string)` or an `Err(error_message)`.",
             "status": "done",
-            "testStrategy": "Write unit tests for the `execute_ffprobe_json` function. Use a known, small video file (e.g., a 5-second MP4). Mock or provide a temporary `ffprobe` binary if needed for isolated testing, or execute against a real bundled binary if built. Assert that the function returns a `Result::Ok` containing a valid JSON string and `Result::Err` for non-existent files or execution failures. Validate basic JSON structure."
+            "testStrategy": "Write unit tests for the `execute_ffprobe_json` function. Use a known, small video file (e.g., a 5-second MP4). Mock or provide a temporary `ffprobe` binary if needed for isolated testing, or execute against a real bundled binary if built. Assert that the function returns a `Result::Ok` containing a valid JSON string and `Result::Err` for non-existent files or execution failures. Validate basic JSON structure.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -383,15 +432,23 @@
             ],
             "details": "In `src-tauri/src/commands/metadata_extractor.rs` (or similar), define a new `#[tauri::command]` function: `async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String>`. This function will: 1. Call `execute_ffprobe_json` with the provided `file_path`. 2. Use `serde_json` to deserialize the JSON string into a custom `VideoMetadata` struct. Define `VideoMetadata` to hold `duration`, `width`, `height`, and `avg_frame_rate`, making it `#[derive(Debug, serde::Serialize, serde::Deserialize)]`. 3. Implement robust error handling for JSON parsing failures or `ffprobe` execution errors. 4. Return the `VideoMetadata` struct on success or an appropriate error message.",
             "status": "done",
-            "testStrategy": "Integrate the `extract_metadata` command into the Tauri application and call it from a simple frontend component. Provide a known video file path. Verify that the frontend receives a structured object containing correct `duration`, `width`, `height`, and `avg_frame_rate` values by comparing against manually verified metadata for the test file. Test with various video formats (MP4, MOV) and edge cases like corrupted files to ensure graceful error handling."
+            "testStrategy": "Integrate the `extract_metadata` command into the Tauri application and call it from a simple frontend component. Provide a known video file path. Verify that the frontend receives a structured object containing correct `duration`, `width`, `height`, and `avg_frame_rate` values by comparing against manually verified metadata for the test file. Test with various video formats (MP4, MOV) and edge cases like corrupted files to ensure graceful error handling.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Decompose FFmpeg integration into three steps: 1) Configure `tauri.conf.json` to correctly bundle the FFmpeg binary resource. 2) Create a Rust function using `std::process::Command` to execute `ffprobe` with JSON output arguments. 3) Create the Tauri command `extract_metadata` that calls this function, parses the JSON output into a Rust struct, and returns the structured data to the frontend."
       }
     ],
     "metadata": {
-      "created": "2025-10-27T20:39:15.987Z",
-      "updated": "2025-10-27T22:02:46.134Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2025-10-27T22:53:27.858Z",
+      "taskCount": 7,
+      "completedCount": 6,
+      "tags": [
+        "master"
+      ]
     }
   }
 }
