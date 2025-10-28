@@ -4,15 +4,26 @@ import VideoPreviewPanel from "./components/VideoPreviewPanel";
 import TimelineClipsPanel from "./components/TimelineClipsPanel";
 import Timeline from "./components/Timeline";
 import { useTimeline } from "./hooks/useTimeline";
+import { useMediaLibrary } from "./hooks/useMediaLibrary";
 
 function App() {
   const timeline = useTimeline();
+  const mediaLibrary = useMediaLibrary();
+
+  // Handle media import from Media Library Panel
+  const handleMediaImport = (videoMetadataArray) => {
+    console.log("App - Media imported:", videoMetadataArray);
+    mediaLibrary.addMediaItems(videoMetadataArray);
+  };
 
   return (
     <div className="app-layout">
       {/* Top section: Three equal panels */}
       <div className="top-panels">
-        <MediaLibraryPanel />
+        <MediaLibraryPanel
+          mediaItems={mediaLibrary.mediaItems}
+          onMediaImport={handleMediaImport}
+        />
         <VideoPreviewPanel />
         <TimelineClipsPanel />
       </div>

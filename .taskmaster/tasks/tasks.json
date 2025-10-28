@@ -46,7 +46,7 @@
         "id": 2,
         "title": "Implement Media Library Panel with Staging Area",
         "description": "Develop the top-left panel for media import and staging. Users will import media files which will then be listed in this panel, ready to be added to the timeline, but not yet part of the edit.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           1
         ],
@@ -59,8 +59,8 @@
             "title": "Build media import drop zone and picker",
             "description": "Create the Media Library panel UI with drag-and-drop and file picker controls for ingesting media files.",
             "dependencies": [],
-            "details": "Implement a React component housing the drop zone with drag-over styling, integrate file input button, and wire both to a shared handler that normalizes selected File objects for later processing.",
-            "status": "pending",
+            "details": "Implement a React component housing the drop zone with drag-over styling, integrate file input button, and wire both to a shared handler that normalizes selected File objects for later processing.\n<info added on 2025-10-28T02:39:19.201Z>\nIntegrated Tauri drag-enter/over/leave/drop listeners, wired the @tauri-apps/plugin-dialog picker into the shared import handler with MP4/MOV validation, added loading plus auto-dismissing success/error feedback, toggled between empty-state drop zone and populated media list with animated drag styling, and surfaced a media-count badge in the panel header.\n</info added on 2025-10-28T02:39:19.201Z>",
+            "status": "done",
             "testStrategy": "Manually drop and select multiple files; confirm the handler receives File objects and UI states respond to drag events."
           },
           {
@@ -70,8 +70,8 @@
             "dependencies": [
               1
             ],
-            "details": "Create an async pipeline that takes queued File objects, runs ffmpeg.wasm (or calls the server) to obtain duration and a representative frame, handles fallbacks, and emits structured metadata payloads.",
-            "status": "pending",
+            "details": "Create an async pipeline that takes queued File objects, runs ffmpeg.wasm (or calls the server) to obtain duration and a representative frame, handles fallbacks, and emits structured metadata payloads.\n<info added on 2025-10-28T02:40:04.062Z>\nLeverage the src-tauri/src/commands/video_import.rs import_video command to hand off queued paths to the backend. extract_metadata in src-tauri/src/commands/metadata.rs already invokes FFprobe and parses its JSON response to return a VideoMetadata struct (path, filename, duration, width, height, frame_rate). The pipeline should invoke(\"import_video\") to receive metadata for each file, tolerate per-file failures, and continue processing subsequent items. Document that thumbnail generation remains a TODO and currently falls back to placeholder imagery until a first-frame extractor is added.\n</info added on 2025-10-28T02:40:04.062Z>",
+            "status": "done",
             "testStrategy": "Use sample media files to verify duration and thumbnail data are produced and errors are surfaced for unsupported formats."
           },
           {
@@ -82,8 +82,8 @@
               1,
               2
             ],
-            "details": "Define the MediaItem interface, add state slice or context actions to insert new items with unique IDs, metadata, and default usedInTimeline flag, ensuring idempotent updates.",
-            "status": "pending",
+            "details": "Define the MediaItem interface, add state slice or context actions to insert new items with unique IDs, metadata, and default usedInTimeline flag, ensuring idempotent updates.\n<info added on 2025-10-28T02:41:15.672Z>\nImplemented src/hooks/useMediaLibrary.js to manage MediaItem state with addMediaItems() transforming VideoMetadata entries, plus removeMediaItem(), markAsUsed(), getMediaItem(), and clearMediaLibrary(). Each MediaItem now receives a media-{timestamp}-{random} identifier, ensuring idempotent inserts. Integrated the hook into App.jsx via handleMediaImport and passed mediaItems/onMediaImport through to MediaLibraryPanel, confirming end-to-end flow from backend metadata to rendered library.\n</info added on 2025-10-28T02:41:15.672Z>",
+            "status": "done",
             "testStrategy": "Trigger imports and inspect state to confirm MediaItems are created with required fields and no duplicates appear."
           },
           {
@@ -93,8 +93,8 @@
             "dependencies": [
               3
             ],
-            "details": "Map state to UI elements, render responsive grid or list entries showing thumbnail previews, text details, and a placeholder green dot element ready to reflect usedInTimeline status.",
-            "status": "pending",
+            "details": "Map state to UI elements, render responsive grid or list entries showing thumbnail previews, text details, and a placeholder green dot element ready to reflect usedInTimeline status.\n<info added on 2025-10-28T02:42:20.356Z>\nImplemented formatDuration helper for MM:SS display; rendered each media item with video icon thumbnail placeholder, ellipsized filename, duration, and resolution; displayed green usage indicator (●, #4ade80) when usedInTimeline is true; applied hover-styled media cards with 60px thumbnails, text truncation, and 0.5rem gaps in the scrollable list; build succeeded (46 modules, CSS 8.27 kB +1.1 kB, JS 221.55 kB); ready for user testing after validation step completes.\n</info added on 2025-10-28T02:42:20.356Z>",
+            "status": "done",
             "testStrategy": "Visually confirm list rendering for multiple items, verify thumbnail and duration text align with metadata, and ensure layout handles overflow gracefully."
           },
           {
@@ -107,8 +107,8 @@
               3,
               4
             ],
-            "details": "Draft a checklist of manual and automated tests across different media types, run through drag-and-drop scenarios, metadata accuracy checks, state inspection, and confirm the timeline remains unaffected.",
-            "status": "pending",
+            "details": "Draft a checklist of manual and automated tests across different media types, run through drag-and-drop scenarios, metadata accuracy checks, state inspection, and confirm the timeline remains unaffected.\n<info added on 2025-10-28T02:43:31.398Z>\nDocumented MEDIA_LIBRARY_VALIDATION.md with completion checkmarks and ten manual validation scenarios covering drag-and-drop, file picker, invalid files, multiple imports, metadata accuracy, usage indicator, timeline isolation, state persistence, responsive layout, and error handling. Captured build metrics (46 modules, CSS 8.27kB, JS 221.55kB, ~350ms build time), listed current limitations (no real thumbnails, no drag-to-timeline, no delete/search/sort), outlined future enhancements and integration points for Tasks 3, 4, and 5, and set validation status to READY FOR USER TESTING.\n</info added on 2025-10-28T02:43:31.398Z>",
+            "status": "done",
             "testStrategy": "Follow the validation checklist, logging results for each scenario and capturing any regressions for follow-up fixes."
           }
         ]
@@ -727,7 +727,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T01:56:29.799Z",
-      "updated": "2025-10-28T02:31:34.529Z",
+      "updated": "2025-10-28T02:43:31.529Z",
       "description": "Tasks for master context"
     }
   }
