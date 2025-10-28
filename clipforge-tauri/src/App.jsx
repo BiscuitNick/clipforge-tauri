@@ -6,6 +6,7 @@ import TimelineClipsPanel from "./components/TimelineClipsPanel";
 import Timeline from "./components/Timeline";
 import { useTimeline } from "./hooks/useTimeline";
 import { useMediaLibrary } from "./hooks/useMediaLibrary";
+import { DndContext } from "@dnd-kit/core";
 
 function App() {
   const timeline = useTimeline();
@@ -24,8 +25,25 @@ function App() {
     setSelectedMedia(mediaItem);
   };
 
+  // Handle drag end - when media is dropped on timeline
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || over.id !== 'timeline-drop-zone') {
+      return;
+    }
+
+    // Get the dragged media item data
+    const mediaData = active.data.current;
+    if (mediaData && mediaData.type === 'media-item') {
+      console.log("Dropped media on timeline:", mediaData);
+      timeline.addClip(mediaData);
+    }
+  };
+
   return (
-    <div className="app-layout">
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="app-layout">
       {/* Top section: Three equal panels */}
       <div className="top-panels">
         <MediaLibraryPanel
@@ -57,6 +75,7 @@ function App() {
         />
       </div>
     </div>
+    </DndContext>
   );
 }
 

@@ -12,6 +12,36 @@ export function useTimeline() {
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
 
+  // Add a single clip from drag-and-drop
+  const addClip = useCallback((mediaData) => {
+    // Calculate start position: 0 for first clip, or end of last clip
+    const startTime = clips.length > 0
+      ? Math.max(...clips.map(c => {
+          const trimStart = c.trimStart || 0;
+          const trimEnd = c.trimEnd || c.duration;
+          const trimmedDuration = trimEnd - trimStart;
+          return c.startTime + trimmedDuration;
+        }))
+      : 0;
+
+    const newClip = {
+      id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      mediaId: mediaData.mediaId,
+      videoPath: mediaData.filepath,
+      filename: mediaData.filename,
+      duration: mediaData.duration,
+      width: mediaData.width,
+      height: mediaData.height,
+      frameRate: mediaData.frameRate,
+      startTime: startTime,
+      trimStart: 0, // inPoint defaults to 0
+      trimEnd: mediaData.duration, // outPoint defaults to full duration
+    };
+
+    setClips(prev => [...prev, newClip]);
+    return newClip;
+  }, [clips]);
+
   // Add clips from imported videos
   const addClips = useCallback((videoMetadata) => {
     const newClips = videoMetadata.map((video, index) => ({
@@ -124,6 +154,7 @@ export function useTimeline() {
     setIsPanning,
 
     // Actions
+    addClip,
     addClips,
     removeClip,
     updateClipPosition,

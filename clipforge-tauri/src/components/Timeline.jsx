@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import "./Timeline.css";
 
 const RULER_HEIGHT = 30;
@@ -13,6 +14,11 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
   const [isPanning, setIsPanning] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
   const [draggingTrimHandle, setDraggingTrimHandle] = useState(null); // { clipId, handle: 'start' | 'end' }
+
+  // Make timeline a drop zone for media items
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: 'timeline-drop-zone'
+  });
 
   // Calculate timeline width based on clips
   const getTotalDuration = () => {
@@ -334,6 +340,11 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
 
   return (
     <div className="timeline-container" ref={containerRef}>
+      <div
+        ref={setDropRef}
+        className={`timeline-drop-overlay ${isOver ? 'active' : ''}`}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: isOver ? 'none' : 'none', zIndex: isOver ? 10 : -1 }}
+      />
       <div className="timeline-controls">
         <div className="toolbar-section">
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>

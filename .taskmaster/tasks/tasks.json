@@ -118,7 +118,7 @@
               4
             ],
             "details": "Draft a checklist of manual and automated tests across different media types, run through drag-and-drop scenarios, metadata accuracy checks, state inspection, and confirm the timeline remains unaffected.\n<info added on 2025-10-28T02:43:31.398Z>\nDocumented MEDIA_LIBRARY_VALIDATION.md with completion checkmarks and ten manual validation scenarios covering drag-and-drop, file picker, invalid files, multiple imports, metadata accuracy, usage indicator, timeline isolation, state persistence, responsive layout, and error handling. Captured build metrics (46 modules, CSS 8.27kB, JS 221.55kB, ~350ms build time), listed current limitations (no real thumbnails, no drag-to-timeline, no delete/search/sort), outlined future enhancements and integration points for Tasks 3, 4, and 5, and set validation status to READY FOR USER TESTING.\n</info added on 2025-10-28T02:43:31.398Z>",
-            "status": "done",
+            "status": "cancelled",
             "testStrategy": "Follow the validation checklist, logging results for each scenario and capturing any regressions for follow-up fixes.",
             "parentId": "undefined"
           }
@@ -342,7 +342,7 @@
         "id": 6,
         "title": "Implement Drag-to-Timeline with Independent Clip Instances",
         "description": "Enable dragging a media item from the Media Library to the timeline. Each drop creates a new, independent TimelineClip instance with a unique ID.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "2",
           "4"
@@ -357,7 +357,7 @@
             "description": "Enable media items to initiate drag operations using the chosen library.",
             "dependencies": [],
             "details": "Integrate dnd-kit or react-dnd into the Media Library component, wrap each MediaItem with the provider hooks, and ensure drag metadata includes mediaId and duration.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Attempt to drag a media item and confirm the drag preview appears with correct metadata.",
             "parentId": "undefined"
           },
@@ -369,7 +369,7 @@
               1
             ],
             "details": "Register the timeline track as a valid drop target, handle drag enter/over for styling, and on drop retrieve payload data from the drag event.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Drag a media item over the timeline and verify the drop zone activates and accepts the drop without errors.",
             "parentId": "undefined"
           },
@@ -381,7 +381,7 @@
               2
             ],
             "details": "Build a factory or helper that constructs TimelineClip objects, assigns unique IDs, sets in/out points based on media duration, and calculates the placement relative to existing clips.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Call the factory with mock media data and existing clips to ensure IDs are unique and positions increment correctly.",
             "parentId": "undefined"
           },
@@ -393,7 +393,7 @@
               3
             ],
             "details": "Invoke the clip factory inside the drop handler, dispatch state update actions to append the new clip, and ensure the timeline data structure reacts to additions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Perform a drag-and-drop in the app and inspect state or logs to confirm the new clip appears in the timeline array.",
             "parentId": "undefined"
           },
@@ -407,7 +407,7 @@
               4
             ],
             "details": "Add temporary highlight or animation on drop, ensure the clip renders at the computed position, and document manual test steps plus integration tests for drag-to-timeline flow.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Follow the documented manual script: drop clips sequentially, verify positioning, and run automated drag-drop test to confirm rendering feedback.",
             "parentId": "undefined"
           }
@@ -823,7 +823,7 @@
       ],
       "created": "2025-10-28T02:52:38.901Z",
       "description": "Tasks for master context",
-      "updated": "2025-10-28T02:53:50.988Z"
+      "updated": "2025-10-28T03:02:24.838Z"
     }
   }
 }

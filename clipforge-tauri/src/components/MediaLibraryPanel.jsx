@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useDraggable } from "@dnd-kit/core";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -12,6 +13,79 @@ function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Draggable wrapper for media items
+ */
+function DraggableMediaItem({ item, isSelected, onSelect }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: item.id,
+    data: {
+      type: 'media-item',
+      mediaId: item.id,
+      filename: item.filename,
+      filepath: item.filepath,
+      duration: item.duration,
+      width: item.width,
+      height: item.height,
+      frameRate: item.frameRate
+    }
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    opacity: isDragging ? 0.5 : 1,
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`media-item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
+      onClick={() => onSelect && onSelect(item)}
+      {...listeners}
+      {...attributes}
+    >
+      <div className="media-thumbnail">
+        <svg
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+      <div className="media-info">
+        <div className="media-title-row">
+          <span className="media-filename" title={item.filename}>
+            {item.filename}
+          </span>
+          {item.usedInTimeline && (
+            <span className="usage-indicator" title="Used in timeline">
+              ●
+            </span>
+          )}
+        </div>
+        <div className="media-metadata">
+          <span className="media-duration">
+            {formatDuration(item.duration)}
+          </span>
+          {item.width && item.height && (
+            <span className="media-resolution">
+              {item.width}×{item.height}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -199,50 +273,12 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             </button>
             <div className="media-items">
               {mediaItems.map((item) => (
-                <div
+                <DraggableMediaItem
                   key={item.id}
-                  className={`media-item ${selectedMediaId === item.id ? 'selected' : ''}`}
-                  onClick={() => onMediaSelect && onMediaSelect(item)}
-                >
-                  <div className="media-thumbnail">
-                    {/* Placeholder thumbnail - TODO: Implement actual thumbnail generation */}
-                    <svg
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                  <div className="media-info">
-                    <div className="media-title-row">
-                      <span className="media-filename" title={item.filename}>
-                        {item.filename}
-                      </span>
-                      {item.usedInTimeline && (
-                        <span className="usage-indicator" title="Used in timeline">
-                          ●
-                        </span>
-                      )}
-                    </div>
-                    <div className="media-metadata">
-                      <span className="media-duration">
-                        {formatDuration(item.duration)}
-                      </span>
-                      {item.width && item.height && (
-                        <span className="media-resolution">
-                          {item.width}×{item.height}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  item={item}
+                  isSelected={selectedMediaId === item.id}
+                  onSelect={onMediaSelect}
+                />
               ))}
             </div>
           </div>

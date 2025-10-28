@@ -166,6 +166,15 @@
   border-color: #007bff;
 }
 
+.media-library-panel .media-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.media-library-panel .media-item {
+  cursor: grab;
+}
+
 .media-library-panel .media-thumbnail {
   width: 60px;
   height: 60px;
