@@ -9,7 +9,7 @@
         "testStrategy": "Test permission dialogs appear correctly on first use. Verify state management tracks recording status accurately. Test cleanup of temporary files on errors and cancellation.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -39,7 +39,7 @@
               2
             ],
             "details": "Design trait-based abstraction for permission operations across platforms. Implement conditional compilation using cfg attributes for platform-specific code. Create Windows permission handling using Windows Runtime APIs for camera/mic. Implement Linux permission checks using DBus and PipeWire/PulseAudio APIs. Build a unified permission manager that selects appropriate implementation at compile time. Include fallback mechanisms for unsupported platforms.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test compilation on all target platforms. Verify permission requests work on each OS. Test fallback behavior on unsupported systems."
           },
           {
@@ -88,7 +88,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -96,7 +96,7 @@
             "description": "Create native macOS implementation for enumerating all available screens and windows using Core Graphics and Accessibility APIs",
             "dependencies": [],
             "details": "Use CGWindowListCopyWindowInfo and NSScreen APIs to enumerate all available displays and windows. Implement filtering to exclude system UI elements and invisible windows. Extract window metadata including CGWindowID, owner application name, window title, bounds, and layer information. Handle permission requests for screen recording access through macOS Security & Privacy settings.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test enumeration with multiple monitors connected, verify all user windows are detected, test with various application types including fullscreen apps, validate permission handling flow"
           },
           {
@@ -105,7 +105,7 @@
             "description": "Design and implement Rust structs for screen and window metadata with proper serialization support",
             "dependencies": [],
             "details": "Create ScreenSource struct with fields for id, name, source_type (enum: Screen/Window), resolution (width/height), position (x/y), thumbnail (Option<Vec<u8>>), and is_primary flag. Implement serde serialization/deserialization for frontend communication. Add builder pattern for easy construction and validation of source objects. Include display scaling factor and color space information for accurate rendering.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test struct serialization/deserialization, validate all field types serialize correctly to JSON, test builder pattern with various input combinations"
           },
           {
@@ -117,7 +117,7 @@
               2
             ],
             "details": "Use CGWindowListCreateImage to capture thumbnail images of screens and windows. Resize captured images to standardized thumbnail dimensions (320x180) using Core Graphics. Convert CGImage to PNG or JPEG format for efficient transmission. Implement caching mechanism to avoid repeated captures. Handle edge cases like minimized windows or off-screen windows. Add option to skip thumbnail generation for performance.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test thumbnail generation for various window sizes, verify image quality and aspect ratio preservation, test performance with many windows, validate memory usage with thumbnail caching"
           },
           {
@@ -129,7 +129,7 @@
               2
             ],
             "details": "Enumerate all connected displays using NSScreen.screens array. Calculate virtual desktop coordinates for proper window positioning across monitors. Handle different DPI scales between monitors (Retina vs non-Retina). Detect primary display and maintain monitor arrangement information. Support monitor hot-plugging with update notifications. Calculate correct capture regions for windows spanning multiple monitors.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test with various multi-monitor configurations, verify coordinates are correct across different arrangements, test monitor connection/disconnection during enumeration, validate DPI handling"
           },
           {
@@ -142,7 +142,7 @@
               4
             ],
             "details": "Create Tauri command 'enumerate_sources' that returns Vec<ScreenSource> to frontend. Implement proper error handling with Result types and custom error messages. Add command 'get_source_thumbnail' for on-demand thumbnail retrieval. Create TypeScript interfaces matching Rust structs for type safety. Implement debouncing for enumeration calls to prevent excessive API usage. Add source change detection and notification system.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test IPC commands from frontend, verify TypeScript types match Rust structs, test error propagation to frontend, validate performance with rapid enumeration calls"
           }
         ]
@@ -157,7 +157,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -165,7 +165,7 @@
             "description": "Set up AVFoundation framework integration for macOS screen recording with proper capture session configuration and screen source selection",
             "dependencies": [],
             "details": "Create Swift/Objective-C bridge for AVFoundation APIs in Tauri. Set up AVCaptureScreenInput for screen capture and configure AVCaptureSession with appropriate presets. Handle screen selection using CGDirectDisplayID and implement proper capture device authorization. Create data structures to pass capture configuration from Rust to native code. Ensure proper memory management and cleanup of AVFoundation resources.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test screen capture initialization on different macOS versions. Verify proper authorization handling and screen selection. Test memory cleanup and resource deallocation."
           },
           {
@@ -176,7 +176,7 @@
               1
             ],
             "details": "Configure AVAssetWriter with H.264 video codec settings including bitrate, keyframe interval, and profile level. Set up AAC audio encoder with sample rate and channel configuration. Implement quality presets (low/medium/high) mapping to specific encoder parameters. Configure MP4 container format with proper metadata. Handle encoder initialization errors and codec availability checks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify encoded output matches H.264/AAC specifications. Test different quality presets produce expected file sizes and visual quality. Validate MP4 container compatibility."
           },
           {
@@ -187,7 +187,7 @@
               1
             ],
             "details": "Set up AVCaptureAudioDataOutput for system audio capture on macOS. Configure audio session to capture system sounds using screen capture audio. Implement audio buffer management and synchronization with video frames. Handle audio device selection and routing changes during recording. Add toggle option to include/exclude system audio in recordings.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test audio capture works with various audio sources. Verify audio/video synchronization in final output. Test audio inclusion toggle functionality."
           },
           {
@@ -199,7 +199,7 @@
               3
             ],
             "details": "Implement start recording command that initializes capture session and begins writing to file. Create stop recording that properly finalizes the video file and releases resources. Add pause/resume functionality by managing capture session state and timestamps. Handle state transitions safely with proper error handling. Implement recording state notifications to update UI.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test rapid start/stop sequences don't cause crashes. Verify pause/resume maintains continuous video. Test state transitions handle errors gracefully."
           },
           {
@@ -210,7 +210,7 @@
               4
             ],
             "details": "Create timer system to track recording duration from start timestamp with millisecond precision. Implement file size monitoring using periodic file system checks or write buffer tracking. Send regular updates to frontend via Tauri events (every 100ms for duration, every second for file size). Calculate estimated remaining recording time based on available disk space. Handle timer accuracy during system sleep or high CPU load.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify duration accuracy over long recordings. Test file size updates match actual file growth. Validate updates continue during high system load."
           },
           {
@@ -221,7 +221,7 @@
               4
             ],
             "details": "Create temporary file in system temp directory with unique naming to avoid conflicts. Stream recording data to temporary location during capture. Implement atomic file move operation to final user-selected location on recording completion. Handle insufficient disk space in both temporary and final locations. Clean up temporary files on cancellation or error. Add progress indication for file move operation on large recordings.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test file moves across different volumes. Verify temporary files are cleaned up properly. Test disk space validation works correctly."
           },
           {
@@ -233,7 +233,7 @@
               6
             ],
             "details": "Implement cancellation command that immediately stops capture session and releases all resources. Delete temporary recording files on cancellation without moving to final location. Properly close and release all AVFoundation objects including capture session, inputs, and outputs. Handle cleanup in error scenarios like disk full or encoder failures. Ensure no memory leaks or dangling resources after cancellation. Reset all recording state variables to initial values.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test cancellation at various recording stages. Verify no temporary files remain after cancellation. Check for memory leaks using profiling tools."
           }
         ]
@@ -710,7 +710,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-28T22:09:43.404Z",
+      "updated": "2025-10-28T22:33:06.516Z",
       "description": "Tasks for master context"
     }
   }

@@ -6,6 +6,9 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::task::JoinHandle;
 use super::permissions::{PermissionHandler, PlatformPermissions};
 
+mod screen_capture;
+use screen_capture::ScreenCaptureSession;
+
 // ============================================================================
 // Data Structures
 // ============================================================================
@@ -415,6 +418,7 @@ pub struct RecordingManager {
     current_recording: Option<RecordingState>,
     duration_task: Option<JoinHandle<()>>,
     temp_file_manager: Arc<Mutex<TempFileManager>>,
+    capture_session: Option<ScreenCaptureSession>,
 }
 
 impl RecordingManager {
@@ -426,6 +430,7 @@ impl RecordingManager {
             current_recording: None,
             duration_task: None,
             temp_file_manager: Arc::new(Mutex::new(temp_manager)),
+            capture_session: None,
         }
     }
 
@@ -562,12 +567,22 @@ pub enum RecordingError {
     InvalidConfig(String),
     /// Recording already in progress
     RecordingInProgress,
+    /// Recording already in progress (alternative name)
+    AlreadyRecording,
     /// No active recording
     NoActiveRecording,
+    /// Not currently recording
+    NotRecording,
     /// Hardware not available (camera/mic)
     HardwareUnavailable(String),
     /// Codec not supported
     CodecNotSupported(String),
+    /// Dependency missing (e.g., FFmpeg)
+    DependencyMissing { dependency: String, install_instructions: String },
+    /// Failed to initialize capture
+    CaptureInitFailed(String),
+    /// Failed to stop capture
+    CaptureStopFailed(String),
     /// Unknown error
     Unknown(String),
 }
@@ -589,10 +604,10 @@ impl RecordingError {
             RecordingError::InvalidConfig(err) => {
                 format!("Invalid configuration: {}", err)
             }
-            RecordingError::RecordingInProgress => {
+            RecordingError::RecordingInProgress | RecordingError::AlreadyRecording => {
                 "A recording is already in progress. Please stop it before starting a new one.".to_string()
             }
-            RecordingError::NoActiveRecording => {
+            RecordingError::NoActiveRecording | RecordingError::NotRecording => {
                 "No recording is currently active.".to_string()
             }
             RecordingError::HardwareUnavailable(device) => {
@@ -600,6 +615,15 @@ impl RecordingError {
             }
             RecordingError::CodecNotSupported(codec) => {
                 format!("Codec '{}' is not supported on this system.", codec)
+            }
+            RecordingError::DependencyMissing { dependency, install_instructions } => {
+                format!("{} is not installed. {}", dependency, install_instructions)
+            }
+            RecordingError::CaptureInitFailed(err) => {
+                format!("Failed to start capture: {}", err)
+            }
+            RecordingError::CaptureStopFailed(err) => {
+                format!("Failed to stop capture: {}", err)
             }
             RecordingError::Unknown(err) => {
                 format!("An unexpected error occurred: {}", err)
@@ -847,7 +871,9 @@ pub async fn get_recording_state(
 #[tauri::command]
 pub async fn start_recording(
     recording_type: RecordingType,
+    source_id: String,
     config: Option<RecordingConfig>,
+    include_audio: bool,
     state: State<'_, RecordingManagerState>,
     app_handle: AppHandle,
 ) -> Result<RecordingState, String> {
@@ -868,14 +894,30 @@ pub async fn start_recording(
     let id = format!("rec_{}", chrono::Utc::now().timestamp_millis());
 
     // Create new recording state and start it
-    let mut recording_state = RecordingState::new(id, recording_type, config);
+    let mut recording_state = RecordingState::new(id.clone(), recording_type, config.clone());
     recording_state.start();
 
-    // TODO: Actually start the recording process
+    // Create temporary file for recording
+    let temp_path = {
+        let mut manager = state.lock().map_err(|e| e.to_string())?;
+        let temp_manager = manager.get_temp_manager();
+        let mut temp = temp_manager.lock().map_err(|e| e.to_string())?;
+        temp.create_temp_file(&id)
+            .map_err(|e| format!("Failed to create temp file: {}", e))?
+    };
+
+    // Create and start screen capture session
+    let mut capture_session = ScreenCaptureSession::new(source_id, temp_path.clone(), config);
+    capture_session.start(include_audio)
+        .map_err(|e| format!("Failed to start capture: {}", e))?;
+
+    // Update recording state with file path
+    recording_state.file_path = Some(temp_path.to_string_lossy().to_string());
 
     // Update manager state and start duration tracking
     {
         let mut manager = state.lock().map_err(|e| e.to_string())?;
+        manager.capture_session = Some(capture_session);
         manager.set_current_recording(Some(recording_state.clone()));
         manager.emit_state_change(&app_handle, "recording:started");
 
@@ -900,7 +942,12 @@ pub async fn stop_recording(
             .get_current_recording()
             .ok_or_else(|| "No active recording".to_string())?;
 
-        // TODO: Actually stop the recording process
+        // Stop the capture session
+        if let Some(mut capture_session) = manager.capture_session.take() {
+            let output_path = capture_session.stop()
+                .map_err(|e| format!("Failed to stop capture: {}", e))?;
+            recording_state.file_path = Some(output_path.to_string_lossy().to_string());
+        }
 
         recording_state.stop();
 
