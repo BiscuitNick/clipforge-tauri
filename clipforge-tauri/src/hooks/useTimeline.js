@@ -16,6 +16,53 @@ export function useTimeline() {
   const animationFrameRef = useRef(null);
   const lastTimeRef = useRef(null);
 
+  // Undo/Redo history management
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const MAX_HISTORY = 50;
+
+  // Save current state to history before mutations
+  const saveHistory = useCallback(() => {
+    // Create a deep copy of the current clips state
+    const currentState = JSON.parse(JSON.stringify(clips));
+
+    // Truncate history after current index (removes redo history)
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(currentState);
+
+    // Limit history size
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+      setHistory(newHistory);
+      // Don't increment index since we removed the oldest entry
+    } else {
+      setHistory(newHistory);
+      setHistoryIndex(prev => prev + 1);
+    }
+  }, [clips, history, historyIndex, MAX_HISTORY]);
+
+  // Undo to previous state
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setClips(JSON.parse(JSON.stringify(history[newIndex])));
+    }
+  }, [history, historyIndex]);
+
+  // Redo to next state
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setClips(JSON.parse(JSON.stringify(history[newIndex])));
+    }
+  }, [history, historyIndex]);
+
+  // Check if undo/redo available
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
   // Check if a position would cause collision with existing clips
   const canDropAtPosition = useCallback((position, duration, excludeClipId = null) => {
     const endPosition = position + duration;
@@ -40,11 +87,56 @@ export function useTimeline() {
     return true; // No collision
   }, [clips]);
 
+  // Calculate snap position for seamless clip placement
+  const calculateSnapPosition = useCallback((targetPosition, duration, excludeClipId = null) => {
+    const SNAP_THRESHOLD = 2.0; // seconds
+    let snappedPosition = targetPosition;
+    let snapType = null; // 'start', 'end', or null
+    let snapToClipId = null;
+
+    // Check all existing clips for snap opportunities
+    for (const clip of clips) {
+      if (clip.id === excludeClipId) continue;
+
+      const clipStart = clip.startTime;
+      const clipTrimStart = clip.trimStart || 0;
+      const clipTrimEnd = clip.trimEnd || clip.duration;
+      const clipDuration = clipTrimEnd - clipTrimStart;
+      const clipEnd = clipStart + clipDuration;
+
+      // Snap to end of clip (seamless continuation)
+      if (Math.abs(targetPosition - clipEnd) < SNAP_THRESHOLD) {
+        snappedPosition = clipEnd;
+        snapType = 'end';
+        snapToClipId = clip.id;
+        break;
+      }
+
+      // Snap to start of clip (place before)
+      const newClipEnd = targetPosition + duration;
+      if (Math.abs(clipStart - newClipEnd) < SNAP_THRESHOLD) {
+        snappedPosition = clipStart - duration;
+        snapType = 'start';
+        snapToClipId = clip.id;
+        break;
+      }
+    }
+
+    // Ensure position doesn't go negative
+    snappedPosition = Math.max(0, snappedPosition);
+
+    return { position: snappedPosition, snapType, snapToClipId };
+  }, [clips]);
+
   // Add a single clip from drag-and-drop
   const addClip = useCallback((mediaData, targetPosition = null) => {
     // Calculate start position
     let startTime;
-    if (targetPosition !== null && targetPosition !== undefined) {
+
+    // If this is the first clip on the timeline, always start at 0
+    if (clips.length === 0) {
+      startTime = 0;
+    } else if (targetPosition !== null && targetPosition !== undefined) {
       // Use the provided position (absolute positioning)
       startTime = Math.max(0, targetPosition);
 
@@ -79,9 +171,87 @@ export function useTimeline() {
       trimEnd: mediaData.duration, // outPoint defaults to full duration
     };
 
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => [...prev, newClip]);
     return newClip;
-  }, [clips, canDropAtPosition]);
+  }, [clips, canDropAtPosition, saveHistory]);
+
+  // Insert clip with automatic shifting of overlapping clips
+  const insertClipWithShift = useCallback((mediaData, targetPosition) => {
+    // If this is the first clip, use regular addClip
+    if (clips.length === 0) {
+      return addClip(mediaData, targetPosition);
+    }
+
+    // Save history before mutation
+    saveHistory();
+
+    // Calculate the new clip's duration
+    const duration = mediaData.duration;
+    const insertEnd = targetPosition + duration;
+
+    // Sort clips by start time
+    const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime);
+
+    // Find first clip that would be affected by this insertion
+    const firstConflictIndex = sortedClips.findIndex(clip => {
+      return clip.startTime < insertEnd;
+    });
+
+    if (firstConflictIndex !== -1) {
+      const firstConflict = sortedClips[firstConflictIndex];
+      const shiftAmount = insertEnd - firstConflict.startTime;
+
+      // Shift all clips from conflict point onward
+      const updatedClips = sortedClips.map((clip, idx) => {
+        if (idx >= firstConflictIndex) {
+          return { ...clip, startTime: clip.startTime + shiftAmount };
+        }
+        return clip;
+      });
+
+      // Create the new clip
+      const newClip = {
+        id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        mediaId: mediaData.mediaId,
+        videoPath: mediaData.filepath,
+        filename: mediaData.filename,
+        duration: mediaData.duration,
+        width: mediaData.width,
+        height: mediaData.height,
+        frameRate: mediaData.frameRate,
+        startTime: targetPosition,
+        trimStart: 0,
+        trimEnd: mediaData.duration,
+      };
+
+      // Add new clip and sort
+      const finalClips = [...updatedClips, newClip].sort((a, b) => a.startTime - b.startTime);
+      setClips(finalClips);
+      return newClip;
+    } else {
+      // No conflicts, just add the clip normally
+      const newClip = {
+        id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        mediaId: mediaData.mediaId,
+        videoPath: mediaData.filepath,
+        filename: mediaData.filename,
+        duration: mediaData.duration,
+        width: mediaData.width,
+        height: mediaData.height,
+        frameRate: mediaData.frameRate,
+        startTime: targetPosition,
+        trimStart: 0,
+        trimEnd: mediaData.duration,
+      };
+
+      const finalClips = [...clips, newClip].sort((a, b) => a.startTime - b.startTime);
+      setClips(finalClips);
+      return newClip;
+    }
+  }, [clips, saveHistory, addClip]);
 
   // Add clips from imported videos
   const addClips = useCallback((videoMetadata) => {
@@ -105,29 +275,58 @@ export function useTimeline() {
       trimEnd: video.duration,
     }));
 
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => [...prev, ...newClips]);
     return newClips;
-  }, [clips]);
+  }, [clips, saveHistory]);
 
   // Remove a clip by ID
   const removeClip = useCallback((clipId) => {
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => prev.filter(c => c.id !== clipId));
     if (selectedClipId === clipId) {
       setSelectedClipId(null);
     }
-  }, [selectedClipId]);
+  }, [selectedClipId, saveHistory]);
 
   // Update clip position
   const updateClipPosition = useCallback((clipId, newStartTime) => {
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => prev.map(clip =>
       clip.id === clipId
         ? { ...clip, startTime: Math.max(0, newStartTime) }
         : clip
     ));
-  }, []);
+  }, [saveHistory]);
+
+  // Move clip to new position (for drag-and-drop reordering)
+  const moveClip = useCallback((clipId, newPosition) => {
+    // Save history before mutation
+    saveHistory();
+
+    const updatedClips = clips.map(clip => {
+      if (clip.id === clipId) {
+        return { ...clip, startTime: Math.max(0, newPosition) };
+      }
+      return clip;
+    });
+
+    // Sort clips by start time for visual consistency
+    updatedClips.sort((a, b) => a.startTime - b.startTime);
+    setClips(updatedClips);
+  }, [clips, saveHistory]);
 
   // Update clip trim points
   const updateClipTrim = useCallback((clipId, trimStart, trimEnd) => {
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => prev.map(clip => {
       if (clip.id !== clipId) return clip;
 
@@ -141,7 +340,7 @@ export function useTimeline() {
         trimEnd: validTrimEnd,
       };
     }));
-  }, []);
+  }, [saveHistory]);
 
   // Handle zoom
   const zoom = useCallback((delta, mouseX) => {
@@ -312,10 +511,13 @@ export function useTimeline() {
       startTime: endPosition,
     };
 
+    // Save history before mutation
+    saveHistory();
+
     setClips(prev => [...prev, newClip]);
     console.log("Clip pasted at position:", endPosition);
     return newClip;
-  }, [clipboardClip, clips]);
+  }, [clipboardClip, clips, saveHistory]);
 
   return {
     // State
@@ -336,8 +538,10 @@ export function useTimeline() {
     // Actions
     addClip,
     addClips,
+    insertClipWithShift,
     removeClip,
     updateClipPosition,
+    moveClip,
     updateClipTrim,
     zoom,
     pan,
@@ -345,6 +549,12 @@ export function useTimeline() {
     // Clipboard
     copyClip,
     pasteClip,
+
+    // Undo/Redo
+    undo,
+    redo,
+    canUndo,
+    canRedo,
 
     // Playback
     togglePlayback,
@@ -354,6 +564,7 @@ export function useTimeline() {
 
     // Validation
     canDropAtPosition,
+    calculateSnapPosition,
 
     // Computed
     getTotalDuration,

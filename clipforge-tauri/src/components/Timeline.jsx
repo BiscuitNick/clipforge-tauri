@@ -19,7 +19,14 @@ function Timeline({
   onZoom,
   onPan,
   onTrimUpdate,
+  onMoveClip,
+  calculateSnapPosition,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   canDrop = true,
+  dragPreview = null,
   isPlaying = false,
   onTogglePlayback,
   onCopyClip,
@@ -33,6 +40,7 @@ function Timeline({
   const [isPanning, setIsPanning] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
   const [draggingTrimHandle, setDraggingTrimHandle] = useState(null); // { clipId, handle: 'start' | 'end' }
+  const [draggingClip, setDraggingClip] = useState(null); // { clipId, originalPosition, currentPosition }
 
   // Make timeline a drop zone for media items
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -87,13 +95,35 @@ function Timeline({
 
     // Draw clips
     if (clips && clips.length > 0) {
-      clips.forEach(clip => drawClip(ctx, clip, width));
+      clips.forEach(clip => {
+        if (draggingClip && clip.id === draggingClip.clipId) {
+          // Draw outline at original position for dragging clip
+          drawClipOutline(ctx, clip, '#666');
+        } else {
+          // Draw normal clip
+          drawClip(ctx, clip, width);
+        }
+      });
+    }
+
+    // Draw dragging clip at new position (with opacity)
+    if (draggingClip) {
+      const draggingClipData = clips?.find(c => c.id === draggingClip.clipId);
+      if (draggingClipData) {
+        const tempClip = { ...draggingClipData, startTime: draggingClip.currentPosition };
+        drawClip(ctx, tempClip, width, 0.5); // 50% opacity
+      }
+    }
+
+    // Draw drop preview (if dragging)
+    if (dragPreview) {
+      drawDropPreview(ctx, dragPreview, width);
     }
 
     // Draw playhead
     drawPlayhead(ctx, width, height);
 
-  }, [clips, playheadPosition, zoomLevel, panOffset, selectedClipId]);
+  }, [clips, playheadPosition, zoomLevel, panOffset, selectedClipId, dragPreview, draggingClip]);
 
   const drawTimeRuler = (ctx, width) => {
     ctx.strokeStyle = "#444";
@@ -172,7 +202,7 @@ function Timeline({
     }
   };
 
-  const drawClip = (ctx, clip, canvasWidth) => {
+  const drawClip = (ctx, clip, canvasWidth, opacity = 1.0) => {
     const startX = timeToPixel(clip.startTime);
     const trimStart = clip.trimStart || 0;
     const trimEnd = clip.trimEnd || clip.duration;
@@ -185,6 +215,9 @@ function Timeline({
     if (startX + clipWidth < 0 || startX > canvasWidth) return;
 
     const isSelected = clip.id === selectedClipId;
+
+    // Apply opacity
+    ctx.globalAlpha = opacity;
 
     // Draw clip background (only show trimmed portion)
     ctx.fillStyle = isSelected ? "#4a7ba7" : "#3a5f7d";
@@ -249,6 +282,9 @@ function Timeline({
     ctx.fillText(`${trimmedDuration.toFixed(2)}s`, startX + (isSelected ? TRIM_HANDLE_WIDTH + 5 : 8), y + 33);
 
     ctx.restore();
+
+    // Reset opacity
+    ctx.globalAlpha = 1.0;
   };
 
   const drawPlayhead = (ctx, width, height) => {
@@ -273,6 +309,86 @@ function Timeline({
     ctx.lineTo(x + 6, RULER_HEIGHT - 8);
     ctx.closePath();
     ctx.fill();
+  };
+
+  const drawClipOutline = (ctx, clip, color = '#888') => {
+    const startX = timeToPixel(clip.startTime);
+    const trimStart = clip.trimStart || 0;
+    const trimEnd = clip.trimEnd || clip.duration;
+    const trimmedDuration = trimEnd - trimStart;
+    const clipWidth = trimmedDuration * zoomLevel;
+    const y = RULER_HEIGHT + TRACK_PADDING;
+    const clipHeight = TRACK_HEIGHT - (TRACK_PADDING * 2);
+
+    ctx.strokeStyle = color;
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, y, clipWidth, clipHeight);
+    ctx.setLineDash([]); // Reset line dash
+  };
+
+  const drawDropPreview = (ctx, preview, canvasWidth) => {
+    const { position, duration, snapType, snapToClipId } = preview;
+    const startX = timeToPixel(position);
+    const clipWidth = duration * zoomLevel;
+    const y = RULER_HEIGHT + TRACK_PADDING;
+    const clipHeight = TRACK_HEIGHT - TRACK_PADDING * 2;
+
+    // Draw vertical insertion line
+    ctx.strokeStyle = '#4a9eff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(startX, RULER_HEIGHT);
+    ctx.lineTo(startX, RULER_HEIGHT + TRACK_HEIGHT);
+    ctx.stroke();
+
+    // Draw ghost clip (semi-transparent rectangle)
+    ctx.fillStyle = 'rgba(74, 158, 255, 0.3)';
+    ctx.fillRect(startX, y, clipWidth, clipHeight);
+
+    // Draw ghost clip border
+    ctx.strokeStyle = '#4a9eff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, y, clipWidth, clipHeight);
+
+    // Draw snap indicator if snapping to another clip
+    if (snapType && snapToClipId && clips) {
+      const snapToClip = clips.find(c => c.id === snapToClipId);
+      if (snapToClip) {
+        const snapClipStart = timeToPixel(snapToClip.startTime);
+        const snapTrimStart = snapToClip.trimStart || 0;
+        const snapTrimEnd = snapToClip.trimEnd || snapToClip.duration;
+        const snapClipDuration = snapTrimEnd - snapTrimStart;
+        const snapClipEnd = timeToPixel(snapToClip.startTime + snapClipDuration);
+
+        // Draw dotted line connecting to the snap target
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+
+        if (snapType === 'end') {
+          // Snapping to end of clip - draw line from end of snap clip to start of preview
+          ctx.beginPath();
+          ctx.moveTo(snapClipEnd, y + clipHeight / 2);
+          ctx.lineTo(startX, y + clipHeight / 2);
+          ctx.stroke();
+        } else if (snapType === 'start') {
+          // Snapping to start of clip - draw line from end of preview to start of snap clip
+          ctx.beginPath();
+          ctx.moveTo(startX + clipWidth, y + clipHeight / 2);
+          ctx.lineTo(snapClipStart, y + clipHeight / 2);
+          ctx.stroke();
+        }
+
+        ctx.setLineDash([]); // Reset line dash
+      }
+    }
+
+    // Draw duration label on ghost clip
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${duration.toFixed(2)}s`, startX + 5, y + 20);
   };
 
   // Mouse event handlers
@@ -323,6 +439,29 @@ function Timeline({
       });
 
       if (clickedClip) {
+        // Check if this is a selected clip being dragged (not on trim handles)
+        if (clickedClip.id === selectedClipId) {
+          const startX = timeToPixel(clickedClip.startTime);
+          const trimStart = clickedClip.trimStart || 0;
+          const trimEnd = clickedClip.trimEnd || clickedClip.duration;
+          const trimmedDuration = trimEnd - trimStart;
+          const clipWidth = trimmedDuration * zoomLevel;
+
+          // If not on trim handles, start dragging the clip
+          const isOnTrimHandle =
+            (x >= startX && x <= startX + TRIM_HANDLE_WIDTH) ||
+            (x >= startX + clipWidth - TRIM_HANDLE_WIDTH && x <= startX + clipWidth);
+
+          if (!isOnTrimHandle) {
+            setDraggingClip({
+              clipId: clickedClip.id,
+              originalPosition: clickedClip.startTime,
+              currentPosition: clickedClip.startTime
+            });
+            return;
+          }
+        }
+
         onClipSelect?.(clickedClip.id);
         return;
       } else {
@@ -367,6 +506,31 @@ function Timeline({
           onTrimUpdate?.(clip.id, currentTrimStart, validTrimEnd);
         }
       }
+    } else if (draggingClip) {
+      // Handle clip dragging/reordering
+      const clip = clips?.find(c => c.id === draggingClip.clipId);
+      if (clip) {
+        const newPosition = Math.max(0, pixelToTime(x));
+
+        // Get clip duration for snap calculation
+        const trimStart = clip.trimStart || 0;
+        const trimEnd = clip.trimEnd || clip.duration;
+        const duration = trimEnd - trimStart;
+
+        // Apply snap logic
+        if (calculateSnapPosition) {
+          const snapResult = calculateSnapPosition(newPosition, duration, clip.id);
+          setDraggingClip(prev => ({
+            ...prev,
+            currentPosition: snapResult.position
+          }));
+        } else {
+          setDraggingClip(prev => ({
+            ...prev,
+            currentPosition: newPosition
+          }));
+        }
+      }
     } else if (isPanning) {
       const deltaX = lastMouseX - x;
       onPan?.(deltaX);
@@ -375,6 +539,12 @@ function Timeline({
   };
 
   const handleMouseUp = () => {
+    // Finalize clip move if dragging
+    if (draggingClip) {
+      onMoveClip?.(draggingClip.clipId, draggingClip.currentPosition);
+      setDraggingClip(null);
+    }
+
     setIsDraggingPlayhead(false);
     setIsPanning(false);
     setDraggingTrimHandle(null);
@@ -505,6 +675,22 @@ function Timeline({
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
           <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>
           <span className="zoom-level">Zoom: {(zoomLevel / 10).toFixed(1)}x</span>
+        </div>
+        <div className="toolbar-section">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (⌘Z / Ctrl+Z)"
+          >
+            ↶ Undo
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (⌘⇧Z / Ctrl+Shift+Z)"
+          >
+            ↷ Redo
+          </button>
         </div>
         <div className="toolbar-section">
           <button
