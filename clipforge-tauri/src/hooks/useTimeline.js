@@ -367,6 +367,63 @@ export function useTimeline() {
     setClips(updatedClips);
   }, [clips, saveHistory]);
 
+  // Snap clip to the left (snap to nearest previous clip's end)
+  const snapLeft = useCallback((clipId) => {
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip) return;
+
+    const clipStart = clip.startTime;
+
+    // Find the nearest clip that ends before this clip starts
+    let nearestClipEnd = 0;
+    for (const otherClip of clips) {
+      if (otherClip.id === clipId) continue;
+
+      const otherTrimStart = otherClip.trimStart || 0;
+      const otherTrimEnd = otherClip.trimEnd || otherClip.duration;
+      const otherDuration = otherTrimEnd - otherTrimStart;
+      const otherEnd = otherClip.startTime + otherDuration;
+
+      // Find clips that end before current clip starts
+      if (otherEnd <= clipStart && otherEnd > nearestClipEnd) {
+        nearestClipEnd = otherEnd;
+      }
+    }
+
+    // Move clip to snap to the nearest clip's end
+    moveClip(clipId, nearestClipEnd);
+  }, [clips, moveClip]);
+
+  // Snap clip to the right (snap to nearest next clip's start)
+  const snapRight = useCallback((clipId) => {
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip) return;
+
+    const trimStart = clip.trimStart || 0;
+    const trimEnd = clip.trimEnd || clip.duration;
+    const duration = trimEnd - trimStart;
+    const clipEnd = clip.startTime + duration;
+
+    // Find the nearest clip that starts after this clip ends
+    let nearestClipStart = Infinity;
+    for (const otherClip of clips) {
+      if (otherClip.id === clipId) continue;
+
+      const otherStart = otherClip.startTime;
+
+      // Find clips that start after current clip ends
+      if (otherStart >= clipEnd && otherStart < nearestClipStart) {
+        nearestClipStart = otherStart;
+      }
+    }
+
+    // If we found a clip to snap to, move current clip so it ends at that clip's start
+    if (nearestClipStart !== Infinity) {
+      const newPosition = nearestClipStart - duration;
+      moveClip(clipId, newPosition);
+    }
+  }, [clips, moveClip]);
+
   // Update clip trim points
   const updateClipTrim = useCallback((clipId, trimStart, trimEnd) => {
     // Save history before mutation
@@ -587,6 +644,8 @@ export function useTimeline() {
     removeClip,
     updateClipPosition,
     moveClip,
+    snapLeft,
+    snapRight,
     updateClipTrim,
     zoom,
     pan,

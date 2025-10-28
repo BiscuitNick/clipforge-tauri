@@ -134,6 +134,13 @@
   font-family: monospace;
 }
 
+.clip-duration {
+  font-size: 0.75rem;
+  color: #666;
+  font-family: monospace;
+  margin-left: 0.25rem;
+}
+
 .expand-button {
   background: none;
   border: none;
@@ -194,6 +201,56 @@
 
 .detail-row.info span {
   font-family: monospace;
+}
+
+/* Input with snap buttons */
+.input-with-snaps {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-with-snaps input {
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.input-with-snaps input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.snap-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.snap-button {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
+  color: #aaa;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.snap-button:hover {
+  background: #3a3a3a;
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
+.snap-button:active {
+  background: #2a2a2a;
 }
 
 /* Detail actions */

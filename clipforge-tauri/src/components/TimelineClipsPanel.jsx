@@ -10,10 +10,11 @@ function TimelineClipsPanel({
   selectedClipId,
   onClipSelect,
   onClipUpdate,
-  onClipRemove
+  onClipRemove,
+  onSnapLeft,
+  onSnapRight
 }) {
   const [expandedClipId, setExpandedClipId] = useState(null);
-  const [editValues, setEditValues] = useState({});
 
   // Sort clips by position (startTime)
   const sortedClips = useMemo(() => {
@@ -31,60 +32,45 @@ function TimelineClipsPanel({
   const handleToggleExpand = (clipId) => {
     if (expandedClipId === clipId) {
       setExpandedClipId(null);
-      setEditValues({});
     } else {
-      const clip = clips.find(c => c.id === clipId);
-      if (clip) {
-        setExpandedClipId(clipId);
-        // Initialize edit values
-        setEditValues({
-          trimStart: clip.trimStart || 0,
-          trimEnd: clip.trimEnd || clip.duration,
-          startTime: clip.startTime || 0
-        });
-      }
+      setExpandedClipId(clipId);
     }
   };
 
-  // Handle input changes
-  const handleInputChange = (field, value) => {
-    setEditValues(prev => ({
-      ...prev,
-      [field]: parseFloat(value) || 0
-    }));
+  // Handle immediate input changes with auto-clamping
+  const handlePositionChange = (clipId, value) => {
+    const startTime = Math.max(0, parseFloat(value) || 0);
+    onClipUpdate(clipId, { startTime });
   };
 
-  // Apply edits to a clip
-  const handleApplyEdits = (clipId) => {
+  const handleTrimStartChange = (clipId, value) => {
     const clip = clips.find(c => c.id === clipId);
     if (!clip) return;
 
-    // Validate trim points
-    let trimStart = Math.max(0, Math.min(editValues.trimStart, clip.duration));
-    let trimEnd = Math.max(trimStart, Math.min(editValues.trimEnd, clip.duration));
-    let startTime = Math.max(0, editValues.startTime);
+    let trimStart = Math.max(0, Math.min(parseFloat(value) || 0, clip.duration));
+    const trimEnd = clip.trimEnd || clip.duration;
+
+    // Ensure trimStart < trimEnd
+    if (trimStart >= trimEnd) {
+      trimStart = Math.max(0, trimEnd - 0.1);
+    }
+
+    onClipUpdate(clipId, { trimStart, trimEnd });
+  };
+
+  const handleTrimEndChange = (clipId, value) => {
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip) return;
+
+    const trimStart = clip.trimStart || 0;
+    let trimEnd = Math.max(0, Math.min(parseFloat(value) || 0, clip.duration));
 
     // Ensure trimEnd > trimStart
     if (trimEnd <= trimStart) {
       trimEnd = Math.min(trimStart + 0.1, clip.duration);
     }
 
-    // Update the clip
-    onClipUpdate(clipId, {
-      trimStart,
-      trimEnd,
-      startTime
-    });
-
-    // Collapse after applying
-    setExpandedClipId(null);
-    setEditValues({});
-  };
-
-  // Cancel editing
-  const handleCancelEdits = () => {
-    setExpandedClipId(null);
-    setEditValues({});
+    onClipUpdate(clipId, { trimStart, trimEnd });
   };
 
   if (sortedClips.length === 0) {
@@ -133,7 +119,12 @@ function TimelineClipsPanel({
                     </span>
                   </div>
                   <div className="clip-meta">
-                    <span className="clip-position">{formatTime(clip.startTime)}</span>
+                    <span className="clip-position" title="Timeline Position">
+                      {formatTime(clip.startTime)}
+                    </span>
+                    <span className="clip-duration" title="Trimmed Duration">
+                      ({formatTime(clipDuration)})
+                    </span>
                     <button
                       className="expand-button"
                       onClick={(e) => {
@@ -151,38 +142,56 @@ function TimelineClipsPanel({
                   <div className="clip-details">
                     <div className="detail-row">
                       <label>Position (s):</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={editValues.startTime ?? clip.startTime}
-                        onChange={(e) => handleInputChange('startTime', e.target.value)}
-                      />
+                      <div className="input-with-snaps">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={clip.startTime.toFixed(1)}
+                          onChange={(e) => handlePositionChange(clip.id, e.target.value)}
+                        />
+                        <div className="snap-buttons">
+                          <button
+                            className="snap-button"
+                            onClick={() => onSnapLeft && onSnapLeft(clip.id)}
+                            title="Snap to previous clip end"
+                          >
+                            ← Snap
+                          </button>
+                          <button
+                            className="snap-button"
+                            onClick={() => onSnapRight && onSnapRight(clip.id)}
+                            title="Snap to next clip start"
+                          >
+                            Snap →
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <div className="detail-row">
-                      <label>In Point (s):</label>
+                      <label>Trim Start (s):</label>
                       <input
                         type="number"
                         min="0"
                         max={clip.duration}
                         step="0.1"
-                        value={editValues.trimStart ?? trimStart}
-                        onChange={(e) => handleInputChange('trimStart', e.target.value)}
+                        value={trimStart.toFixed(1)}
+                        onChange={(e) => handleTrimStartChange(clip.id, e.target.value)}
                       />
                     </div>
                     <div className="detail-row">
-                      <label>Out Point (s):</label>
+                      <label>Trim End (s):</label>
                       <input
                         type="number"
                         min="0"
                         max={clip.duration}
                         step="0.1"
-                        value={editValues.trimEnd ?? trimEnd}
-                        onChange={(e) => handleInputChange('trimEnd', e.target.value)}
+                        value={trimEnd.toFixed(1)}
+                        onChange={(e) => handleTrimEndChange(clip.id, e.target.value)}
                       />
                     </div>
                     <div className="detail-row info">
-                      <label>Duration:</label>
+                      <label>Trimmed Duration:</label>
                       <span>{formatTime(clipDuration)}</span>
                     </div>
                     <div className="detail-row info">
@@ -191,28 +200,15 @@ function TimelineClipsPanel({
                     </div>
                     <div className="detail-actions">
                       <button
-                        className="apply-button"
-                        onClick={() => handleApplyEdits(clip.id)}
-                      >
-                        Apply
-                      </button>
-                      <button
-                        className="cancel-button"
-                        onClick={handleCancelEdits}
-                      >
-                        Cancel
-                      </button>
-                      <button
                         className="remove-button"
                         onClick={() => {
                           if (onClipRemove) {
                             onClipRemove(clip.id);
                             setExpandedClipId(null);
-                            setEditValues({});
                           }
                         }}
                       >
-                        Remove
+                        Remove Clip
                       </button>
                     </div>
                   </div>

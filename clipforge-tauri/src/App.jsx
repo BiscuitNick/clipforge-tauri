@@ -137,9 +137,9 @@ function App() {
       timeline.updateClipTrim(clipId, updates.trimStart, updates.trimEnd);
     }
 
-    // Update position if provided
+    // Update position if provided - use moveClip to handle overlaps
     if (updates.startTime !== undefined) {
-      timeline.updateClipPosition(clipId, updates.startTime);
+      timeline.moveClip(clipId, updates.startTime);
     }
   };
 
@@ -249,6 +249,8 @@ function App() {
           onClipSelect={timeline.setSelectedClipId}
           onClipUpdate={handleClipUpdate}
           onClipRemove={timeline.removeClip}
+          onSnapLeft={timeline.snapLeft}
+          onSnapRight={timeline.snapRight}
         />
       </div>
 
