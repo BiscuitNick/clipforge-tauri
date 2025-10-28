@@ -34,4 +34,6 @@ objc-foundation = "0.1"
 core-foundation = "0.10"
 core-graphics = "0.24"
 block = "0.1"
+image = "0.25"
+base64 = "0.22"
 

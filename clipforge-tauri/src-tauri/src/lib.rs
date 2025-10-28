@@ -38,7 +38,10 @@ pub fn run() {
             commands::recording::cleanup_orphaned_files,
             commands::recording::cleanup_temp_files,
             commands::recording::check_disk_space,
-            commands::recording::get_error_details
+            commands::recording::get_error_details,
+            commands::screen_sources::enumerate_sources,
+            commands::screen_sources::enumerate_screens,
+            commands::screen_sources::enumerate_windows
         ])
         .setup(|app| {
             // Create the menu
