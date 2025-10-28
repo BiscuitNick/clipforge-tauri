@@ -7,6 +7,9 @@ import Timeline from "./components/Timeline";
 import { useTimeline } from "./hooks/useTimeline";
 import { useMediaLibrary } from "./hooks/useMediaLibrary";
 import { DndContext } from "@dnd-kit/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 function App() {
   const timeline = useTimeline();
@@ -16,6 +19,8 @@ function App() {
   const [dropTimePosition, setDropTimePosition] = React.useState(null);
   const [canDrop, setCanDrop] = React.useState(true);
   const [dragPreview, setDragPreview] = React.useState(null);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [exportProgress, setExportProgress] = React.useState(null);
   const timelineRef = React.useRef(null);
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
@@ -138,6 +143,70 @@ function App() {
     }
   };
 
+  // Handle export
+  const handleExport = async () => {
+    if (timeline.clips.length === 0) {
+      alert("No clips to export");
+      return;
+    }
+
+    try {
+      // Show save dialog
+      const filePath = await save({
+        filters: [{
+          name: 'Video',
+          extensions: ['mp4']
+        }],
+        defaultPath: 'export.mp4'
+      });
+
+      if (!filePath) {
+        // User cancelled
+        return;
+      }
+
+      setIsExporting(true);
+      setExportProgress({ current: 0, total: 1, message: 'Starting export...' });
+
+      // Prepare clips data for export
+      const clipsData = timeline.clips.map(clip => ({
+        videoPath: clip.videoPath,
+        startTime: clip.startTime,
+        trimStart: clip.trimStart,
+        trimEnd: clip.trimEnd,
+        duration: clip.duration,
+        width: clip.width,
+        height: clip.height,
+        frameRate: clip.frameRate
+      }));
+
+      // Call Rust export command
+      await invoke('export_timeline', {
+        clips: clipsData,
+        outputPath: filePath
+      });
+
+      alert('Export completed successfully!');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert(`Export failed: ${error}`);
+    } finally {
+      setIsExporting(false);
+      setExportProgress(null);
+    }
+  };
+
+  // Listen for export progress events
+  React.useEffect(() => {
+    const unlisten = listen('export-progress', (event) => {
+      setExportProgress(event.payload);
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
+
   // Keyboard shortcuts for undo/redo
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -227,8 +296,29 @@ function App() {
           onPasteClip={timeline.pasteClip}
           onDeleteClip={timeline.removeClip}
           hasClipboard={!!timeline.clipboardClip}
+          onExport={handleExport}
+          isExporting={isExporting}
         />
       </div>
+
+      {/* Export Progress Overlay */}
+      {isExporting && exportProgress && (
+        <div className="export-overlay">
+          <div className="export-modal">
+            <h2>Exporting Timeline</h2>
+            <div className="export-progress">
+              <div
+                className="export-progress-bar"
+                style={{ width: `${(exportProgress.current / exportProgress.total) * 100}%` }}
+              />
+            </div>
+            <p>{exportProgress.message}</p>
+            <p className="export-step">
+              Step {exportProgress.current} of {exportProgress.total}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
     </DndContext>
   );

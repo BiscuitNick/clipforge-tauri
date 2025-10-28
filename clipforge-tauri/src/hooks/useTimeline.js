@@ -195,9 +195,15 @@ export function useTimeline() {
     // Sort clips by start time
     const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime);
 
-    // Find first clip that would be affected by this insertion
+    // Find first clip that actually overlaps with the new clip
     const firstConflictIndex = sortedClips.findIndex(clip => {
-      return clip.startTime < insertEnd;
+      const clipTrimStart = clip.trimStart || 0;
+      const clipTrimEnd = clip.trimEnd || clip.duration;
+      const clipDuration = clipTrimEnd - clipTrimStart;
+      const clipEnd = clip.startTime + clipDuration;
+
+      // Check for actual overlap: clip ends after new clip starts AND clip starts before new clip ends
+      return clipEnd > targetPosition && clip.startTime < insertEnd;
     });
 
     if (firstConflictIndex !== -1) {
@@ -310,12 +316,51 @@ export function useTimeline() {
     // Save history before mutation
     saveHistory();
 
-    const updatedClips = clips.map(clip => {
-      if (clip.id === clipId) {
-        return { ...clip, startTime: Math.max(0, newPosition) };
-      }
-      return clip;
+    // Find the clip being moved
+    const movingClip = clips.find(c => c.id === clipId);
+    if (!movingClip) return;
+
+    // Calculate the moving clip's duration
+    const trimStart = movingClip.trimStart || 0;
+    const trimEnd = movingClip.trimEnd || movingClip.duration;
+    const duration = trimEnd - trimStart;
+    const insertEnd = newPosition + duration;
+
+    // Sort all OTHER clips by start time (exclude the clip being moved)
+    const otherClips = clips.filter(c => c.id !== clipId).sort((a, b) => a.startTime - b.startTime);
+
+    // Find first clip that overlaps with the new position
+    const firstConflictIndex = otherClips.findIndex(clip => {
+      const clipTrimStart = clip.trimStart || 0;
+      const clipTrimEnd = clip.trimEnd || clip.duration;
+      const clipDuration = clipTrimEnd - clipTrimStart;
+      const clipEnd = clip.startTime + clipDuration;
+
+      // Check for actual overlap: clip ends after new position starts AND clip starts before new position ends
+      return clipEnd > newPosition && clip.startTime < insertEnd;
     });
+
+    let updatedClips;
+    if (firstConflictIndex !== -1) {
+      // There's an overlap - shift clips to make room
+      const firstConflict = otherClips[firstConflictIndex];
+      const shiftAmount = insertEnd - firstConflict.startTime;
+
+      // Shift all clips from conflict point onward
+      updatedClips = otherClips.map((clip, idx) => {
+        if (idx >= firstConflictIndex) {
+          return { ...clip, startTime: clip.startTime + shiftAmount };
+        }
+        return clip;
+      });
+    } else {
+      // No overlap - keep other clips as they are
+      updatedClips = otherClips;
+    }
+
+    // Add the moved clip at its new position
+    const movedClip = { ...movingClip, startTime: Math.max(0, newPosition) };
+    updatedClips.push(movedClip);
 
     // Sort clips by start time for visual consistency
     updatedClips.sort((a, b) => a.startTime - b.startTime);

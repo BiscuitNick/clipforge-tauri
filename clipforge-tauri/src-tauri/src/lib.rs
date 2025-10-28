@@ -40,6 +40,10 @@ pub fn run() {
                                 .accelerator("CmdOrCtrl+Shift+S")
                                 .build(app)?,
                             &PredefinedMenuItem::separator(app)?,
+                            &MenuItemBuilder::with_id("export", "Export Timeline...")
+                                .accelerator("CmdOrCtrl+E")
+                                .build(app)?,
+                            &PredefinedMenuItem::separator(app)?,
                             &PredefinedMenuItem::close_window(app, None)?,
                         ])
                         .build()?,

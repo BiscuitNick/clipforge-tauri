@@ -32,7 +32,9 @@ function Timeline({
   onCopyClip,
   onPasteClip,
   onDeleteClip,
-  hasClipboard
+  hasClipboard,
+  onExport,
+  isExporting = false
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -720,6 +722,16 @@ function Timeline({
             title="Redo (⌘⇧Z / Ctrl+Shift+Z)"
           >
             ↷ Redo
+          </button>
+        </div>
+        <div className="toolbar-section">
+          <button
+            onClick={onExport}
+            disabled={isExporting || clips.length === 0}
+            title="Export Timeline (⌘E / Ctrl+E)"
+            style={{ fontWeight: 'bold' }}
+          >
+            {isExporting ? '⏳ Exporting...' : '📹 Export'}
           </button>
         </div>
         <div className="toolbar-section">
