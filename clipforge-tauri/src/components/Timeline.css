@@ -28,6 +28,12 @@
   border-color: #007bff;
 }
 
+.timeline-drop-overlay.invalid {
+  background-color: rgba(255, 68, 68, 0.1);
+  border-color: #ff4444;
+  cursor: not-allowed;
+}
+
 .timeline-controls {
   display: flex;
   align-items: center;

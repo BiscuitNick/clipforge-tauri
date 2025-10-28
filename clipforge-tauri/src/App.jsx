@@ -12,6 +12,9 @@ function App() {
   const timeline = useTimeline();
   const mediaLibrary = useMediaLibrary();
   const [selectedMedia, setSelectedMedia] = React.useState(null);
+  const [dropTimePosition, setDropTimePosition] = React.useState(null);
+  const [canDrop, setCanDrop] = React.useState(true);
+  const timelineRef = React.useRef(null);
 
   // Handle media import from Media Library Panel
   const handleMediaImport = (videoMetadataArray) => {
@@ -25,24 +28,61 @@ function App() {
     setSelectedMedia(mediaItem);
   };
 
+  // Handle drag move - track position for drop calculation
+  const handleDragMove = (event) => {
+    const { over, delta, active } = event;
+
+    if (over && over.id === 'timeline-drop-zone' && timelineRef.current) {
+      // Get timeline bounds
+      const rect = timelineRef.current.getBoundingClientRect();
+
+      // Calculate current mouse position from initial position + delta
+      const initialX = active.rect?.current?.initial?.left || 0;
+      const currentX = initialX + delta.x;
+      const relativeX = currentX - rect.left;
+
+      // Calculate time position using timeline's conversion utilities
+      const timePosition = timeline.pixelToTime(relativeX);
+      const validPosition = Math.max(0, timePosition);
+      setDropTimePosition(validPosition);
+
+      // Check for collision
+      const mediaData = active.data.current;
+      if (mediaData && mediaData.duration) {
+        const canDropHere = timeline.canDropAtPosition(validPosition, mediaData.duration);
+        setCanDrop(canDropHere);
+      }
+    }
+  };
+
   // Handle drag end - when media is dropped on timeline
   const handleDragEnd = (event) => {
     const { active, over } = event;
 
     if (!over || over.id !== 'timeline-drop-zone') {
+      setDropTimePosition(null);
+      setCanDrop(true);
       return;
     }
 
     // Get the dragged media item data
     const mediaData = active.data.current;
     if (mediaData && mediaData.type === 'media-item') {
-      console.log("Dropped media on timeline:", mediaData);
-      timeline.addClip(mediaData);
+      // Only add if position is valid
+      if (canDrop) {
+        console.log("Dropped media on timeline at position:", dropTimePosition);
+        timeline.addClip(mediaData, dropTimePosition);
+      } else {
+        console.warn("Cannot drop clip - position is occupied");
+      }
+
+      setDropTimePosition(null);
+      setCanDrop(true);
     }
   };
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="app-layout">
       {/* Top section: Three equal panels */}
       <div className="top-panels">
@@ -60,7 +100,7 @@ function App() {
       </div>
 
       {/* Bottom section: Timeline */}
-      <div className="bottom-timeline">
+      <div className="bottom-timeline" ref={timelineRef}>
         <Timeline
           clips={timeline.clips}
           playheadPosition={timeline.playheadPosition}
@@ -72,6 +112,7 @@ function App() {
           onZoom={timeline.zoom}
           onPan={timeline.pan}
           onTrimUpdate={timeline.updateClipTrim}
+          canDrop={canDrop}
         />
       </div>
     </div>

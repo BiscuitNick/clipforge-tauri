@@ -7,7 +7,7 @@ const TRACK_HEIGHT = 60;
 const TRACK_PADDING = 10;
 const TRIM_HANDLE_WIDTH = 8;
 
-function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate }) {
+function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipId, onClipSelect, onPlayheadMove, onZoom, onPan, onTrimUpdate, canDrop = true }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -342,8 +342,8 @@ function Timeline({ clips, playheadPosition, zoomLevel, panOffset, selectedClipI
     <div className="timeline-container" ref={containerRef}>
       <div
         ref={setDropRef}
-        className={`timeline-drop-overlay ${isOver ? 'active' : ''}`}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: isOver ? 'none' : 'none', zIndex: isOver ? 10 : -1 }}
+        className={`timeline-drop-overlay ${isOver ? (canDrop ? 'active' : 'invalid') : ''}`}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: isOver ? 10 : -1 }}
       />
       <div className="timeline-controls">
         <div className="toolbar-section">

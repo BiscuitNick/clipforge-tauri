@@ -12,17 +12,54 @@ export function useTimeline() {
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
 
+  // Check if a position would cause collision with existing clips
+  const canDropAtPosition = useCallback((position, duration, excludeClipId = null) => {
+    const endPosition = position + duration;
+
+    for (const clip of clips) {
+      // Skip the clip being moved (for repositioning)
+      if (clip.id === excludeClipId) continue;
+
+      const clipStart = clip.startTime;
+      const clipTrimStart = clip.trimStart || 0;
+      const clipTrimEnd = clip.trimEnd || clip.duration;
+      const clipDuration = clipTrimEnd - clipTrimStart;
+      const clipEnd = clipStart + clipDuration;
+
+      // Check for overlap
+      const overlaps = (position < clipEnd) && (endPosition > clipStart);
+      if (overlaps) {
+        return false; // Collision detected
+      }
+    }
+
+    return true; // No collision
+  }, [clips]);
+
   // Add a single clip from drag-and-drop
-  const addClip = useCallback((mediaData) => {
-    // Calculate start position: 0 for first clip, or end of last clip
-    const startTime = clips.length > 0
-      ? Math.max(...clips.map(c => {
-          const trimStart = c.trimStart || 0;
-          const trimEnd = c.trimEnd || c.duration;
-          const trimmedDuration = trimEnd - trimStart;
-          return c.startTime + trimmedDuration;
-        }))
-      : 0;
+  const addClip = useCallback((mediaData, targetPosition = null) => {
+    // Calculate start position
+    let startTime;
+    if (targetPosition !== null && targetPosition !== undefined) {
+      // Use the provided position (absolute positioning)
+      startTime = Math.max(0, targetPosition);
+
+      // Check for collision before adding
+      if (!canDropAtPosition(startTime, mediaData.duration)) {
+        console.warn("Cannot drop clip at position", startTime, "- collision detected");
+        return null; // Don't add the clip
+      }
+    } else {
+      // Default: append to end
+      startTime = clips.length > 0
+        ? Math.max(...clips.map(c => {
+            const trimStart = c.trimStart || 0;
+            const trimEnd = c.trimEnd || c.duration;
+            const trimmedDuration = trimEnd - trimStart;
+            return c.startTime + trimmedDuration;
+          }))
+        : 0;
+    }
 
     const newClip = {
       id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -40,7 +77,7 @@ export function useTimeline() {
 
     setClips(prev => [...prev, newClip]);
     return newClip;
-  }, [clips]);
+  }, [clips, canDropAtPosition]);
 
   // Add clips from imported videos
   const addClips = useCallback((videoMetadata) => {
@@ -161,6 +198,9 @@ export function useTimeline() {
     updateClipTrim,
     zoom,
     pan,
+
+    // Validation
+    canDropAtPosition,
 
     // Computed
     getTotalDuration,
