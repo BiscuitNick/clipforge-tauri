@@ -7,7 +7,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 export function useTimeline() {
   const [clips, setClips] = useState([]);
   const [playheadPosition, setPlayheadPosition] = useState(0); // in seconds
-  const [zoomLevel, setZoomLevel] = useState(1); // pixels per second
+  const [zoomLevel, setZoomLevel] = useState(10); // pixels per second (10px = 1s at zoom 1.0)
   const [panOffset, setPanOffset] = useState(0); // horizontal pan in pixels
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
@@ -146,7 +146,8 @@ export function useTimeline() {
   // Handle zoom
   const zoom = useCallback((delta, mouseX) => {
     setZoomLevel(prev => {
-      const newZoom = Math.max(0.1, Math.min(10, prev + delta));
+      // Min: 1 (0.1x), Max: 100 (10.0x), delta is in 0.5x increments (5 pixels/sec)
+      const newZoom = Math.max(1, Math.min(100, prev + (delta * 10)));
 
       // Adjust pan to zoom towards mouse position
       if (mouseX !== undefined) {

@@ -50,14 +50,17 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   // Handle timeline playback mode
   useEffect(() => {
     if (mode !== "timeline" || !timelineState) {
+      console.log("[VideoPreview] Timeline mode check failed - mode:", mode, "hasTimelineState:", !!timelineState);
       return;
     }
 
     const { playheadPosition, getClipAtTime, isPlaying: timelinePlaying } = timelineState;
     const activeClipData = getClipAtTime(playheadPosition);
+    console.log("[VideoPreview] Timeline - playhead at", playheadPosition, "activeClip:", activeClipData);
 
     if (!activeClipData) {
       // In a gap - show black screen
+      console.log("[VideoPreview] Timeline - No clip at playhead, showing black screen");
       setShowBlackScreen(true);
       setVideoSrc(null);
       if (videoRef.current) {
@@ -67,33 +70,75 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     }
 
     const { clip, sourceTime } = activeClipData;
+    console.log("[VideoPreview] Timeline - Found clip:", {
+      filename: clip.filename,
+      videoPath: clip.videoPath,
+      sourceTime,
+      duration: clip.duration
+    });
     setShowBlackScreen(false);
 
     // Load the clip's video if not already loaded
     const assetUrl = convertFileSrc(clip.videoPath);
+    console.log("[VideoPreview] Timeline - Current videoSrc:", videoSrc);
+    console.log("[VideoPreview] Timeline - New assetUrl:", assetUrl);
+
     if (videoSrc !== assetUrl) {
-      console.log("Timeline - Loading clip:", clip.filename);
+      console.log("[VideoPreview] Timeline - Loading new clip:", clip.filename);
       setVideoSrc(assetUrl);
-    }
 
-    // Sync video time with timeline
-    if (videoRef.current && videoRef.current.readyState >= 2) {
-      const videoTime = videoRef.current.currentTime;
-      const timeDiff = Math.abs(videoTime - sourceTime);
-
-      // Only seek if significantly out of sync (> 0.1s)
-      if (timeDiff > 0.1) {
-        videoRef.current.currentTime = sourceTime;
+      // Set duration from clip
+      if (clip.duration) {
+        setDuration(clip.duration);
       }
 
-      // Sync play/pause state
-      if (timelinePlaying && videoRef.current.paused) {
-        videoRef.current.play();
-      } else if (!timelinePlaying && !videoRef.current.paused) {
-        videoRef.current.pause();
+      // When video loads, seek to correct position
+      const video = videoRef.current;
+      if (video) {
+        const handleCanPlayTimeline = () => {
+          console.log("[VideoPreview] Timeline - Video ready, seeking to:", sourceTime);
+          video.currentTime = sourceTime;
+          setCurrentTime(sourceTime);
+
+          // Start playback if timeline is playing
+          if (timelinePlaying) {
+            video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+          }
+
+          video.removeEventListener('canplay', handleCanPlayTimeline);
+        };
+
+        video.addEventListener('canplay', handleCanPlayTimeline);
+
+        // Cleanup
+        return () => {
+          video.removeEventListener('canplay', handleCanPlayTimeline);
+        };
+      }
+    } else {
+      // Same video, just sync time and play state
+      const video = videoRef.current;
+      if (video && video.readyState >= 2) {
+        const videoTime = video.currentTime;
+        const timeDiff = Math.abs(videoTime - sourceTime);
+
+        // Only seek if significantly out of sync (> 0.1s)
+        if (timeDiff > 0.1) {
+          console.log("[VideoPreview] Timeline - Syncing time from", videoTime, "to", sourceTime);
+          video.currentTime = sourceTime;
+        }
+
+        // Sync play/pause state
+        if (timelinePlaying && video.paused) {
+          console.log("[VideoPreview] Timeline - Starting playback");
+          video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+        } else if (!timelinePlaying && !video.paused) {
+          console.log("[VideoPreview] Timeline - Pausing playback");
+          video.pause();
+        }
       }
     }
-  }, [mode, timelineState, videoSrc]);
+  }, [mode, timelineState]);
 
   // Load video when selectedMedia changes (library mode)
   useEffect(() => {
@@ -234,30 +279,44 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Handle play
   const handlePlay = () => {
-    if (!videoRef.current) return;
-    videoRef.current.play();
+    if (mode === "timeline" && timelineState) {
+      timelineState.play();
+    } else if (videoRef.current) {
+      videoRef.current.play();
+    }
   };
 
   // Handle pause
   const handlePause = () => {
-    if (!videoRef.current) return;
-    videoRef.current.pause();
+    if (mode === "timeline" && timelineState) {
+      timelineState.pause();
+    } else if (videoRef.current) {
+      videoRef.current.pause();
+    }
   };
 
   // Handle stop (pause and seek to beginning)
   const handleStop = () => {
-    if (!videoRef.current) return;
-    videoRef.current.pause();
-    videoRef.current.currentTime = 0;
-    setCurrentTime(0);
+    if (mode === "timeline" && timelineState) {
+      timelineState.pause();
+      timelineState.setPlayheadPosition(0);
+    } else if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+      setCurrentTime(0);
+    }
   };
 
   // Handle scrubber change
   const handleScrubberChange = (e) => {
-    if (!videoRef.current) return;
     const newTime = parseFloat(e.target.value);
-    videoRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
+
+    if (mode === "timeline" && timelineState) {
+      timelineState.setPlayheadPosition(newTime);
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
   };
 
   // Handle scrubber drag start
@@ -321,15 +380,15 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
               type="range"
               className="scrubber"
               min="0"
-              max={duration || 0}
+              max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
               step="0.1"
-              value={currentTime}
+              value={mode === "timeline" && timelineState ? timelineState.playheadPosition : currentTime}
               onChange={handleScrubberChange}
               onMouseDown={handleScrubberMouseDown}
               onMouseUp={handleScrubberMouseUp}
               onTouchStart={handleScrubberMouseDown}
               onTouchEnd={handleScrubberMouseUp}
-              disabled={!videoSrc}
+              disabled={mode === "timeline" ? !timelineState : !videoSrc}
             />
           </div>
 
@@ -337,7 +396,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
             <button
               className="play-pause-btn"
               onClick={handleStop}
-              disabled={!videoSrc}
+              disabled={mode === "timeline" ? !timelineState : !videoSrc}
               title="Stop"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -346,12 +405,12 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
             </button>
 
             <button
-              className={`play-pause-btn ${isPlaying ? 'playing' : ''}`}
-              onClick={isPlaying ? handlePause : handlePlay}
-              disabled={!videoSrc}
-              title={isPlaying ? "Pause" : "Play"}
+              className={`play-pause-btn ${isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? 'playing' : ''}`}
+              onClick={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? handlePause : handlePlay}
+              disabled={mode === "timeline" ? !timelineState : !videoSrc}
+              title={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? (
+              {isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? (
                 <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                   <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
                 </svg>
@@ -363,7 +422,10 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
             </button>
 
             <div className="time-display">
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {mode === "timeline" && timelineState
+                ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
+                : `${formatTime(currentTime)} / ${formatTime(duration)}`
+              }
             </div>
           </div>
         </div>

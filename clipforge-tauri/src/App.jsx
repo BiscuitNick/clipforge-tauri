@@ -17,6 +17,31 @@ function App() {
   const [canDrop, setCanDrop] = React.useState(true);
   const timelineRef = React.useRef(null);
 
+  // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
+  const timelineState = React.useMemo(() => {
+    if (previewMode !== "timeline") return null;
+    return {
+      playheadPosition: timeline.playheadPosition,
+      getClipAtTime: timeline.getClipAtTime,
+      isPlaying: timeline.isPlaying,
+      getTotalDuration: timeline.getTotalDuration,
+      setPlayheadPosition: timeline.setPlayheadPosition,
+      play: timeline.play,
+      pause: timeline.pause,
+      togglePlayback: timeline.togglePlayback
+    };
+  }, [
+    previewMode,
+    timeline.playheadPosition,
+    timeline.isPlaying,
+    timeline.getClipAtTime,
+    timeline.getTotalDuration,
+    timeline.setPlayheadPosition,
+    timeline.play,
+    timeline.pause,
+    timeline.togglePlayback
+  ]);
+
   // Handle media import from Media Library Panel
   const handleMediaImport = (videoMetadataArray) => {
     console.log("App - Media imported:", videoMetadataArray);
@@ -111,11 +136,7 @@ function App() {
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
           mode={previewMode}
-          timelineState={previewMode === "timeline" ? {
-            playheadPosition: timeline.playheadPosition,
-            getClipAtTime: timeline.getClipAtTime,
-            isPlaying: timeline.isPlaying
-          } : null}
+          timelineState={timelineState}
         />
         <TimelineClipsPanel
           clips={timeline.clips}
@@ -137,15 +158,18 @@ function App() {
           onClipSelect={timeline.setSelectedClipId}
           onPlayheadMove={(pos) => {
             setPreviewMode("timeline");
+            setSelectedMedia(null);
             timeline.pause(); // Pause when manually moving playhead
             timeline.setPlayheadPosition(pos);
           }}
           onZoom={(delta) => {
             setPreviewMode("timeline");
+            setSelectedMedia(null);
             timeline.zoom(delta);
           }}
           onPan={(delta) => {
             setPreviewMode("timeline");
+            setSelectedMedia(null);
             timeline.pan(delta);
           }}
           onTrimUpdate={timeline.updateClipTrim}
@@ -153,6 +177,7 @@ function App() {
           isPlaying={timeline.isPlaying}
           onTogglePlayback={() => {
             setPreviewMode("timeline");
+            setSelectedMedia(null);
             timeline.togglePlayback();
           }}
           onCopyClip={timeline.copyClip}

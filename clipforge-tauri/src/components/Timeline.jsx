@@ -6,6 +6,7 @@ const RULER_HEIGHT = 30;
 const TRACK_HEIGHT = 60;
 const TRACK_PADDING = 10;
 const TRIM_HANDLE_WIDTH = 8;
+const TIMELINE_MARGIN = 20; // Horizontal margin on left and right
 
 function Timeline({
   clips,
@@ -50,11 +51,11 @@ function Timeline({
   };
 
   const timeToPixel = (time) => {
-    return time * zoomLevel - panOffset;
+    return time * zoomLevel - panOffset + TIMELINE_MARGIN;
   };
 
   const pixelToTime = (pixel) => {
-    return (pixel + panOffset) / zoomLevel;
+    return (pixel - TIMELINE_MARGIN + panOffset) / zoomLevel;
   };
 
   // Draw timeline on canvas
@@ -100,16 +101,46 @@ function Timeline({
     ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
 
-    const totalDuration = getTotalDuration();
-    const secondsPerMajorTick = zoomLevel < 10 ? 10 : zoomLevel < 30 ? 5 : 1;
+    // Calculate visible time range (always fill screen, cap at 1 hour)
+    const startTime = Math.max(0, pixelToTime(0));
+    const endTime = Math.min(3600, pixelToTime(width)); // Cap at 1 hour (3600s)
+
+    // Determine tick intervals based on zoom level
+    // zoomLevel = pixels per second
+    let secondsPerMajorTick;
+    if (zoomLevel >= 50) {
+      // Very zoomed in: 1 second intervals
+      secondsPerMajorTick = 1;
+    } else if (zoomLevel >= 20) {
+      // Zoomed in: 5 second intervals
+      secondsPerMajorTick = 5;
+    } else if (zoomLevel >= 10) {
+      // Medium zoom: 10 second intervals
+      secondsPerMajorTick = 10;
+    } else if (zoomLevel >= 5) {
+      // Zoomed out: 30 second intervals
+      secondsPerMajorTick = 30;
+    } else if (zoomLevel >= 2) {
+      // Very zoomed out: 1 minute intervals
+      secondsPerMajorTick = 60;
+    } else {
+      // Extremely zoomed out: 5 minute intervals
+      secondsPerMajorTick = 300;
+    }
+
     const secondsPerMinorTick = secondsPerMajorTick / 5;
 
-    // Draw ticks
-    for (let time = 0; time <= totalDuration; time += secondsPerMinorTick) {
-      const x = timeToPixel(time);
-      if (x < -50 || x > width + 50) continue;
+    // Round start time to nearest minor tick
+    const firstTick = Math.floor(startTime / secondsPerMinorTick) * secondsPerMinorTick;
 
-      const isMajorTick = time % secondsPerMajorTick === 0;
+    // Draw ticks across visible range
+    for (let time = firstTick; time <= endTime; time += secondsPerMinorTick) {
+      if (time < 0) continue;
+
+      const x = timeToPixel(time);
+      if (x < 0 || x > width) continue;
+
+      const isMajorTick = Math.abs(time % secondsPerMajorTick) < 0.001; // Use epsilon for floating point comparison
 
       if (isMajorTick) {
         // Major tick
@@ -118,10 +149,18 @@ function Timeline({
         ctx.lineTo(x, RULER_HEIGHT);
         ctx.stroke();
 
-        // Time label
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        const label = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        // Time label - format based on scale
+        let label;
+        if (secondsPerMajorTick >= 60) {
+          // Show minutes only for large intervals
+          const minutes = Math.floor(time / 60);
+          label = `${minutes}m`;
+        } else {
+          // Show MM:SS for smaller intervals
+          const minutes = Math.floor(time / 60);
+          const seconds = Math.floor(time % 60);
+          label = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
         ctx.fillText(label, x, RULER_HEIGHT - 18);
       } else {
         // Minor tick
@@ -216,7 +255,7 @@ function Timeline({
     const x = timeToPixel(playheadPosition);
 
     // Only draw if playhead is visible
-    if (x < -10 || x > width + 10) return;
+    if (x < 0 || x > width) return;
 
     // Draw playhead line
     ctx.strokeStyle = "#ff4444";
@@ -463,26 +502,9 @@ function Timeline({
       />
       <div className="timeline-controls">
         <div className="toolbar-section">
-          <button
-            className={`play-pause-btn ${isPlaying ? 'playing' : ''}`}
-            onClick={onTogglePlayback}
-            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-          >
-            {isPlaying ? (
-              // Pause icon
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              </svg>
-            ) : (
-              // Play icon
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
           <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>
-          <span className="zoom-level">Zoom: {zoomLevel.toFixed(1)}x</span>
+          <span className="zoom-level">Zoom: {(zoomLevel / 10).toFixed(1)}x</span>
         </div>
         <div className="toolbar-section">
           <button
