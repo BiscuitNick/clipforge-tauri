@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use std::path::Path;
 use std::fs;
+use super::ffmpeg_utils::find_ffmpeg;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClipData {
@@ -24,6 +24,12 @@ pub async fn export_timeline(clips: Vec<ClipData>, output_path: String) -> Resul
         return Err("No clips to export".to_string());
     }
 
+    // Find ffmpeg executable
+    let ffmpeg_path = find_ffmpeg()
+        .ok_or_else(|| "ffmpeg not found. Please install FFmpeg.".to_string())?;
+
+    println!("Using ffmpeg at: {:?}", ffmpeg_path);
+
     // Create temp directory for intermediate files
     let temp_dir = std::env::temp_dir().join("clipforge_export");
     fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp directory: {}", e))?;
@@ -43,7 +49,7 @@ pub async fn export_timeline(clips: Vec<ClipData>, output_path: String) -> Resul
         // -ss after -i for accurate seeking (frame-accurate)
         // -c:v libx264 -preset ultrafast for fast re-encoding with accurate cuts
         // -c:a aac for audio re-encoding
-        let output = Command::new("ffmpeg")
+        let output = Command::new(&ffmpeg_path)
             .arg("-i")
             .arg(&clip.video_path)
             .arg("-ss")
@@ -88,7 +94,7 @@ pub async fn export_timeline(clips: Vec<ClipData>, output_path: String) -> Resul
         println!("Concatenating {} clips...", trimmed_files.len());
 
         // Concatenate all clips with re-encoding for compatibility
-        let output = Command::new("ffmpeg")
+        let output = Command::new(&ffmpeg_path)
             .arg("-f")
             .arg("concat")
             .arg("-safe")

@@ -10,6 +10,11 @@
     "dialog:default",
     "core:default",
     "core:window:default",
-    "core:event:default"
+    "core:event:default",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-exists"
   ]
 }
