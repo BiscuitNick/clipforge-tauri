@@ -15,6 +15,10 @@ pub struct ScreenCaptureSession {
     config: RecordingConfig,
     /// Source ID (screen or window)
     source_id: String,
+    /// Window bounds for cropping (x, y, width, height)
+    window_bounds: Option<(i32, i32, u32, u32)>,
+    /// Screen device to record from (for window recording)
+    screen_device: Option<String>,
 }
 
 impl ScreenCaptureSession {
@@ -25,7 +29,19 @@ impl ScreenCaptureSession {
             output_path,
             config,
             source_id,
+            window_bounds: None,
+            screen_device: None,
         }
+    }
+
+    /// Set window bounds for cropping (used for window recording)
+    pub fn set_window_bounds(&mut self, x: i32, y: i32, width: u32, height: u32) {
+        self.window_bounds = Some((x, y, width, height));
+    }
+
+    /// Set the screen device to record from (used for window recording)
+    pub fn set_screen_device(&mut self, device: String) {
+        self.screen_device = Some(device);
     }
 
     /// Start the screen capture
@@ -103,21 +119,35 @@ impl ScreenCaptureSession {
             println!("[ScreenCapture] FFmpeg input device: {}", input_device);
             command.arg("-i").arg(input_device);
         } else if self.source_id.starts_with("window_") {
-            // Window capture is more complex with AVFoundation
-            // For now, fall back to full screen capture
-            // TODO: Implement window-specific capture using CGWindowListCreateImage
-            if include_audio {
-                command.arg("-i").arg("0:0"); // Capture screen 0 + audio
+            // Window capture: record the screen containing the window, then crop
+            println!("[ScreenCapture] Window capture - using screen device with crop filter");
+
+            let screen_device = self.screen_device.as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or("4"); // Default to primary screen if not set
+
+            let input_device = if include_audio {
+                format!("{}:0", screen_device)
             } else {
-                command.arg("-i").arg("0:"); // Capture screen 0, no audio
-            }
+                format!("{}:", screen_device)
+            };
+
+            println!("[ScreenCapture] Recording from device {} for window", screen_device);
+            command.arg("-i").arg(input_device);
         } else {
-            // Default to screen 0
-            if include_audio {
-                command.arg("-i").arg("0:0");
+            // Default to primary screen (device 4)
+            println!("[ScreenCapture] Unknown source type, defaulting to primary screen");
+
+            let primary_screen_device = "4";
+
+            let input_device = if include_audio {
+                format!("{}:0", primary_screen_device)
             } else {
-                command.arg("-i").arg("0:");
-            }
+                format!("{}:", primary_screen_device)
+            };
+
+            println!("[ScreenCapture] Using default device: {}", input_device);
+            command.arg("-i").arg(input_device);
         }
 
         // Set pixel format for compatibility
@@ -126,14 +156,24 @@ impl ScreenCaptureSession {
 
     /// Add encoding arguments based on configuration
     fn add_encoding_args(&self, command: &mut Command) {
+        // Apply crop filter if window bounds are set
+        if let Some((x, y, width, height)) = self.window_bounds {
+            println!("[ScreenCapture] Applying crop filter: {}:{}:{}:{}", width, height, x, y);
+            // Crop filter format: crop=width:height:x:y
+            let crop_filter = format!("crop={}:{}:{}:{}", width, height, x, y);
+            command.arg("-vf").arg(crop_filter);
+        }
+
         // Video codec
         command.arg("-c:v").arg(&self.config.video_codec);
 
         // Video bitrate
         command.arg("-b:v").arg(format!("{}k", self.config.video_bitrate));
 
-        // Resolution (scale if needed)
-        command.arg("-s").arg(format!("{}x{}", self.config.width, self.config.height));
+        // Resolution (scale if needed) - only if not using crop
+        if self.window_bounds.is_none() {
+            command.arg("-s").arg(format!("{}x{}", self.config.width, self.config.height));
+        }
 
         // Keyframe interval (every 2 seconds)
         let keyframe_interval = self.config.frame_rate * 2;

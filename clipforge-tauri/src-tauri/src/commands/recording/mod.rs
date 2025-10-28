@@ -907,7 +907,69 @@ pub async fn start_recording(
     };
 
     // Create and start screen capture session
-    let mut capture_session = ScreenCaptureSession::new(source_id, temp_path.clone(), config);
+    let mut capture_session = ScreenCaptureSession::new(source_id.clone(), temp_path.clone(), config);
+
+    // If recording a window, get window bounds and determine which screen it's on
+    if source_id.starts_with("window_") {
+        if let Some(window_id) = source_id.strip_prefix("window_").and_then(|s| s.parse::<u32>().ok()) {
+            // Get window bounds and screens from the system
+            use super::screen_sources::{SourceEnumerator, PlatformEnumerator};
+            if let Ok(windows) = PlatformEnumerator::enumerate_windows() {
+                if let Some(window) = windows.iter().find(|w| w.id == source_id) {
+                    println!("[RecordingManager] Window position: x={}, y={}, w={}, h={}",
+                        window.x, window.y, window.width, window.height);
+
+                    // Get all screens to find which one contains the window
+                    if let Ok(screens) = PlatformEnumerator::enumerate_screens() {
+                        // Find which screen contains the window center point
+                        let window_center_x = window.x + (window.width as i32 / 2);
+                        let window_center_y = window.y + (window.height as i32 / 2);
+
+                        println!("[RecordingManager] Window center: ({}, {})", window_center_x, window_center_y);
+
+                        // Find the screen that contains this point
+                        let mut found_screen = None;
+                        for screen in &screens {
+                            let screen_right = screen.x + screen.width as i32;
+                            let screen_bottom = screen.y + screen.height as i32;
+
+                            println!("[RecordingManager] Checking screen {}: x={}, y={}, w={}, h={} (bounds: {}-{}, {}-{})",
+                                screen.id, screen.x, screen.y, screen.width, screen.height,
+                                screen.x, screen_right, screen.y, screen_bottom);
+
+                            if window_center_x >= screen.x && window_center_x < screen_right &&
+                               window_center_y >= screen.y && window_center_y < screen_bottom {
+                                println!("[RecordingManager] Window is on screen: {}", screen.id);
+                                found_screen = Some(screen);
+                                break;
+                            }
+                        }
+
+                        if let Some(screen) = found_screen {
+                            // Extract device number from screen ID (e.g., "screen_4" -> "4")
+                            if let Some(device_num) = screen.id.strip_prefix("screen_") {
+                                println!("[RecordingManager] Using screen device: {}", device_num);
+                                capture_session.set_screen_device(device_num.to_string());
+
+                                // Adjust crop coordinates to be relative to screen origin
+                                let relative_x = window.x - screen.x;
+                                let relative_y = window.y - screen.y;
+
+                                println!("[RecordingManager] Relative crop coordinates: x={}, y={}, w={}, h={}",
+                                    relative_x, relative_y, window.width, window.height);
+
+                                capture_session.set_window_bounds(relative_x, relative_y, window.width, window.height);
+                            }
+                        } else {
+                            println!("[RecordingManager] Warning: Could not determine which screen contains the window, using absolute coordinates");
+                            capture_session.set_window_bounds(window.x, window.y, window.width, window.height);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     capture_session.start(include_audio)
         .map_err(|e| format!("Failed to start capture: {}", e))?;
 

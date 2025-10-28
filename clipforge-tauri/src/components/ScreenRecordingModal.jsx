@@ -85,10 +85,26 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
     setError('');
 
     try {
+      // Create config with source dimensions
+      const config = {
+        width: selectedSource.width,
+        height: selectedSource.height,
+        frame_rate: 30,
+        video_bitrate: 5000,
+        video_codec: "h264",
+        audio_sample_rate: 48000,
+        audio_channels: 2,
+        audio_bitrate: 128,
+        audio_codec: "aac",
+        output_format: "mp4"
+      };
+
+      console.log('[ScreenRecordingModal] Starting recording with config:', config);
+
       const result = await invoke('start_recording', {
         recordingType: 'screen',
         sourceId: selectedSource.id,
-        config: null, // Use default config
+        config: config,
         includeAudio: includeAudio
       });
 

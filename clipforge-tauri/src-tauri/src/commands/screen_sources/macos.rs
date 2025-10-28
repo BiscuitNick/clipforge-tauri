@@ -89,8 +89,60 @@ impl PlatformEnumerator {
 
     /// Capture thumbnail for a window by window ID
     fn capture_window_thumbnail(window_id: u32) -> Option<String> {
-        // Window thumbnails not implemented yet
-        None
+        use std::process::Command;
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Create temp file path
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        let temp_path = format!("/tmp/window_thumb_{}_{}.png", window_id, timestamp);
+
+        // Use macOS screencapture to capture window
+        // -l <windowid> captures a specific window
+        // -x disables sound
+        let output = Command::new("screencapture")
+            .arg("-l")
+            .arg(window_id.to_string())
+            .arg("-x") // No sound
+            .arg(&temp_path)
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            println!("[WindowThumbnail] screencapture failed for window {}: {:?}",
+                window_id, String::from_utf8_lossy(&output.stderr));
+            return None;
+        }
+
+        // Check if file was created
+        if !std::path::Path::new(&temp_path).exists() {
+            println!("[WindowThumbnail] Thumbnail file not created for window {}", window_id);
+            return None;
+        }
+
+        // Resize the image using sips (built-in macOS image tool)
+        let resize_output = Command::new("sips")
+            .arg("-Z")
+            .arg("200") // Max dimension 200px
+            .arg(&temp_path)
+            .output()
+            .ok()?;
+
+        if !resize_output.status.success() {
+            println!("[WindowThumbnail] Failed to resize thumbnail for window {}", window_id);
+        }
+
+        // Read PNG file and base64 encode
+        let png_data = fs::read(&temp_path).ok()?;
+        let base64_string = base64::engine::general_purpose::STANDARD.encode(&png_data);
+
+        // Clean up temp file
+        let _ = fs::remove_file(&temp_path);
+
+        Some(base64_string)
     }
 
     /// Capture thumbnail for a screen by AVFoundation device index
