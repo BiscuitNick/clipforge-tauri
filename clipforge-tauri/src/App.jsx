@@ -67,6 +67,21 @@ function App() {
     return timeline.clips.find(clip => clip.id === timeline.selectedClipId);
   }, [timeline.selectedClipId, timeline.clips]);
 
+  // Handle clip end - automatically play next clip
+  const handleClipEnd = () => {
+    if (!selectedClip) return;
+
+    // Find the current clip index
+    const currentIndex = timeline.clips.findIndex(c => c.id === selectedClip.id);
+
+    // Check if there's a next clip
+    if (currentIndex >= 0 && currentIndex < timeline.clips.length - 1) {
+      const nextClip = timeline.clips[currentIndex + 1];
+      timeline.setSelectedClipId(nextClip.id);
+      // The PreviewPlayer will automatically start playing the new clip
+    }
+  };
+
   // Convert file path to Tauri asset URL
   const videoSrc = useMemo(() => {
     if (!selectedClip?.videoPath) return null;
@@ -91,6 +106,7 @@ function App() {
           trimStart={selectedClip?.trimStart}
           trimEnd={selectedClip?.trimEnd}
           clipStartTime={selectedClip?.startTime}
+          onClipEnd={handleClipEnd}
         />
       </div>
 

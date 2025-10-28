@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import "./PreviewPlayer.css";
 
-function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0, trimEnd, clipStartTime = 0 }) {
+function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0, trimEnd, clipStartTime = 0, onClipEnd }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -63,11 +63,17 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
       return;
     }
 
-    // Stop playback if we've reached the trim end point
+    // When we reach the trim end point, move to next clip or stop
     if (effectiveTrimEnd && time >= effectiveTrimEnd) {
-      video.pause();
-      video.currentTime = effectiveTrimEnd;
-      setIsPlaying(false);
+      if (onClipEnd) {
+        // Try to play the next clip
+        onClipEnd();
+      } else {
+        // No next clip handler, just stop
+        video.pause();
+        video.currentTime = effectiveTrimEnd;
+        setIsPlaying(false);
+      }
       setCurrentTime(effectiveTrimEnd);
       onTimeUpdate?.(videoTimeToTimelinePosition(effectiveTrimEnd));
       return;
@@ -165,6 +171,7 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
 
   // Reset when video source or trim points change
   useEffect(() => {
+    const wasPlaying = isPlaying;
     setIsPlaying(false);
 
     const video = videoRef.current;
@@ -175,6 +182,17 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
       setCurrentTime(startTime);
       // Notify parent of new position (in timeline coordinates)
       onTimeUpdate?.(videoTimeToTimelinePosition(startTime));
+
+      // Auto-play if we were previously playing (for continuous playback)
+      if (wasPlaying && videoSrc) {
+        setTimeout(() => {
+          video.play().then(() => {
+            setIsPlaying(true);
+          }).catch(err => {
+            console.error("Auto-play failed:", err);
+          });
+        }, 100);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoSrc, trimStart, trimEnd, effectiveTrimStart, videoTimeToTimelinePosition]);
