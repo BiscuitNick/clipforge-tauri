@@ -1,0 +1,58 @@
+.timeline-clips-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #1a1a1a;
+  overflow: hidden;
+}
+
+.timeline-clips-panel .panel-header {
+  padding: 1rem;
+  border-bottom: 1px solid #333;
+}
+
+.timeline-clips-panel .panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f6f6f6;
+}
+
+.timeline-clips-panel .panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.timeline-clips-panel .placeholder-text {
+  font-size: 1.2rem;
+  color: #888;
+  margin: 0;
+}
+
+.timeline-clips-panel .placeholder-hint {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767px) {
+  .timeline-clips-panel {
+    min-height: 200px; /* Ensure minimum height when stacked */
+  }
+
+  .timeline-clips-panel .panel-content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .timeline-clips-panel .placeholder-text {
+    font-size: 1rem;
+  }
+}
