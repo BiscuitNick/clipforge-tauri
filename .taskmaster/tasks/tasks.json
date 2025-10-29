@@ -304,7 +304,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -312,7 +312,7 @@
             "description": "Create a Tauri backend command that enumerates all available camera devices and returns their metadata including device IDs, labels, and capabilities",
             "dependencies": [],
             "details": "Build a Tauri command that uses platform-specific APIs to enumerate camera devices. Return an array of camera objects containing deviceId, label/name, and basic capabilities (resolution support, audio availability). Handle permissions gracefully and return appropriate error messages if camera access is denied. Ensure the command properly serializes data for frontend consumption.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test with no cameras, single camera, and multiple cameras connected. Verify correct metadata is returned for each device. Test permission denial scenarios."
           },
           {
@@ -323,7 +323,7 @@
               1
             ],
             "details": "Use navigator.mediaDevices.getUserMedia() to request camera and microphone access with appropriate constraints (video resolution, frame rate, audio settings). Initialize MediaRecorder with the obtained MediaStream, configure MIME type as 'video/webm' or 'video/mp4' based on browser support. Set up event handlers for dataavailable, start, stop, and error events. Create a blob accumulator to collect recorded chunks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test getUserMedia with different constraint combinations. Verify MediaRecorder initialization with various MIME types. Test recording start/stop lifecycle."
           },
           {
@@ -334,7 +334,7 @@
               2
             ],
             "details": "Implement a Tauri command that accepts base64-encoded blob data or binary array from the frontend. Convert the received data to a proper video file format, handling any necessary transcoding if the input is WebM and output needs to be MP4. Use Tauri's file system APIs to save the file with proper naming convention (timestamp-based). Return the saved file path to the frontend for media library integration.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test blob data conversion with various sizes. Verify file is saved in correct format and location. Test error handling for invalid data or disk space issues."
           },
           {
@@ -346,7 +346,7 @@
               2
             ],
             "details": "Build a dropdown component that displays available cameras from the enumeration command. Implement camera switching logic that stops current stream and starts new one with selected device. Create a video preview component using HTML5 video element with srcObject set to the MediaStream. Add visual indicators for active camera and preview status. Style components to match existing UI patterns with proper sizing and positioning.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test dropdown populates with available cameras. Verify camera switching works smoothly without memory leaks. Test preview displays correctly at different resolutions."
           },
           {
@@ -359,7 +359,7 @@
               4
             ],
             "details": "Build recording control buttons with start, stop, and pause functionality that interact with MediaRecorder API. Implement audio toggle checkbox that modifies getUserMedia constraints to include/exclude audio track. Add visual recording indicators (red dot, timer showing MM:SS format). Manage recording state properly to prevent invalid operations (e.g., starting when already recording). Include error handling and user feedback for recording failures.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test all recording state transitions (idle->recording->paused->recording->stopped). Verify audio toggle works during and before recording. Test timer accuracy and UI updates."
           }
         ]
@@ -374,7 +374,7 @@
         "dependencies": [
           5
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -382,7 +382,7 @@
             "description": "Implement Tauri backend commands to enumerate available audio input devices and return their metadata to the frontend",
             "dependencies": [],
             "details": "Create Tauri commands to list all available audio input devices using platform-specific APIs. Return device information including device ID, name, sample rate, and channel count. Handle default device selection and device availability changes. Serialize device data properly for frontend consumption.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test enumeration with multiple audio devices connected. Verify device list updates when devices are plugged/unplugged. Test default device selection works correctly."
           },
           {
@@ -393,7 +393,7 @@
               1
             ],
             "details": "Create Web Audio API context and connect to selected audio input device. Configure AnalyserNode with appropriate FFT size and smoothing parameters. Implement getByteFrequencyData sampling at 60fps for smooth visualization. Calculate RMS and peak levels from frequency data. Handle audio context permissions and browser compatibility.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test analyzer responds to different audio input levels. Verify smooth 60fps updates without performance issues. Test browser permission handling and fallbacks."
           },
           {
@@ -404,7 +404,7 @@
               2
             ],
             "details": "Build React component with CSS animations for smooth VU meter display. Implement green to yellow to red color transitions based on audio levels (green: -40dB to -12dB, yellow: -12dB to -3dB, red: above -3dB). Add peak hold indicator and numerical dB display. Style to match existing UI with responsive sizing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test VU meter responds smoothly to audio level changes. Verify color transitions occur at correct dB thresholds. Test component renders correctly at different sizes."
           },
           {
@@ -416,7 +416,7 @@
               3
             ],
             "details": "Create mute/unmute toggle button with microphone icon that changes based on state. Implement audio stream muting at Web Audio API level to prevent audio capture. Add visual feedback with strikethrough icon when muted and grayed-out VU meter. Persist mute state across recording sessions. Include keyboard shortcut support (M key) for quick muting.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test mute toggle stops audio capture completely. Verify visual feedback updates immediately. Test keyboard shortcut works correctly. Validate mute state persists between recordings."
           },
           {
@@ -710,7 +710,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-28T22:39:43.286Z",
+      "updated": "2025-10-29T18:32:51.106Z",
       "description": "Tasks for master context"
     }
   }

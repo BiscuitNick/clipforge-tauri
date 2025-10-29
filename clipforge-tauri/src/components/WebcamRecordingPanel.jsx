@@ -11,13 +11,19 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
   const [selectedCameraId, setSelectedCameraId] = useState(null);
   const [isLoadingCameras, setIsLoadingCameras] = useState(true);
 
+  // Audio state
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedAudioId, setSelectedAudioId] = useState(null);
+  const [includeAudio, setIncludeAudio] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+
   // MediaStream and recording state
   const [stream, setStream] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [includeAudio, setIncludeAudio] = useState(true);
 
   // Refs
   const videoRef = useRef(null);
@@ -25,13 +31,18 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
   const timerIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
   const finalDurationRef = useRef(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const audioAnimationRef = useRef(null);
 
-  // Load available cameras on mount
+  // Load available cameras and audio devices on mount
   useEffect(() => {
     loadCameras();
+    loadAudioDevices();
     return () => {
       // Cleanup on unmount
       stopStream();
+      stopAudioMonitoring();
     };
   }, []);
 
@@ -79,15 +90,51 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
     }
   };
 
+  // Load audio devices using browser API
+  const loadAudioDevices = async () => {
+    try {
+      // Request audio access to get device labels
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Enumerate audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to our format
+      const audioInputDevices = audioInputs.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Microphone ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setAudioDevices(audioInputDevices);
+
+      // Auto-select default audio device
+      const defaultAudio = audioInputDevices.find(dev => dev.is_default);
+      if (defaultAudio) {
+        setSelectedAudioId(defaultAudio.id);
+      } else if (audioInputDevices.length > 0) {
+        setSelectedAudioId(audioInputDevices[0].id);
+      }
+    } catch (err) {
+      console.error('[WebcamRecording] Failed to enumerate audio devices:', err);
+      // Don't show error to user - audio is optional
+    }
+  };
+
   // Start camera preview
   const startPreview = async () => {
     try {
       // Stop existing stream if any
       stopStream();
+      stopAudioMonitoring();
 
       const constraints = {
         video: selectedCameraId ? { deviceId: { exact: selectedCameraId } } : true,
-        audio: includeAudio
+        audio: includeAudio && selectedAudioId ? { deviceId: { exact: selectedAudioId } } : includeAudio
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -96,6 +143,11 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
       // Attach to video element
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+      }
+
+      // Set up audio monitoring if audio is enabled
+      if (includeAudio && mediaStream.getAudioTracks().length > 0) {
+        startAudioMonitoring(mediaStream);
       }
     } catch (err) {
       console.error('[WebcamRecording] Failed to start preview:', err);
@@ -116,6 +168,65 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
     }
   };
 
+  // Start audio level monitoring using Web Audio API
+  const startAudioMonitoring = (mediaStream) => {
+    try {
+      // Create audio context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // Create analyser node
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      // Create media stream source
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      source.connect(analyser);
+
+      // Start monitoring loop
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateAudioLevel = () => {
+        if (!analyserRef.current) return;
+
+        analyser.getByteFrequencyData(dataArray);
+
+        // Calculate average audio level (0-100)
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const average = sum / dataArray.length;
+        const normalizedLevel = Math.min(100, (average / 255) * 100);
+
+        // Apply mute
+        setAudioLevel(isMuted ? 0 : normalizedLevel);
+
+        audioAnimationRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+
+      updateAudioLevel();
+    } catch (err) {
+      console.error('[WebcamRecording] Failed to start audio monitoring:', err);
+    }
+  };
+
+  // Stop audio monitoring
+  const stopAudioMonitoring = () => {
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
+
   // Start preview when camera or audio settings change
   useEffect(() => {
     if (selectedCameraId) {
@@ -123,12 +234,29 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
     }
     return () => {
       stopStream();
+      stopAudioMonitoring();
     };
-  }, [selectedCameraId, includeAudio]);
+  }, [selectedCameraId, selectedAudioId, includeAudio]);
 
   // Handle camera selection change
   const handleCameraChange = (e) => {
     setSelectedCameraId(e.target.value);
+  };
+
+  // Handle audio device selection change
+  const handleAudioDeviceChange = (e) => {
+    setSelectedAudioId(e.target.value);
+  };
+
+  // Handle mute toggle
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+    if (stream) {
+      const audioTracks = stream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMuted; // Will be flipped after state updates
+      });
+    }
   };
 
   // Start recording
@@ -297,6 +425,13 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Get VU meter color based on audio level
+  const getVUMeterColor = (level) => {
+    if (level < 30) return '#27ae60'; // Green - low
+    if (level < 70) return '#f39c12'; // Orange - medium
+    return '#e74c3c'; // Red - high/clipping
+  };
+
   return (
     <div className="webcam-recording-panel">
       {/* Camera Preview */}
@@ -368,6 +503,48 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
             Include Audio
           </label>
         </div>
+
+        {/* Audio Device Selection */}
+        {includeAudio && audioDevices.length > 0 && (
+          <div className="audio-device-selector">
+            <label htmlFor="audio-select">Microphone:</label>
+            <select
+              id="audio-select"
+              value={selectedAudioId || ''}
+              onChange={handleAudioDeviceChange}
+              disabled={isRecording}
+            >
+              {audioDevices.map(device => (
+                <option key={device.id} value={device.id}>
+                  {device.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Audio Level Meter */}
+        {includeAudio && stream && stream.getAudioTracks().length > 0 && (
+          <div className="audio-level-container">
+            <button
+              className={`mute-btn ${isMuted ? 'muted' : ''}`}
+              onClick={handleMuteToggle}
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+            <div className="vu-meter">
+              <div
+                className="vu-meter-fill"
+                style={{
+                  width: `${audioLevel}%`,
+                  backgroundColor: getVUMeterColor(audioLevel)
+                }}
+              />
+            </div>
+            <span className="audio-level-text">{Math.round(audioLevel)}%</span>
+          </div>
+        )}
       </div>
 
       {/* Recording Controls */}
