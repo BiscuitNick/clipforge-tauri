@@ -27,7 +27,29 @@ function App() {
   const [webcamStream, setWebcamStream] = React.useState(null); // Track webcam stream for preview
   const [webcamRecordingDuration, setWebcamRecordingDuration] = React.useState(0); // Track webcam recording duration
   const [isWebcamPaused, setIsWebcamPaused] = React.useState(false); // Track webcam recording paused state
+
+  // Panel visibility state - flexible panel system (2-4 panels)
+  const [panelVisibility, setPanelVisibility] = React.useState({
+    mediaLibrary: true,      // Always visible
+    videoPreview1: true,     // Always visible
+    videoPreview2: true,     // Can be hidden
+    timelineClips: true      // Can be hidden
+  });
+
   const timelineRef = React.useRef(null);
+
+  // Calculate number of visible panels for CSS grid
+  const visiblePanelCount = React.useMemo(() => {
+    return Object.values(panelVisibility).filter(Boolean).length;
+  }, [panelVisibility]);
+
+  // Toggle panel visibility
+  const togglePanel = (panelName) => {
+    setPanelVisibility(prev => ({
+      ...prev,
+      [panelName]: !prev[panelName]
+    }));
+  };
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
   const timelineState = React.useMemo(() => {
@@ -359,42 +381,96 @@ function App() {
   return (
     <DndContext onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="app-layout">
-      {/* Top section: Three equal panels */}
-      <div className="top-panels">
-        <MediaLibraryPanel
-          mediaItems={mediaLibrary.mediaItems}
-          onMediaImport={handleMediaImport}
-          onMediaSelect={handleMediaSelect}
-          selectedMediaId={selectedMedia?.id}
-          onRecordingStateChange={handleRecordingStateChange}
-          isRecording={recordingState?.type === 'recording'}
-          onPlayPauseMedia={handlePlayPauseMedia}
-          onStopMedia={handleStopMedia}
-          isLibraryPlaying={isLibraryPlaying}
-          onWebcamStreamChange={handleWebcamStreamChange}
-          onWebcamRecordingDurationChange={handleWebcamRecordingDurationChange}
-          onWebcamPausedChange={handleWebcamPausedChange}
-        />
-        <VideoPreviewPanel
-          selectedMedia={selectedMedia}
-          mode={previewMode}
-          timelineState={timelineState}
-          recordingState={recordingState}
-          onStopRecording={handleStopRecording}
-          libraryPlaybackCommand={libraryPlaybackCommand}
-          webcamStream={webcamStream}
-          webcamRecordingDuration={webcamRecordingDuration}
-          isWebcamPaused={isWebcamPaused}
-        />
-        <TimelineClipsPanel
-          clips={timeline.clips}
-          selectedClipId={timeline.selectedClipId}
-          onClipSelect={timeline.setSelectedClipId}
-          onClipUpdate={handleClipUpdate}
-          onClipRemove={timeline.removeClip}
-          onSnapLeft={timeline.snapLeft}
-          onSnapRight={timeline.snapRight}
-        />
+      {/* Top section: Flexible panels (2-4 columns) */}
+      <div className={`top-panels panels-${visiblePanelCount}`}>
+        {/* Media Library Panel - Always visible */}
+        {panelVisibility.mediaLibrary && (
+          <MediaLibraryPanel
+            mediaItems={mediaLibrary.mediaItems}
+            onMediaImport={handleMediaImport}
+            onMediaSelect={handleMediaSelect}
+            selectedMediaId={selectedMedia?.id}
+            onRecordingStateChange={handleRecordingStateChange}
+            isRecording={recordingState?.type === 'recording'}
+            onPlayPauseMedia={handlePlayPauseMedia}
+            onStopMedia={handleStopMedia}
+            isLibraryPlaying={isLibraryPlaying}
+            onWebcamStreamChange={handleWebcamStreamChange}
+            onWebcamRecordingDurationChange={handleWebcamRecordingDurationChange}
+            onWebcamPausedChange={handleWebcamPausedChange}
+          />
+        )}
+
+        {/* Video Preview Panel 1 - Always visible */}
+        {panelVisibility.videoPreview1 && (
+          <VideoPreviewPanel
+            selectedMedia={selectedMedia}
+            mode={previewMode}
+            timelineState={timelineState}
+            recordingState={recordingState}
+            onStopRecording={handleStopRecording}
+            libraryPlaybackCommand={libraryPlaybackCommand}
+            webcamStream={webcamStream}
+            webcamRecordingDuration={webcamRecordingDuration}
+            isWebcamPaused={isWebcamPaused}
+            panelLabel="Preview 1"
+          />
+        )}
+
+        {/* Video Preview Panel 2 - Can be hidden */}
+        {panelVisibility.videoPreview2 && (
+          <VideoPreviewPanel
+            selectedMedia={selectedMedia}
+            mode={previewMode}
+            timelineState={timelineState}
+            recordingState={recordingState}
+            onStopRecording={handleStopRecording}
+            libraryPlaybackCommand={libraryPlaybackCommand}
+            webcamStream={webcamStream}
+            webcamRecordingDuration={webcamRecordingDuration}
+            isWebcamPaused={isWebcamPaused}
+            panelLabel="Preview 2"
+            onCollapse={() => togglePanel('videoPreview2')}
+          />
+        )}
+
+        {/* Timeline Clips Panel - Can be hidden */}
+        {panelVisibility.timelineClips && (
+          <TimelineClipsPanel
+            clips={timeline.clips}
+            selectedClipId={timeline.selectedClipId}
+            onClipSelect={timeline.setSelectedClipId}
+            onClipUpdate={handleClipUpdate}
+            onClipRemove={timeline.removeClip}
+            onSnapLeft={timeline.snapLeft}
+            onSnapRight={timeline.snapRight}
+            onCollapse={() => togglePanel('timelineClips')}
+          />
+        )}
+      </div>
+
+      {/* Floating toggle buttons for hidden panels */}
+      <div className="floating-panel-toggles">
+        {!panelVisibility.videoPreview2 && (
+          <button
+            className="panel-toggle preview-2-toggle"
+            onClick={() => togglePanel('videoPreview2')}
+            aria-label="Show Preview 2 panel"
+            title="Show Preview 2 panel"
+          >
+            ◀ Preview 2
+          </button>
+        )}
+        {!panelVisibility.timelineClips && (
+          <button
+            className="panel-toggle clips-toggle"
+            onClick={() => togglePanel('timelineClips')}
+            aria-label="Show Timeline Clips panel"
+            title="Show Timeline Clips panel"
+          >
+            ◀ Clips
+          </button>
+        )}
       </div>
 
       {/* Bottom section: Timeline */}

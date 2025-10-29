@@ -12,7 +12,8 @@ function TimelineClipsPanel({
   onClipUpdate,
   onClipRemove,
   onSnapLeft,
-  onSnapRight
+  onSnapRight,
+  onCollapse
 }) {
   const [expandedClipId, setExpandedClipId] = useState(null);
 
@@ -78,7 +79,17 @@ function TimelineClipsPanel({
       <div className="timeline-clips-panel">
         <div className="panel-header">
           <h2>Timeline Clips</h2>
-          <span className="clip-count">0 clips</span>
+          <div className="header-actions">
+            <span className="clip-count">0 clips</span>
+            <button
+              className="collapse-button"
+              onClick={() => onCollapse && onCollapse()}
+              aria-label="Hide panel"
+              title="Hide panel"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="panel-content empty">
           <p className="empty-message">No clips on timeline</p>
@@ -92,7 +103,17 @@ function TimelineClipsPanel({
     <div className="timeline-clips-panel">
       <div className="panel-header">
         <h2>Timeline Clips</h2>
-        <span className="clip-count">{sortedClips.length} {sortedClips.length === 1 ? 'clip' : 'clips'}</span>
+        <div className="header-actions">
+          <span className="clip-count">{sortedClips.length} {sortedClips.length === 1 ? 'clip' : 'clips'}</span>
+          <button
+            className="collapse-button"
+            onClick={() => onCollapse && onCollapse()}
+            aria-label="Hide panel"
+            title="Hide panel"
+          >
+            ✕
+          </button>
+        </div>
       </div>
       <div className="panel-content">
         <div className="clips-list">

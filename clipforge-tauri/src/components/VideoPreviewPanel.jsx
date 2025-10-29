@@ -22,7 +22,7 @@ function formatTime(seconds) {
  * - recording: Show live recording preview and controls
  * - webcam-recording: Show live webcam stream during recording
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null }) {
   const videoRef = useRef(null);
   const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -397,7 +397,17 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   return (
     <div className="video-preview-panel">
       <div className="panel-header">
-        <h2>Video Preview</h2>
+        <h2>{panelLabel}</h2>
+        {onCollapse && (
+          <button
+            className="collapse-button"
+            onClick={onCollapse}
+            aria-label="Hide panel"
+            title="Hide panel"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div className="panel-content">
