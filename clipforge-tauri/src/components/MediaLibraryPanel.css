@@ -556,6 +556,134 @@
   cursor: not-allowed;
 }
 
+/* Inline Webcam Configuration */
+.webcam-config-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: #222;
+  border-radius: 6px;
+  margin: 1rem;
+}
+
+.webcam-config-inline .config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.webcam-config-inline .config-label {
+  font-size: 0.9rem;
+  color: #f6f6f6;
+  font-weight: 500;
+  min-width: 85px;
+}
+
+.webcam-config-inline .config-select {
+  flex: 1;
+  background-color: #2a2a2a;
+  color: #f6f6f6;
+  border: 1px solid #444;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.webcam-config-inline .config-select:hover:not(:disabled) {
+  background-color: #333;
+  border-color: #555;
+}
+
+.webcam-config-inline .config-select:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.webcam-config-inline .config-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.webcam-config-inline .config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.webcam-config-inline .config-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.webcam-config-inline .config-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.webcam-config-inline .config-checkbox span {
+  font-size: 0.9rem;
+  color: #f6f6f6;
+}
+
+.webcam-config-inline .audio-meter-row {
+  padding: 0.5rem;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.webcam-config-inline .mute-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: all 0.2s ease;
+  min-width: 30px;
+}
+
+.webcam-config-inline .mute-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.webcam-config-inline .mute-btn.muted {
+  opacity: 0.5;
+}
+
+.webcam-config-inline .mute-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.webcam-config-inline .vu-meter {
+  flex: 1;
+  height: 24px;
+  background-color: #0a0a0a;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.webcam-config-inline .vu-meter-fill {
+  height: 100%;
+  transition: width 0.1s ease-out;
+  border-radius: 3px;
+}
+
+.webcam-config-inline .audio-level-text {
+  color: #f6f6f6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
   .media-library-panel {

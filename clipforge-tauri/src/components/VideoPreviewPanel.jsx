@@ -22,7 +22,7 @@ function formatTime(seconds) {
  * - recording: Show live recording preview and controls
  * - webcam-recording: Show live webcam stream during recording
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0 }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false }) {
   const videoRef = useRef(null);
   const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -415,16 +415,14 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                   Your browser does not support the video tag.
                 </video>
                 {webcamStream && webcamRecordingDuration > 0 && (
-                  <div className="recording-preview-overlay">
-                    <div className="recording-preview-content">
-                      <div className="recording-indicator-large">
-                        <div className="recording-dot-large"></div>
-                      </div>
-                      <div className="recording-timer-large">
-                        {formatTime(webcamRecordingDuration)}
-                      </div>
+                  <>
+                    <div className="recording-indicator-bottom-left">
+                      <div className={isWebcamPaused ? "recording-dot-paused" : "recording-dot-pulse"}></div>
                     </div>
-                  </div>
+                    <div className="recording-timer-bottom-right">
+                      {formatTime(webcamRecordingDuration)}
+                    </div>
+                  </>
                 )}
               </>
             ) : mode === "recording-preview" && recordingState ? (
@@ -460,15 +458,11 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                     />
                   </div>
                 )}
-                <div className="recording-preview-overlay">
-                  <div className="recording-preview-content">
-                    <div className="recording-indicator-large">
-                      <div className="recording-dot-large"></div>
-                    </div>
-                    <div className="recording-timer-large">
-                      {formatTime(recordingState.duration)}
-                    </div>
-                  </div>
+                <div className="recording-indicator-bottom-left">
+                  <div className="recording-dot-pulse"></div>
+                </div>
+                <div className="recording-timer-bottom-right">
+                  {formatTime(recordingState.duration)}
                 </div>
               </div>
             ) : showBlackScreen ? (
@@ -489,28 +483,31 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
             )}
           </div>
 
-          <div className="video-scrubber-container">
-            <input
-              type="range"
-              className="video-scrubber minimalistic"
-              min="0"
-              max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
-              step="0.1"
-              value={mode === "timeline" && timelineState ? timelineState.playheadPosition : currentTime}
-              onChange={handleScrubberChange}
-              onMouseDown={handleScrubberMouseDown}
-              onMouseUp={handleScrubberMouseUp}
-              onTouchStart={handleScrubberMouseDown}
-              onTouchEnd={handleScrubberMouseUp}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-            />
-            <div className="video-time-display">
-              {mode === "timeline" && timelineState
-                ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`
-              }
+          {/* Hide scrubber in recording modes */}
+          {mode !== "recording" && mode !== "webcam-recording" && mode !== "recording-preview" && (
+            <div className="video-scrubber-container">
+              <input
+                type="range"
+                className="video-scrubber minimalistic"
+                min="0"
+                max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
+                step="0.1"
+                value={mode === "timeline" && timelineState ? timelineState.playheadPosition : currentTime}
+                onChange={handleScrubberChange}
+                onMouseDown={handleScrubberMouseDown}
+                onMouseUp={handleScrubberMouseUp}
+                onTouchStart={handleScrubberMouseDown}
+                onTouchEnd={handleScrubberMouseUp}
+                disabled={mode === "timeline" ? !timelineState : !videoSrc}
+              />
+              <div className="video-time-display">
+                {mode === "timeline" && timelineState
+                  ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`
+                }
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

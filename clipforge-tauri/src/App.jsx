@@ -26,6 +26,7 @@ function App() {
   const [isLibraryPlaying, setIsLibraryPlaying] = React.useState(false); // Track library playback state
   const [webcamStream, setWebcamStream] = React.useState(null); // Track webcam stream for preview
   const [webcamRecordingDuration, setWebcamRecordingDuration] = React.useState(0); // Track webcam recording duration
+  const [isWebcamPaused, setIsWebcamPaused] = React.useState(false); // Track webcam recording paused state
   const timelineRef = React.useRef(null);
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
@@ -165,6 +166,11 @@ function App() {
   // Handle webcam recording duration updates
   const handleWebcamRecordingDurationChange = (duration) => {
     setWebcamRecordingDuration(duration);
+  };
+
+  // Handle webcam recording paused state changes
+  const handleWebcamPausedChange = (isPaused) => {
+    setIsWebcamPaused(isPaused);
   };
 
   // Handle drag move - track position for drop calculation
@@ -365,6 +371,7 @@ function App() {
           isLibraryPlaying={isLibraryPlaying}
           onWebcamStreamChange={handleWebcamStreamChange}
           onWebcamRecordingDurationChange={handleWebcamRecordingDurationChange}
+          onWebcamPausedChange={handleWebcamPausedChange}
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
@@ -375,6 +382,7 @@ function App() {
           libraryPlaybackCommand={libraryPlaybackCommand}
           webcamStream={webcamStream}
           webcamRecordingDuration={webcamRecordingDuration}
+          isWebcamPaused={isWebcamPaused}
         />
         <TimelineClipsPanel
           clips={timeline.clips}

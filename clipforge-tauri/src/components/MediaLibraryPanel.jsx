@@ -4,7 +4,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useDraggable } from "@dnd-kit/core";
 import ScreenRecordingModal from "./ScreenRecordingModal";
-import WebcamConfigurationModal from "./WebcamConfigurationModal";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -106,7 +105,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -118,10 +117,8 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const [countdown, setCountdown] = useState(null); // Countdown timer before recording starts
 
   // Webcam recording state
-  const [webcamConfig, setWebcamConfig] = useState(null); // Stores selected camera and audio config
   const [isWebcamRecording, setIsWebcamRecording] = useState(false);
   const [isWebcamPaused, setIsWebcamPaused] = useState(false);
-  const [isWebcamConfigModalOpen, setIsWebcamConfigModalOpen] = useState(false);
   const [webcamStream, setWebcamStream] = useState(null);
   const [webcamRecordingDuration, setWebcamRecordingDuration] = useState(0);
   const webcamMediaRecorderRef = useRef(null);
@@ -129,6 +126,18 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const webcamRecordingStartTimeRef = useRef(null);
   const webcamRecordingTimerRef = useRef(null);
   const webcamFinalDurationRef = useRef(0); // Capture final duration at stop time
+
+  // Webcam device state (inline controls instead of modal)
+  const [cameraDevices, setCameraDevices] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState(null);
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedAudioId, setSelectedAudioId] = useState(null);
+  const [includeAudio, setIncludeAudio] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const audioAnimationRef = useRef(null);
 
   // Cleanup webcam recording timer on unmount or mode change
   useEffect(() => {
@@ -429,22 +438,163 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     }
   };
 
-  // Handle webcam configuration selection
-  const handleWebcamConfigSelect = async (config) => {
-    console.log("[MediaLibraryPanel] Webcam config selected:", config);
-    setWebcamConfig(config);
-
-    // Start webcam stream
+  // Load available cameras
+  const loadCameras = async () => {
     try {
+      // Request camera access to trigger permission prompt
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      // Enumerate devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to camera format
+      const cameras = videoDevices.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Camera ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setCameraDevices(cameras);
+
+      // Auto-select default
+      if (cameras.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(cameras[0].id);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to enumerate cameras:', err);
+      setMessage(`Failed to load cameras: ${err.message || err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    }
+  };
+
+  // Load available audio devices
+  const loadAudioDevices = async () => {
+    try {
+      // Request audio access
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Enumerate audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to audio format
+      const audioDevs = audioInputs.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Microphone ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setAudioDevices(audioDevs);
+
+      // Auto-select default
+      if (audioDevs.length > 0 && !selectedAudioId) {
+        setSelectedAudioId(audioDevs[0].id);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to enumerate audio devices:', err);
+      // Don't show error - audio is optional
+    }
+  };
+
+  // Start audio level monitoring
+  const startAudioMonitoring = (mediaStream) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateAudioLevel = () => {
+        if (!analyserRef.current) return;
+
+        analyser.getByteFrequencyData(dataArray);
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const average = sum / dataArray.length;
+        const normalizedLevel = Math.min(100, (average / 255) * 100);
+
+        setAudioLevel(isMuted ? 0 : normalizedLevel);
+        audioAnimationRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+
+      updateAudioLevel();
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start audio monitoring:', err);
+    }
+  };
+
+  // Stop audio monitoring
+  const stopAudioMonitoring = () => {
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
+
+  // Load devices when entering record-video mode
+  useEffect(() => {
+    if (mode === 'record-video') {
+      loadCameras();
+      loadAudioDevices();
+    } else {
+      // Cleanup when leaving record-video mode
+      stopAudioMonitoring();
+    }
+
+    return () => {
+      stopAudioMonitoring();
+    };
+  }, [mode]);
+
+  // Start webcam preview when device selections change
+  const startWebcamPreview = async () => {
+    if (!selectedCameraId || isWebcamRecording) return;
+
+    try {
+      // Stop existing stream
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+      }
+      stopAudioMonitoring();
+
       const constraints = {
-        video: { deviceId: { exact: config.cameraId } },
-        audio: config.includeMicrophone ? {
-          deviceId: config.microphoneDeviceId ? { exact: config.microphoneDeviceId } : undefined
-        } : false
+        video: { deviceId: { exact: selectedCameraId } },
+        audio: includeAudio && selectedAudioId ? { deviceId: { exact: selectedAudioId } } : includeAudio
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setWebcamStream(stream);
+
+      // Start audio monitoring if audio is enabled
+      if (includeAudio && stream.getAudioTracks().length > 0) {
+        startAudioMonitoring(stream);
+      }
 
       // Notify parent to show webcam preview
       if (onWebcamStreamChange) {
@@ -458,6 +608,24 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setMessage("");
         setMessageType("");
       }, 5000);
+    }
+  };
+
+  // Start preview when device selections change
+  useEffect(() => {
+    if (mode === 'record-video' && selectedCameraId) {
+      startWebcamPreview();
+    }
+  }, [selectedCameraId, selectedAudioId, includeAudio]);
+
+  // Handle mute toggle
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+    if (webcamStream) {
+      const audioTracks = webcamStream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMuted; // Will be flipped after state updates
+      });
     }
   };
 
@@ -575,11 +743,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
           // Reset and go back to media view
           setMode("media");
-          setWebcamConfig(null);
           setWebcamRecordingDuration(0);
           if (webcamStream) {
             webcamStream.getTracks().forEach(track => track.stop());
             setWebcamStream(null);
+          }
+          // Reset to default camera for next recording
+          if (cameraDevices.length > 0) {
+            setSelectedCameraId(cameraDevices[0].id);
           }
         } catch (err) {
           console.error('[MediaLibraryPanel] Failed to save webcam recording:', err);
@@ -637,17 +808,26 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       // Resume recording and timer
       recorder.resume();
       setIsWebcamPaused(false);
+      if (onWebcamPausedChange) {
+        onWebcamPausedChange(false);
+      }
       // Restart timer from where we paused
       webcamRecordingStartTimeRef.current = Date.now() - (webcamRecordingDuration * 1000);
       webcamRecordingTimerRef.current = setInterval(() => {
         const elapsed = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
         setWebcamRecordingDuration(elapsed);
+        if (onWebcamRecordingDurationChange) {
+          onWebcamRecordingDurationChange(elapsed);
+        }
       }, 100);
       console.log('[MediaLibraryPanel] Webcam recording resumed');
     } else {
       // Pause recording and timer
       recorder.pause();
       setIsWebcamPaused(true);
+      if (onWebcamPausedChange) {
+        onWebcamPausedChange(true);
+      }
       if (webcamRecordingTimerRef.current) {
         clearInterval(webcamRecordingTimerRef.current);
         webcamRecordingTimerRef.current = null;
@@ -791,39 +971,81 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         )}
 
         {mode === "record-video" && (
-          <div className="recording-mode-view">
-            {!webcamConfig ? (
-              <div className="recording-mode-centered">
-                <button
-                  className="select-source-button"
-                  onClick={() => setIsWebcamConfigModalOpen(true)}
-                  disabled={isLoading || isWebcamRecording}
+          <div className="webcam-config-inline">
+            {/* Camera Selection */}
+            <div className="config-row">
+              <label className="config-label">Camera:</label>
+              <select
+                className="config-select"
+                value={selectedCameraId || ''}
+                onChange={(e) => setSelectedCameraId(e.target.value)}
+                disabled={isWebcamRecording || cameraDevices.length === 0}
+              >
+                {cameraDevices.length === 0 ? (
+                  <option>No cameras found</option>
+                ) : (
+                  cameraDevices.map(camera => (
+                    <option key={camera.id} value={camera.id}>
+                      {camera.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Audio Toggle */}
+            <div className="config-row">
+              <label className="config-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeAudio}
+                  onChange={(e) => setIncludeAudio(e.target.checked)}
+                  disabled={isWebcamRecording}
+                />
+                <span>Include Audio</span>
+              </label>
+            </div>
+
+            {/* Audio Device Selection */}
+            {includeAudio && audioDevices.length > 0 && (
+              <div className="config-row">
+                <label className="config-label">Microphone:</label>
+                <select
+                  className="config-select"
+                  value={selectedAudioId || ''}
+                  onChange={(e) => setSelectedAudioId(e.target.value)}
+                  disabled={isWebcamRecording}
                 >
-                  Configure Camera & Audio
-                </button>
+                  {audioDevices.map(device => (
+                    <option key={device.id} value={device.id}>
+                      {device.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <div className="recording-mode-centered">
-                <div className="selected-source-compact">
-                  <span className="source-details">
-                    {webcamConfig.cameraName}
-                    {webcamConfig.includeAudio && ` • Audio: ${webcamConfig.includeMicrophone ? 'System + Mic' : 'System'}`}
-                  </span>
-                  <button
-                    className="change-source-button-compact"
-                    onClick={() => {
-                      // Stop stream if active
-                      if (webcamStream) {
-                        webcamStream.getTracks().forEach(track => track.stop());
-                        setWebcamStream(null);
-                      }
-                      setWebcamConfig(null);
+            )}
+
+            {/* Audio Level Meter */}
+            {includeAudio && webcamStream && webcamStream.getAudioTracks().length > 0 && (
+              <div className="config-row audio-meter-row">
+                <button
+                  className={`mute-btn ${isMuted ? 'muted' : ''}`}
+                  onClick={handleMuteToggle}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                  disabled={isWebcamRecording}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+                <div className="vu-meter">
+                  <div
+                    className="vu-meter-fill"
+                    style={{
+                      width: `${audioLevel}%`,
+                      backgroundColor: audioLevel < 30 ? '#27ae60' : audioLevel < 70 ? '#f39c12' : '#e74c3c'
                     }}
-                    disabled={isLoading || isWebcamRecording}
-                  >
-                    Change Settings
-                  </button>
+                  />
                 </div>
+                <span className="audio-level-text">{Math.round(audioLevel)}%</span>
               </div>
             )}
           </div>
@@ -943,7 +1165,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
                   handleStartWebcamRecording();
                 }
               }}
-              disabled={!webcamConfig && !isWebcamRecording}
+              disabled={!webcamStream && !isWebcamRecording}
               title={isWebcamRecording ? (isWebcamPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
             >
               {isWebcamRecording ? (
@@ -970,12 +1192,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         isOpen={isRecordingModalOpen}
         onClose={() => setIsRecordingModalOpen(false)}
         onSourceSelect={handleSourceSelect}
-      />
-
-      <WebcamConfigurationModal
-        isOpen={isWebcamConfigModalOpen}
-        onClose={() => setIsWebcamConfigModalOpen(false)}
-        onConfigSelect={handleWebcamConfigSelect}
       />
     </div>
   );
