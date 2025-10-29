@@ -1196,6 +1196,48 @@ pub struct ErrorDetails {
     pub suggestion: Option<String>,
 }
 
+/// Save PiP recording metadata to JSON file
+#[tauri::command]
+pub async fn save_pip_metadata(
+    metadata: String,
+    state: State<'_, RecordingManagerState>,
+) -> Result<String, String> {
+    use std::fs;
+    use std::io::Write;
+
+    let manager = state.lock().map_err(|e| e.to_string())?;
+    let temp_manager = manager.get_temp_manager();
+    let temp_mgr = temp_manager.lock().map_err(|e| e.to_string())?;
+
+    // Create unique filename with timestamp
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let filename = format!("pip_metadata_{}.json", timestamp);
+
+    // Get temp directory path
+    let file_path = temp_mgr.temp_dir.join(&filename);
+
+    // Write metadata to file
+    let mut file = fs::File::create(&file_path)
+        .map_err(|e| format!("Failed to create metadata file: {}", e))?;
+
+    file.write_all(metadata.as_bytes())
+        .map_err(|e| format!("Failed to write metadata: {}", e))?;
+
+    file.flush()
+        .map_err(|e| format!("Failed to flush metadata file: {}", e))?;
+
+    println!("[RecordingManager] Saved PiP metadata to: {}", file_path.display());
+
+    // Return absolute file path
+    file_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())
+        .map(|s| s.to_string())
+}
+
 /// Save webcam recording from blob data
 #[tauri::command]
 pub async fn save_webcam_recording(

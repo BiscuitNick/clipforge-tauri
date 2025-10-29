@@ -40,6 +40,7 @@ pub fn run() {
             commands::recording::check_disk_space,
             commands::recording::get_error_details,
             commands::recording::save_webcam_recording,
+            commands::recording::save_pip_metadata,
             commands::screen_sources::enumerate_sources,
             commands::screen_sources::enumerate_screens,
             commands::screen_sources::enumerate_windows,
