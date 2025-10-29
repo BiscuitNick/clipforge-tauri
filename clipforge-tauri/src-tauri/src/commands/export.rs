@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::process::Command;
 use std::fs;
 use super::ffmpeg_utils::find_ffmpeg;
@@ -19,6 +20,10 @@ pub struct ClipData {
     pub height: u32,
     #[serde(rename = "frameRate")]
     pub frame_rate: f64,
+    #[serde(rename = "mediaType")]
+    pub media_type: Option<String>,
+    #[serde(rename = "pipMetadataPath")]
+    pub pip_metadata_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,6 +31,170 @@ struct ExportProgress {
     current: usize,
     total: usize,
     message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PiPConfiguration {
+    position: String,
+    size: String,
+    #[serde(rename = "cameraId")]
+    camera_id: Option<String>,
+    #[serde(rename = "includeAudio")]
+    include_audio: bool,
+    #[serde(rename = "audioDeviceId")]
+    audio_device_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ScreenDimensions {
+    width: u32,
+    height: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PiPMetadata {
+    id: String,
+    #[serde(rename = "startTime")]
+    start_time: u64,
+    duration: f64,
+    #[serde(rename = "screenFilePath")]
+    screen_file_path: String,
+    #[serde(rename = "webcamFilePath")]
+    webcam_file_path: String,
+    #[serde(rename = "pipConfig")]
+    pip_config: PiPConfiguration,
+    #[serde(rename = "screenDimensions")]
+    screen_dimensions: ScreenDimensions,
+    #[serde(rename = "webcamDimensions")]
+    webcam_dimensions: ScreenDimensions,
+}
+
+#[derive(Debug)]
+struct PiPCoordinates {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+/// Calculate PiP overlay coordinates based on configuration
+fn calculate_pip_coordinates(
+    pip_config: &PiPConfiguration,
+    screen_width: u32,
+    screen_height: u32,
+) -> PiPCoordinates {
+    // Size percentages matching frontend
+    let size_percent = match pip_config.size.as_str() {
+        "small" => 0.15,
+        "medium" => 0.25,
+        "large" => 0.35,
+        _ => 0.25,
+    };
+
+    const EDGE_PADDING: u32 = 20;
+
+    // Calculate overlay dimensions (16:9 aspect ratio)
+    let overlay_width = (screen_width as f64 * size_percent) as u32;
+    let overlay_height = (overlay_width as f64 / (16.0 / 9.0)) as u32;
+
+    // Calculate position based on corner
+    let (x, y) = match pip_config.position.as_str() {
+        "topLeft" => (EDGE_PADDING, EDGE_PADDING),
+        "topRight" => (screen_width - overlay_width - EDGE_PADDING, EDGE_PADDING),
+        "bottomLeft" => (EDGE_PADDING, screen_height - overlay_height - EDGE_PADDING),
+        "bottomRight" => (
+            screen_width - overlay_width - EDGE_PADDING,
+            screen_height - overlay_height - EDGE_PADDING,
+        ),
+        _ => (
+            screen_width - overlay_width - EDGE_PADDING,
+            screen_height - overlay_height - EDGE_PADDING,
+        ),
+    };
+
+    PiPCoordinates {
+        x,
+        y,
+        width: overlay_width,
+        height: overlay_height,
+    }
+}
+
+/// Load PiP metadata from JSON file
+fn load_pip_metadata(metadata_path: &str) -> Result<PiPMetadata, String> {
+    let content = fs::read_to_string(metadata_path)
+        .map_err(|e| format!("Failed to read PiP metadata file: {}", e))?;
+
+    let metadata: PiPMetadata = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse PiP metadata: {}", e))?;
+
+    Ok(metadata)
+}
+
+/// Composite a PiP recording into a single video file
+fn composite_pip_recording(
+    ffmpeg_path: &std::path::Path,
+    metadata: &PiPMetadata,
+    output_path: &std::path::Path,
+) -> Result<(), String> {
+    println!("Compositing PiP recording: {} + {}",
+        metadata.screen_file_path, metadata.webcam_file_path);
+
+    // Calculate overlay coordinates
+    let coordinates = calculate_pip_coordinates(
+        &metadata.pip_config,
+        metadata.screen_dimensions.width,
+        metadata.screen_dimensions.height,
+    );
+
+    println!("Overlay position: {}x{} at ({}, {})",
+        coordinates.width, coordinates.height, coordinates.x, coordinates.y);
+
+    // Build FFmpeg filter_complex for PiP overlay
+    let filter_complex = format!(
+        "[1:v]scale={}:{}[webcam];[0:v][webcam]overlay={}:{}[outv]",
+        coordinates.width,
+        coordinates.height,
+        coordinates.x,
+        coordinates.y
+    );
+
+    // Execute FFmpeg compositing
+    let output = Command::new(ffmpeg_path)
+        .arg("-i")
+        .arg(&metadata.screen_file_path)
+        .arg("-i")
+        .arg(&metadata.webcam_file_path)
+        .arg("-filter_complex")
+        .arg(&filter_complex)
+        .arg("-map")
+        .arg("[outv]")
+        .arg("-map")
+        .arg("0:a?") // Screen audio only (ignore webcam audio)
+        .arg("-c:v")
+        .arg("libx264")
+        .arg("-preset")
+        .arg("medium")
+        .arg("-crf")
+        .arg("23")
+        .arg("-c:a")
+        .arg("aac")
+        .arg("-b:a")
+        .arg("192k")
+        .arg("-movflags")
+        .arg("+faststart")
+        .arg("-y")
+        .arg(output_path)
+        .output()
+        .map_err(|e| format!("Failed to execute FFmpeg for PiP compositing: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("FFmpeg PiP compositing failed: {}", stderr));
+    }
+
+    println!("PiP compositing completed: {}", output_path.display());
+    Ok(())
 }
 
 #[tauri::command]
@@ -77,16 +246,46 @@ pub async fn export_timeline(
             message: format!("Processing clip {} of {}", i + 1, clips.len()),
         });
 
+        // Determine the actual video path - composite PiP if needed
+        let actual_video_path: String;
+        let composite_temp_file: Option<std::path::PathBuf>;
+
+        if clip.media_type.as_deref() == Some("pip") && clip.pip_metadata_path.is_some() {
+            // This is a PiP recording - composite it first
+            let metadata_path = clip.pip_metadata_path.as_ref().unwrap();
+            println!("Detected PiP clip, loading metadata from: {}", metadata_path);
+
+            let _ = app.emit("export-progress", ExportProgress {
+                current: current_step,
+                total: total_steps,
+                message: format!("Compositing PiP clip {} of {}", i + 1, clips.len()),
+            });
+
+            let pip_metadata = load_pip_metadata(metadata_path)?;
+            let composite_output = temp_dir.join(format!("pip_composite_{:03}.mp4", i));
+
+            composite_pip_recording(&ffmpeg_path, &pip_metadata, &composite_output)?;
+
+            actual_video_path = composite_output.to_str()
+                .ok_or_else(|| "Failed to convert composite path to string".to_string())?
+                .to_string();
+            composite_temp_file = Some(composite_output);
+        } else {
+            // Regular video clip
+            actual_video_path = clip.video_path.clone();
+            composite_temp_file = None;
+        }
+
         let temp_output = temp_dir.join(format!("segment_{:03}.mp4", segment_files.len()));
         let trimmed_duration = clip.trim_end - clip.trim_start;
 
         println!("Processing clip {}: {} (trim: {}-{}, duration: {}s)",
-            i, clip.video_path, clip.trim_start, clip.trim_end, trimmed_duration);
+            i, actual_video_path, clip.trim_start, clip.trim_end, trimmed_duration);
 
         // Use FFmpeg to trim and normalize the clip
         let output = Command::new(&ffmpeg_path)
             .arg("-i")
-            .arg(&clip.video_path)
+            .arg(&actual_video_path)
             .arg("-ss")
             .arg(clip.trim_start.to_string())
             .arg("-t")

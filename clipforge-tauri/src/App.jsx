@@ -288,7 +288,9 @@ function App() {
         duration: clip.duration,
         width: clip.width,
         height: clip.height,
-        frameRate: clip.frameRate
+        frameRate: clip.frameRate,
+        mediaType: clip.mediaType,
+        pipMetadataPath: clip.pipMetadataPath
       }));
 
       // Call Rust export command

@@ -584,7 +584,7 @@
           7,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -592,7 +592,7 @@
             "description": "Modify the existing export system to detect when Picture-in-Picture mode is active and route to composite export pipeline",
             "dependencies": [],
             "details": "Add PiP detection logic to the export handler by checking if both screen recording and webcam clips are present and PiP mode is enabled. Create a conditional branch in the export flow that routes to composite export when PiP is detected. Set up the basic structure for passing PiP configuration (position, size, margins) to the compositing pipeline.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test that export system correctly identifies PiP mode vs standard export. Verify routing logic works for all export scenarios."
           },
           {
@@ -603,7 +603,7 @@
               1
             ],
             "details": "Create functions to calculate overlay X/Y coordinates based on corner position (top-left, top-right, bottom-left, bottom-right), size percentage, and margin values. Convert percentage-based sizing to pixel dimensions based on main video resolution. Generate FFmpeg overlay filter string with calculated parameters including position and scaling.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test coordinate calculations for all corner positions. Verify margin calculations work correctly. Test scaling calculations maintain aspect ratio."
           },
           {
@@ -614,7 +614,7 @@
               2
             ],
             "details": "Implement FFmpeg command builder that takes two input videos and applies overlay filter with calculated parameters. Handle video scaling for PiP overlay to maintain quality. Set up proper codec parameters for output video (H.264/AAC). Implement error handling for FFmpeg process failures and validate input video compatibility.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test compositing with various video resolutions and formats. Verify overlay positioning is accurate. Test error handling for invalid inputs."
           },
           {
@@ -625,7 +625,7 @@
               3
             ],
             "details": "Configure FFmpeg to extract and use audio track only from the screen recording input. Suppress or remove audio track from webcam recording during compositing. Handle cases where screen recording may not have audio. Ensure audio sync is maintained throughout the composite video.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test audio is only from screen recording source. Verify audio sync with video. Test handling of silent screen recordings."
           },
           {
@@ -637,7 +637,7 @@
               4
             ],
             "details": "Parse FFmpeg progress output to extract completion percentage and estimated time remaining. Create progress event emitter to send updates to frontend. Implement progress bar UI component that displays during composite export. Add cancellation support for long-running composite operations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test progress updates are accurate and smooth. Verify cancellation stops FFmpeg process cleanly. Test progress UI updates correctly."
           }
         ]
@@ -710,7 +710,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-29T20:33:12.930Z",
+      "updated": "2025-10-29T20:46:24.001Z",
       "description": "Tasks for master context"
     }
   }
