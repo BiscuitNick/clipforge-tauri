@@ -179,11 +179,18 @@ impl ScreenCaptureSession {
         let keyframe_interval = self.config.frame_rate * 2;
         command.arg("-g").arg(keyframe_interval.to_string());
 
+        // Force first frame as keyframe to prevent gray/blurry start
+        command.arg("-force_key_frames").arg("expr:eq(n,0)");
+
         // H.264 specific settings
         if self.config.video_codec == "h264" || self.config.video_codec == "libx264" {
             command.arg("-preset").arg("medium"); // Balance between speed and quality
             command.arg("-profile:v").arg("high"); // H.264 High Profile
             command.arg("-level").arg("4.2"); // Support up to 4K
+
+            // Use CRF for consistent quality instead of pure CBR
+            // CRF 18 = visually lossless, prevents blurry initial frames
+            command.arg("-crf").arg("18");
         }
 
         // Audio codec (if configured)

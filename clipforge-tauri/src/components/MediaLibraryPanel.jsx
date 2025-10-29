@@ -114,6 +114,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const [mode, setMode] = useState("media"); // "media", "record-screen", "record-video"
   const [selectedRecordingSource, setSelectedRecordingSource] = useState(null); // Stores selected screen/window and config
   const [isPaused, setIsPaused] = useState(false); // Track recording pause state
+  const [countdown, setCountdown] = useState(null); // Countdown timer before recording starts
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -268,7 +269,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       return;
     }
 
+    // Start countdown
     setIsLoading(true);
+    for (let i = 3; i > 0; i--) {
+      setCountdown(i);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    setCountdown(null);
+
     setMessage("Starting recording...");
     setMessageType("loading");
 
@@ -298,6 +306,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       console.error('[MediaLibraryPanel] Failed to start recording:', err);
       setMessage(`Failed to start recording: ${err}`);
       setMessageType("error");
+      setCountdown(null); // Clear countdown on error
       setTimeout(() => {
         setMessage("");
         setMessageType("");
@@ -398,6 +407,16 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
   return (
     <div className="media-library-panel">
+      {/* Countdown Overlay */}
+      {countdown !== null && (
+        <div className="countdown-overlay">
+          <div className="countdown-content">
+            <div className="countdown-number">{countdown}</div>
+            <div className="countdown-text">Recording starts in...</div>
+          </div>
+        </div>
+      )}
+
       <div className="panel-header">
         <h2>Media Library</h2>
         <div className="header-controls">
