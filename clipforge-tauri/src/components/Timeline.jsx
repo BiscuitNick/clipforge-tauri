@@ -703,6 +703,41 @@ function Timeline({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: isOver ? 10 : -1 }}
       />
       <div className="timeline-controls">
+        {/* Video Playback Controls */}
+        <div className="timeline-video-controls">
+          <button
+            className="timeline-control-btn stop-btn"
+            onClick={() => {
+              if (isPlaying) {
+                onTogglePlayback?.(); // Pause if currently playing
+              }
+              onPlayheadMove?.(0); // Always reset to beginning
+            }}
+            disabled={clips.length === 0}
+            title="Stop (Reset to beginning)"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M6 6h12v12H6z" />
+            </svg>
+          </button>
+          <button
+            className={`timeline-control-btn play-pause-btn ${isPlaying ? 'playing' : ''}`}
+            onClick={onTogglePlayback}
+            disabled={clips.length === 0}
+            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          >
+            {isPlaying ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
         <div className="toolbar-section">
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
           <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>

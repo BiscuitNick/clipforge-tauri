@@ -21,7 +21,7 @@ function formatTime(seconds) {
  * - timeline: Play back the timeline with clips and gaps
  * - recording: Show live recording preview and controls
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -48,6 +48,27 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   useEffect(() => {
     console.log("[VideoPreview] videoSrc changed to:", videoSrc);
   }, [videoSrc]);
+
+  // Handle library playback commands (from Media Library controls)
+  useEffect(() => {
+    if (!libraryPlaybackCommand || mode !== "library") return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (libraryPlaybackCommand === 'play') {
+      console.log("[VideoPreview] Library command: Play");
+      video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+    } else if (libraryPlaybackCommand === 'pause') {
+      console.log("[VideoPreview] Library command: Pause");
+      video.pause();
+    } else if (libraryPlaybackCommand === 'stop') {
+      console.log("[VideoPreview] Library command: Stop");
+      video.pause();
+      video.currentTime = 0;
+      setCurrentTime(0);
+    }
+  }, [libraryPlaybackCommand, mode]);
 
   // Handle timeline playback mode
   useEffect(() => {
@@ -478,10 +499,10 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
             )}
           </div>
 
-          <div className="timeline-scrubber">
+          <div className="video-scrubber-container">
             <input
               type="range"
-              className="scrubber"
+              className="video-scrubber minimalistic"
               min="0"
               max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
               step="0.1"
@@ -493,38 +514,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
               onTouchEnd={handleScrubberMouseUp}
               disabled={mode === "timeline" ? !timelineState : !videoSrc}
             />
-          </div>
-
-          <div className="video-controls">
-            <button
-              className="play-pause-btn"
-              onClick={handleStop}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-              title="Stop"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M6 6h12v12H6z" />
-              </svg>
-            </button>
-
-            <button
-              className={`play-pause-btn ${isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? 'playing' : ''}`}
-              onClick={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? handlePause : handlePlay}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-              title={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
-
-            <div className="time-display">
+            <div className="video-time-display">
               {mode === "timeline" && timelineState
                 ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
                 : `${formatTime(currentTime)} / ${formatTime(duration)}`

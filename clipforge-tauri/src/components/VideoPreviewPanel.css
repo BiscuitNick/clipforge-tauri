@@ -79,67 +79,90 @@
   font-weight: 500;
 }
 
-/* Timeline scrubber - full width */
-.video-preview-panel .timeline-scrubber {
+/* Minimalistic video scrubber */
+.video-preview-panel .video-scrubber-container {
   width: 100%;
-  padding: 0.75rem;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #333;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(26, 26, 26, 0.8);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber {
-  width: 100%;
-  height: 8px;
+.video-preview-panel .video-scrubber.minimalistic {
+  flex: 1;
+  height: 3px;
   -webkit-appearance: none;
   appearance: none;
-  background: #333;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
   outline: none;
   cursor: pointer;
+  transition: height 0.2s ease;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-webkit-slider-thumb {
+.video-preview-panel .video-scrubber.minimalistic:hover {
+  height: 4px;
+}
+
+.video-preview-panel .video-scrubber.minimalistic::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #007bff;
+  width: 10px;
+  height: 10px;
+  background: #fff;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  opacity: 0.8;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-webkit-slider-thumb:hover {
-  background: #0056b3;
+.video-preview-panel .video-scrubber.minimalistic:hover::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  opacity: 1;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #007bff;
+.video-preview-panel .video-scrubber.minimalistic::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: #fff;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  opacity: 0.8;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-moz-range-thumb:hover {
-  background: #0056b3;
+.video-preview-panel .video-scrubber.minimalistic:hover::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  opacity: 1;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled {
-  opacity: 0.5;
+.video-preview-panel .video-scrubber.minimalistic:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled::-webkit-slider-thumb {
+.video-preview-panel .video-scrubber.minimalistic:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  background: #666;
+}
+
+.video-preview-panel .video-scrubber.minimalistic:disabled::-moz-range-thumb {
   cursor: not-allowed;
   background: #666;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled::-moz-range-thumb {
-  cursor: not-allowed;
-  background: #666;
+.video-preview-panel .video-time-display {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+  min-width: 85px;
+  text-align: right;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
 /* Video controls styles */

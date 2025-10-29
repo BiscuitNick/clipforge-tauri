@@ -105,7 +105,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -113,6 +113,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
   const [mode, setMode] = useState("media"); // "media", "record-screen", "record-video"
   const [selectedRecordingSource, setSelectedRecordingSource] = useState(null); // Stores selected screen/window and config
+  const [isPaused, setIsPaused] = useState(false); // Track recording pause state
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -306,6 +307,90 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     setIsRecordingModalOpen(true);
   };
 
+  // Handle pause/resume recording
+  const handlePauseResumeRecording = async () => {
+    if (!isRecording) return;
+
+    try {
+      if (isPaused) {
+        // Resume recording
+        setIsLoading(true);
+        setMessage("Resuming recording...");
+        setMessageType("loading");
+
+        const result = await invoke('resume_recording');
+        console.log('[MediaLibraryPanel] Recording resumed:', result);
+        setIsPaused(false);
+        setMessage("");
+        setMessageType("");
+      } else {
+        // Pause recording
+        setIsLoading(true);
+        setMessage("Pausing recording...");
+        setMessageType("loading");
+
+        const result = await invoke('pause_recording');
+        console.log('[MediaLibraryPanel] Recording paused:', result);
+        setIsPaused(true);
+        setMessage("");
+        setMessageType("");
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to pause/resume recording:', err);
+      setMessage(`Failed to ${isPaused ? 'resume' : 'pause'} recording: ${err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle stop recording
+  const handleStopRecording = async () => {
+    if (!isRecording) return;
+
+    try {
+      setIsLoading(true);
+      setMessage("Stopping recording and processing video...");
+      setMessageType("loading");
+
+      const result = await invoke('stop_recording');
+      console.log('[MediaLibraryPanel] Recording stopped:', result);
+
+      // Reset state
+      setIsPaused(false);
+      setSelectedRecordingSource(null);
+
+      // Notify parent
+      if (onRecordingStateChange) {
+        onRecordingStateChange(result);
+      }
+
+      // Switch to media files view
+      setMode("media");
+      setMessage("Recording saved successfully!");
+      setMessageType("success");
+
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 3000);
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to stop recording:', err);
+      setMessage(`Failed to stop recording: ${err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="media-library-panel">
       <div className="panel-header">
@@ -327,7 +412,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         </div>
       </div>
 
-      <div className="panel-content">
+      <div className="panel-content-scrollable">
         {mode === "media" && (
           <>
             {mediaItems.length === 0 ? (
@@ -362,15 +447,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             ) : (
               // Show media list when items exist
               <div className="media-list">
-                <div className="media-actions">
-                  <button
-                    className="import-button compact"
-                    onClick={handleImportClick}
-                    disabled={isLoading}
-                  >
-                    + Add Media
-                  </button>
-                </div>
                 <div className="media-items">
                   {mediaItems.map((item) => (
                     <DraggableMediaItem
@@ -482,6 +558,94 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             {message}
           </div>
         )}
+      </div>
+
+      {/* Video Controls - Context-based */}
+      <div className="media-library-controls">
+        {mode === "media" ? (
+          // Media Files controls: Add Media button + Play/Stop for selected media
+          <>
+            {mediaItems.length > 0 && (
+              <>
+                <button
+                  className="control-btn add-media-btn"
+                  onClick={handleImportClick}
+                  disabled={isLoading}
+                  title="Add Media"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                  </svg>
+                </button>
+                <div className="controls-separator" />
+              </>
+            )}
+            <div className="media-library-controls-playback">
+              <button
+                className="control-btn stop-btn"
+                onClick={onStopMedia}
+                disabled={!selectedMediaId}
+                title="Stop"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M6 6h12v12H6z" />
+                </svg>
+              </button>
+              <button
+                className={`control-btn ${isLibraryPlaying ? 'pause-btn' : 'play-btn'}`}
+                onClick={onPlayPauseMedia}
+                disabled={!selectedMediaId}
+                title={isLibraryPlaying ? "Pause" : "Play"}
+              >
+                {isLibraryPlaying ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </>
+        ) : mode === "record-screen" ? (
+          // Record Screen controls: Record/Pause/Stop (centered)
+          <div className="media-library-controls-playback">
+            <button
+              className="control-btn stop-btn"
+              onClick={handleStopRecording}
+              disabled={!isRecording}
+              title="Stop Recording"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 6h12v12H6z" />
+              </svg>
+            </button>
+            <button
+              className="control-btn record-btn"
+              onClick={isRecording ? handlePauseResumeRecording : handleStartRecording}
+              disabled={!selectedRecordingSource && !isRecording}
+              title={isRecording ? (isPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
+            >
+              {isRecording ? (
+                isPaused ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                )
+              ) : (
+                <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                  <circle cx="10" cy="10" r="6" />
+                </svg>
+              )}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <ScreenRecordingModal

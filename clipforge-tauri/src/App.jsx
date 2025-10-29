@@ -22,6 +22,8 @@ function App() {
   const [isExporting, setIsExporting] = React.useState(false);
   const [exportProgress, setExportProgress] = React.useState(null);
   const [recordingState, setRecordingState] = React.useState(null);
+  const [libraryPlaybackCommand, setLibraryPlaybackCommand] = React.useState(null); // 'play', 'pause', or 'stop'
+  const [isLibraryPlaying, setIsLibraryPlaying] = React.useState(false); // Track library playback state
   const timelineRef = React.useRef(null);
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
@@ -61,6 +63,7 @@ function App() {
     console.log("[App] Setting previewMode to: library");
     setSelectedMedia(mediaItem);
     setPreviewMode("library");
+    setIsLibraryPlaying(false); // Reset playback state when selecting new media
   };
 
   // Handle recording state changes (source selection, start, and complete)
@@ -111,6 +114,27 @@ function App() {
     } catch (error) {
       console.error("[App] Failed to stop recording:", error);
     }
+  };
+
+  // Handle play/pause toggle from Media Library
+  const handlePlayPauseMedia = () => {
+    console.log("[App] Play/Pause media from library, current state:", isLibraryPlaying);
+    if (isLibraryPlaying) {
+      setLibraryPlaybackCommand('pause');
+      setIsLibraryPlaying(false);
+    } else {
+      setLibraryPlaybackCommand('play');
+      setIsLibraryPlaying(true);
+    }
+    setTimeout(() => setLibraryPlaybackCommand(null), 100); // Reset after command is processed
+  };
+
+  // Handle stop media from Media Library
+  const handleStopMedia = () => {
+    console.log("[App] Stop media from library");
+    setLibraryPlaybackCommand('stop');
+    setIsLibraryPlaying(false);
+    setTimeout(() => setLibraryPlaybackCommand(null), 100); // Reset after command is processed
   };
 
   // Handle drag move - track position for drop calculation
@@ -302,6 +326,9 @@ function App() {
           selectedMediaId={selectedMedia?.id}
           onRecordingStateChange={handleRecordingStateChange}
           isRecording={recordingState?.type === 'recording'}
+          onPlayPauseMedia={handlePlayPauseMedia}
+          onStopMedia={handleStopMedia}
+          isLibraryPlaying={isLibraryPlaying}
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
@@ -309,6 +336,7 @@ function App() {
           timelineState={timelineState}
           recordingState={recordingState}
           onStopRecording={handleStopRecording}
+          libraryPlaybackCommand={libraryPlaybackCommand}
         />
         <TimelineClipsPanel
           clips={timeline.clips}
@@ -335,6 +363,7 @@ function App() {
             if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
+            setIsLibraryPlaying(false); // Reset library playback state
             timeline.pause(); // Pause when manually moving playhead
             timeline.setPlayheadPosition(pos);
           }}
@@ -343,6 +372,7 @@ function App() {
             if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
+            setIsLibraryPlaying(false); // Reset library playback state
             timeline.zoom(delta);
           }}
           onPan={(delta) => {
@@ -350,6 +380,7 @@ function App() {
             if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
+            setIsLibraryPlaying(false); // Reset library playback state
             timeline.pan(delta);
           }}
           onTrimUpdate={timeline.updateClipTrim}
@@ -367,6 +398,7 @@ function App() {
             if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
+            setIsLibraryPlaying(false); // Reset library playback state
             timeline.togglePlayback();
           }}
           onCopyClip={timeline.copyClip}

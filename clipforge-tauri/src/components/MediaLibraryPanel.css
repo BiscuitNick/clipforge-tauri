@@ -57,21 +57,100 @@
   border-radius: 4px;
 }
 
-.media-library-panel .panel-content {
+.media-library-panel .panel-content-scrollable {
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 1rem;
   overflow-y: auto;
+  min-height: 0;
+}
+
+/* Media Library Controls - Context-based video controls */
+.media-library-panel .media-library-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #1a1a1a;
+  border-top: 1px solid #333;
+}
+
+.media-library-panel .media-library-controls-playback {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.media-library-panel .control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-library-panel .control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.media-library-panel .add-media-btn {
+  background-color: #007bff;
+}
+
+.media-library-panel .add-media-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.media-library-panel .stop-btn {
+  background-color: #666;
+}
+
+.media-library-panel .stop-btn:hover:not(:disabled) {
+  background-color: #777;
+}
+
+.media-library-panel .play-btn {
+  background-color: #28a745;
+}
+
+.media-library-panel .play-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.media-library-panel .pause-btn {
+  background-color: #ffc107;
+}
+
+.media-library-panel .pause-btn:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
+.media-library-panel .record-btn {
+  background-color: #e74c3c;
+}
+
+.media-library-panel .record-btn:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+.media-library-panel .controls-separator {
+  width: 1px;
+  height: 32px;
+  background-color: #444;
+  margin: 0 0.25rem;
 }
 
 /* Drop zone styles */
-/* Media actions toolbar */
-.media-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 1rem;
-}
 
 /* Record button */
 .record-button {
@@ -467,11 +546,25 @@
     min-height: 200px;
   }
 
-  .media-library-panel .panel-content {
+  .media-library-panel .panel-content-scrollable {
     padding: 0.75rem;
   }
 
   .media-library-panel .drop-zone {
     padding: 1.5rem 1rem;
+  }
+
+  .media-library-panel .media-library-controls {
+    padding: 0.5rem;
+  }
+
+  .media-library-panel .control-btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .media-library-panel .controls-separator {
+    height: 28px;
   }
 }
