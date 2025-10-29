@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import './ScreenRecordingModal.css';
@@ -15,15 +15,40 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch available sources when modal opens
+  // Audio state
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedAudioId, setSelectedAudioId] = useState(null);
+  const [includeMicrophone, setIncludeMicrophone] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  // Audio refs
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const audioAnimationRef = useRef(null);
+  const audioStreamRef = useRef(null);
+
+  // Fetch available sources and audio devices when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchSources();
+      loadAudioDevices();
     } else {
       // Reset error when modal closes
       setError('');
+      stopAudioMonitoring();
     }
   }, [isOpen]);
+
+  // Start/stop audio monitoring when microphone setting changes
+  useEffect(() => {
+    if (includeMicrophone && selectedAudioId) {
+      startAudioMonitoring();
+    } else {
+      stopAudioMonitoring();
+    }
+    return () => stopAudioMonitoring();
+  }, [includeMicrophone, selectedAudioId]);
 
   const fetchSources = async () => {
     setIsLoading(true);
@@ -46,6 +71,127 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Load audio devices using browser API
+  const loadAudioDevices = async () => {
+    try {
+      // Request audio access to get device labels
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Enumerate audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to our format
+      const audioInputDevices = audioInputs.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Microphone ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setAudioDevices(audioInputDevices);
+
+      // Auto-select default audio device
+      const defaultAudio = audioInputDevices.find(dev => dev.is_default);
+      if (defaultAudio) {
+        setSelectedAudioId(defaultAudio.id);
+      } else if (audioInputDevices.length > 0) {
+        setSelectedAudioId(audioInputDevices[0].id);
+      }
+    } catch (err) {
+      console.error('[ScreenRecordingModal] Failed to enumerate audio devices:', err);
+      // Don't show error to user - audio is optional
+    }
+  };
+
+  // Start audio level monitoring using Web Audio API
+  const startAudioMonitoring = async () => {
+    try {
+      // Stop existing monitoring
+      stopAudioMonitoring();
+
+      // Get audio stream
+      const constraints = {
+        audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      audioStreamRef.current = stream;
+
+      // Create audio context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // Create analyser node
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      // Create media stream source
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      // Start monitoring loop
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateAudioLevel = () => {
+        if (!analyserRef.current) return;
+
+        analyser.getByteFrequencyData(dataArray);
+
+        // Calculate average audio level (0-100)
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const average = sum / dataArray.length;
+        const normalizedLevel = Math.min(100, (average / 255) * 100);
+
+        // Apply mute
+        setAudioLevel(isMuted ? 0 : normalizedLevel);
+
+        audioAnimationRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+
+      updateAudioLevel();
+    } catch (err) {
+      console.error('[ScreenRecordingModal] Failed to start audio monitoring:', err);
+    }
+  };
+
+  // Stop audio monitoring
+  const stopAudioMonitoring = () => {
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
+
+  // Handle mute toggle
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+  };
+
+  // Get VU meter color based on audio level
+  const getVUMeterColor = (level) => {
+    if (level < 30) return '#27ae60'; // Green - low
+    if (level < 70) return '#f39c12'; // Orange - medium
+    return '#e74c3c'; // Red - high/clipping
   };
 
   // Calculate actual recording dimensions based on resolution setting
@@ -77,6 +223,9 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
       return;
     }
 
+    // Stop audio monitoring before closing
+    stopAudioMonitoring();
+
     const dimensions = getRecordingDimensions();
 
     // Create config with selected resolution
@@ -101,6 +250,8 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
         source: selectedSource,
         config: config,
         includeAudio: includeAudio,
+        includeMicrophone: includeMicrophone,
+        microphoneDeviceId: selectedAudioId,
         resolution: resolution
       });
     }
@@ -246,6 +397,56 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
                   />
                   <span>Include System Audio</span>
                 </label>
+
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeMicrophone}
+                    onChange={(e) => setIncludeMicrophone(e.target.checked)}
+                  />
+                  <span>Include Microphone</span>
+                </label>
+
+                {/* Microphone device selection */}
+                {includeMicrophone && audioDevices.length > 0 && (
+                  <div className="microphone-controls">
+                    <div className="audio-device-selector">
+                      <label htmlFor="mic-select">Microphone:</label>
+                      <select
+                        id="mic-select"
+                        value={selectedAudioId || ''}
+                        onChange={(e) => setSelectedAudioId(e.target.value)}
+                      >
+                        {audioDevices.map(device => (
+                          <option key={device.id} value={device.id}>
+                            {device.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Audio Level Meter */}
+                    <div className="audio-level-container">
+                      <button
+                        className={`mute-btn ${isMuted ? 'muted' : ''}`}
+                        onClick={handleMuteToggle}
+                        title={isMuted ? 'Unmute' : 'Mute'}
+                      >
+                        {isMuted ? '🔇' : '🔊'}
+                      </button>
+                      <div className="vu-meter">
+                        <div
+                          className="vu-meter-fill"
+                          style={{
+                            width: `${audioLevel}%`,
+                            backgroundColor: getVUMeterColor(audioLevel)
+                          }}
+                        />
+                      </div>
+                      <span className="audio-level-text">{Math.round(audioLevel)}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
         </div>

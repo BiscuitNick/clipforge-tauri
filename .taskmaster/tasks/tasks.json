@@ -374,7 +374,7 @@
         "dependencies": [
           5
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -430,7 +430,7 @@
               4
             ],
             "details": "Integrate audio device selection into screen recording and webcam recording workflows. Ensure audio stream synchronizes properly with video capture. Handle audio-only recording for screen capture mode. Implement audio track multiplexing for recordings with both system and microphone audio. Add audio configuration to recording settings with bitrate and sample rate options.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test audio syncs correctly with video in both recording modes. Verify system and microphone audio can be captured simultaneously. Test audio quality at different bitrate settings."
           }
         ]
@@ -710,7 +710,7 @@
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-29T18:32:51.106Z",
+      "updated": "2025-10-29T18:38:29.981Z",
       "description": "Tasks for master context"
     }
   }

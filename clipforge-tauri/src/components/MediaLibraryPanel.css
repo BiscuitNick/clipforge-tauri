@@ -506,6 +506,50 @@
   cursor: not-allowed;
 }
 
+/* Recording status display */
+.media-library-panel .recording-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.media-library-panel .recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f6f6f6;
+  font-size: 0.9rem;
+}
+
+.media-library-panel .recording-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #e74c3c;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.media-library-panel .recording-timer {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f6f6f6;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Disabled mode selector */
 .media-library-panel .mode-selector:disabled {
   opacity: 0.5;

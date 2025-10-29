@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useDraggable } from "@dnd-kit/core";
 import ScreenRecordingModal from "./ScreenRecordingModal";
-import WebcamRecordingPanel from "./WebcamRecordingPanel";
+import WebcamConfigurationModal from "./WebcamConfigurationModal";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -106,7 +106,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -116,6 +116,29 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const [selectedRecordingSource, setSelectedRecordingSource] = useState(null); // Stores selected screen/window and config
   const [isPaused, setIsPaused] = useState(false); // Track recording pause state
   const [countdown, setCountdown] = useState(null); // Countdown timer before recording starts
+
+  // Webcam recording state
+  const [webcamConfig, setWebcamConfig] = useState(null); // Stores selected camera and audio config
+  const [isWebcamRecording, setIsWebcamRecording] = useState(false);
+  const [isWebcamPaused, setIsWebcamPaused] = useState(false);
+  const [isWebcamConfigModalOpen, setIsWebcamConfigModalOpen] = useState(false);
+  const [webcamStream, setWebcamStream] = useState(null);
+  const [webcamRecordingDuration, setWebcamRecordingDuration] = useState(0);
+  const webcamMediaRecorderRef = useRef(null);
+  const webcamRecordedChunksRef = useRef([]);
+  const webcamRecordingStartTimeRef = useRef(null);
+  const webcamRecordingTimerRef = useRef(null);
+  const webcamFinalDurationRef = useRef(0); // Capture final duration at stop time
+
+  // Cleanup webcam recording timer on unmount or mode change
+  useEffect(() => {
+    return () => {
+      if (webcamRecordingTimerRef.current) {
+        clearInterval(webcamRecordingTimerRef.current);
+        webcamRecordingTimerRef.current = null;
+      }
+    };
+  }, [mode]);
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -406,6 +429,254 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     }
   };
 
+  // Handle webcam configuration selection
+  const handleWebcamConfigSelect = async (config) => {
+    console.log("[MediaLibraryPanel] Webcam config selected:", config);
+    setWebcamConfig(config);
+
+    // Start webcam stream
+    try {
+      const constraints = {
+        video: { deviceId: { exact: config.cameraId } },
+        audio: config.includeMicrophone ? {
+          deviceId: config.microphoneDeviceId ? { exact: config.microphoneDeviceId } : undefined
+        } : false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setWebcamStream(stream);
+
+      // Notify parent to show webcam preview
+      if (onWebcamStreamChange) {
+        onWebcamStreamChange(stream);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start webcam stream:', err);
+      setMessage(`Failed to start webcam: ${err.message}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    }
+  };
+
+  // Handle starting webcam recording
+  const handleStartWebcamRecording = async () => {
+    if (!webcamStream) {
+      setMessage("Please configure camera first");
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 3000);
+      return;
+    }
+
+    try {
+      setIsWebcamRecording(true);
+      setIsWebcamPaused(false);
+
+      // Reset all recording state
+      webcamRecordedChunksRef.current = [];
+      webcamFinalDurationRef.current = 0;
+
+      console.log('[MediaLibraryPanel] Starting webcam recording, stream tracks:', webcamStream.getTracks().length);
+
+      // Create MediaRecorder with the stream
+      const options = {
+        mimeType: 'video/webm;codecs=vp8,opus',
+        videoBitsPerSecond: 2500000
+      };
+
+      const mediaRecorder = new MediaRecorder(webcamStream, options);
+      webcamMediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          console.log('[MediaLibraryPanel] Data chunk received, size:', event.data.size, 'total chunks:', webcamRecordedChunksRef.current.length + 1);
+          webcamRecordedChunksRef.current.push(event.data);
+        } else {
+          console.warn('[MediaLibraryPanel] Received empty data chunk');
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        console.log('[MediaLibraryPanel] Webcam recording stopped, saving...');
+        console.log('[MediaLibraryPanel] Chunks collected:', webcamRecordedChunksRef.current.length);
+
+        // Stop timer
+        if (webcamRecordingTimerRef.current) {
+          clearInterval(webcamRecordingTimerRef.current);
+          webcamRecordingTimerRef.current = null;
+        }
+
+        // Use the captured final duration
+        const finalDuration = webcamFinalDurationRef.current;
+        console.log('[MediaLibraryPanel] Using final duration:', finalDuration);
+
+        // Create blob from recorded chunks
+        const blob = new Blob(webcamRecordedChunksRef.current, {
+          type: 'video/webm'
+        });
+
+        console.log('[MediaLibraryPanel] Blob size:', blob.size, 'bytes');
+
+        if (blob.size === 0) {
+          console.error('[MediaLibraryPanel] Blob is empty! No data recorded.');
+          setMessage("Recording failed: No data captured");
+          setMessageType("error");
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 5000);
+          return;
+        }
+
+        try {
+          // Convert blob to array buffer
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // Convert to array of numbers (required for Tauri serialization)
+          const dataArray = [...uint8Array];
+
+          console.log('[MediaLibraryPanel] Saving webcam recording, size:', dataArray.length, 'bytes, duration:', finalDuration);
+
+          // Save the recording
+          const result = await invoke('save_webcam_recording', {
+            data: dataArray,
+            mimeType: 'video/webm',
+            duration: finalDuration
+          });
+
+          console.log('[MediaLibraryPanel] Webcam recording saved:', result);
+
+          // Import the saved recording by fetching its path
+          // The result is the file path, so we need to import it
+          const importResult = await invoke('import_video', {
+            paths: [result]
+          });
+
+          console.log('[MediaLibraryPanel] Webcam recording imported:', importResult);
+
+          // Add to media library
+          if (onMediaImport && importResult && importResult.length > 0) {
+            onMediaImport(importResult);
+          }
+
+          setMessage("Webcam recording saved successfully!");
+          setMessageType("success");
+
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 3000);
+
+          // Reset and go back to media view
+          setMode("media");
+          setWebcamConfig(null);
+          setWebcamRecordingDuration(0);
+          if (webcamStream) {
+            webcamStream.getTracks().forEach(track => track.stop());
+            setWebcamStream(null);
+          }
+        } catch (err) {
+          console.error('[MediaLibraryPanel] Failed to save webcam recording:', err);
+          setMessage(`Failed to save recording: ${err}`);
+          setMessageType("error");
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 5000);
+        }
+      };
+
+      // Start recording
+      mediaRecorder.start(1000); // Collect data every second
+      console.log('[MediaLibraryPanel] Webcam recording started');
+
+      // Start timer
+      webcamRecordingStartTimeRef.current = Date.now();
+      setWebcamRecordingDuration(0);
+      if (onWebcamRecordingDurationChange) {
+        onWebcamRecordingDurationChange(0);
+      }
+      webcamRecordingTimerRef.current = setInterval(() => {
+        const elapsed = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+        setWebcamRecordingDuration(elapsed);
+        if (onWebcamRecordingDurationChange) {
+          onWebcamRecordingDurationChange(elapsed);
+        }
+      }, 100); // Update every 100ms for smooth display
+
+      setMessage("Recording started");
+      setMessageType("success");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 2000);
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start webcam recording:', err);
+      setMessage(`Failed to start recording: ${err.message}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+      setIsWebcamRecording(false);
+    }
+  };
+
+  // Handle pausing/resuming webcam recording
+  const handleToggleWebcamPause = () => {
+    const recorder = webcamMediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (isWebcamPaused) {
+      // Resume recording and timer
+      recorder.resume();
+      setIsWebcamPaused(false);
+      // Restart timer from where we paused
+      webcamRecordingStartTimeRef.current = Date.now() - (webcamRecordingDuration * 1000);
+      webcamRecordingTimerRef.current = setInterval(() => {
+        const elapsed = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+        setWebcamRecordingDuration(elapsed);
+      }, 100);
+      console.log('[MediaLibraryPanel] Webcam recording resumed');
+    } else {
+      // Pause recording and timer
+      recorder.pause();
+      setIsWebcamPaused(true);
+      if (webcamRecordingTimerRef.current) {
+        clearInterval(webcamRecordingTimerRef.current);
+        webcamRecordingTimerRef.current = null;
+      }
+      console.log('[MediaLibraryPanel] Webcam recording paused');
+    }
+  };
+
+  // Handle stopping webcam recording
+  const handleStopWebcamRecording = () => {
+    const recorder = webcamMediaRecorderRef.current;
+    if (!recorder) return;
+
+    // Capture final duration before stopping
+    if (webcamRecordingStartTimeRef.current) {
+      const finalDuration = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+      webcamFinalDurationRef.current = finalDuration;
+      console.log('[MediaLibraryPanel] Capturing final duration:', finalDuration);
+    }
+
+    if (recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+
+    setIsWebcamRecording(false);
+    setIsWebcamPaused(false);
+    console.log('[MediaLibraryPanel] Webcam recording stopped');
+  };
+
   return (
     <div className="media-library-panel">
       {/* Countdown Overlay */}
@@ -520,55 +791,42 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         )}
 
         {mode === "record-video" && (
-          <WebcamRecordingPanel
-            onRecordingComplete={async (recordingData) => {
-              console.log('[MediaLibraryPanel] Webcam recording complete:', recordingData);
-
-              try {
-                setIsLoading(true);
-                setMessage("Processing recording...");
-                setMessageType("loading");
-
-                // Import the recorded file to media library
-                const result = await invoke("import_video", { paths: [recordingData.filePath] });
-                console.log('[MediaLibraryPanel] Webcam recording imported:', result);
-
-                // Call onMediaImport callback with the imported video metadata
-                if (onMediaImport && result.length > 0) {
-                  onMediaImport(result);
-                }
-
-                // Switch to media files view
-                setMode("media");
-                setMessage(`Recording saved successfully! (${Math.floor(recordingData.duration)}s)`);
-                setMessageType("success");
-
-                setTimeout(() => {
-                  setMessage("");
-                  setMessageType("");
-                }, 3000);
-              } catch (err) {
-                console.error('[MediaLibraryPanel] Failed to import webcam recording:', err);
-                setMessage(`Failed to import recording: ${err}`);
-                setMessageType("error");
-                setTimeout(() => {
-                  setMessage("");
-                  setMessageType("");
-                }, 5000);
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            onError={(errorMessage) => {
-              console.error('[MediaLibraryPanel] Webcam recording error:', errorMessage);
-              setMessage(errorMessage);
-              setMessageType("error");
-              setTimeout(() => {
-                setMessage("");
-                setMessageType("");
-              }, 5000);
-            }}
-          />
+          <div className="recording-mode-view">
+            {!webcamConfig ? (
+              <div className="recording-mode-centered">
+                <button
+                  className="select-source-button"
+                  onClick={() => setIsWebcamConfigModalOpen(true)}
+                  disabled={isLoading || isWebcamRecording}
+                >
+                  Configure Camera & Audio
+                </button>
+              </div>
+            ) : (
+              <div className="recording-mode-centered">
+                <div className="selected-source-compact">
+                  <span className="source-details">
+                    {webcamConfig.cameraName}
+                    {webcamConfig.includeAudio && ` • Audio: ${webcamConfig.includeMicrophone ? 'System + Mic' : 'System'}`}
+                  </span>
+                  <button
+                    className="change-source-button-compact"
+                    onClick={() => {
+                      // Stop stream if active
+                      if (webcamStream) {
+                        webcamStream.getTracks().forEach(track => track.stop());
+                        setWebcamStream(null);
+                      }
+                      setWebcamConfig(null);
+                    }}
+                    disabled={isLoading || isWebcamRecording}
+                  >
+                    Change Settings
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {message && (
@@ -663,6 +921,48 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
               )}
             </button>
           </div>
+        ) : mode === "record-video" ? (
+          // Record Video (Webcam) controls: Stop/Record/Pause (centered)
+          <div className="media-library-controls-playback">
+            <button
+              className="control-btn stop-btn"
+              onClick={handleStopWebcamRecording}
+              disabled={!isWebcamRecording}
+              title="Stop Recording"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 6h12v12H6z" />
+              </svg>
+            </button>
+            <button
+              className="control-btn record-btn"
+              onClick={() => {
+                if (isWebcamRecording) {
+                  handleToggleWebcamPause();
+                } else {
+                  handleStartWebcamRecording();
+                }
+              }}
+              disabled={!webcamConfig && !isWebcamRecording}
+              title={isWebcamRecording ? (isWebcamPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
+            >
+              {isWebcamRecording ? (
+                isWebcamPaused ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                )
+              ) : (
+                <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                  <circle cx="10" cy="10" r="6" />
+                </svg>
+              )}
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -670,6 +970,12 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         isOpen={isRecordingModalOpen}
         onClose={() => setIsRecordingModalOpen(false)}
         onSourceSelect={handleSourceSelect}
+      />
+
+      <WebcamConfigurationModal
+        isOpen={isWebcamConfigModalOpen}
+        onClose={() => setIsWebcamConfigModalOpen(false)}
+        onConfigSelect={handleWebcamConfigSelect}
       />
     </div>
   );

@@ -16,13 +16,15 @@ function formatTime(seconds) {
  * Video Preview Panel - Central playback area
  * Loads selected media and provides playback controls
  * Videos remain paused on load until user clicks play
- * Supports three modes:
+ * Supports multiple modes:
  * - library: Preview a single media item from the library
  * - timeline: Play back the timeline with clips and gaps
  * - recording: Show live recording preview and controls
+ * - webcam-recording: Show live webcam stream during recording
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0 }) {
   const videoRef = useRef(null);
+  const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -48,6 +50,29 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   useEffect(() => {
     console.log("[VideoPreview] videoSrc changed to:", videoSrc);
   }, [videoSrc]);
+
+  // Handle webcam stream changes
+  useEffect(() => {
+    if (mode !== "webcam-recording") {
+      // Clear webcam stream when not in webcam recording mode
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = null;
+      }
+      return;
+    }
+
+    const video = webcamVideoRef.current;
+    if (!video) return;
+
+    if (webcamStream) {
+      console.log("[VideoPreview] Setting webcam stream");
+      video.srcObject = webcamStream;
+      video.play().catch(err => console.error("[VideoPreview] Webcam play failed:", err));
+    } else {
+      console.log("[VideoPreview] Clearing webcam stream");
+      video.srcObject = null;
+    }
+  }, [webcamStream, mode]);
 
   // Handle library playback commands (from Media Library controls)
   useEffect(() => {
@@ -364,6 +389,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const getModeText = () => {
     if (mode === "recording") return "Recording";
     if (mode === "recording-preview") return "Ready to Record";
+    if (mode === "webcam-recording") return "Webcam Recording";
     if (mode === "timeline") return "Timeline";
     return "Library";
   };
@@ -377,7 +403,31 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       <div className="panel-content">
         <div className="video-player">
           <div className="video-container">
-            {mode === "recording-preview" && recordingState ? (
+            {mode === "webcam-recording" ? (
+              <>
+                <video
+                  ref={webcamVideoRef}
+                  className="video-element webcam-preview"
+                  autoPlay
+                  playsInline
+                  muted
+                >
+                  Your browser does not support the video tag.
+                </video>
+                {webcamStream && webcamRecordingDuration > 0 && (
+                  <div className="recording-preview-overlay">
+                    <div className="recording-preview-content">
+                      <div className="recording-indicator-large">
+                        <div className="recording-dot-large"></div>
+                      </div>
+                      <div className="recording-timer-large">
+                        {formatTime(webcamRecordingDuration)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : mode === "recording-preview" && recordingState ? (
               <div className="recording-preview preview-mode">
                 {/* Show thumbnail preview if available */}
                 {recordingState.source?.thumbnail && (

@@ -24,6 +24,8 @@ function App() {
   const [recordingState, setRecordingState] = React.useState(null);
   const [libraryPlaybackCommand, setLibraryPlaybackCommand] = React.useState(null); // 'play', 'pause', or 'stop'
   const [isLibraryPlaying, setIsLibraryPlaying] = React.useState(false); // Track library playback state
+  const [webcamStream, setWebcamStream] = React.useState(null); // Track webcam stream for preview
+  const [webcamRecordingDuration, setWebcamRecordingDuration] = React.useState(0); // Track webcam recording duration
   const timelineRef = React.useRef(null);
 
   // Memoize timeline state to prevent unnecessary re-renders in VideoPreviewPanel
@@ -139,6 +141,30 @@ function App() {
     setLibraryPlaybackCommand('stop');
     setIsLibraryPlaying(false);
     setTimeout(() => setLibraryPlaybackCommand(null), 100); // Reset after command is processed
+  };
+
+  // Handle webcam stream changes
+  const handleWebcamStreamChange = (stream) => {
+    console.log("[App] Webcam stream changed:", stream);
+    setWebcamStream(stream);
+
+    // Update preview mode to webcam-recording when stream is active
+    if (stream) {
+      setPreviewMode("webcam-recording");
+      setSelectedMedia(null);
+    } else {
+      // Stream stopped, go back to library mode
+      if (previewMode === "webcam-recording") {
+        setPreviewMode("library");
+      }
+      // Reset duration when stream stops
+      setWebcamRecordingDuration(0);
+    }
+  };
+
+  // Handle webcam recording duration updates
+  const handleWebcamRecordingDurationChange = (duration) => {
+    setWebcamRecordingDuration(duration);
   };
 
   // Handle drag move - track position for drop calculation
@@ -337,6 +363,8 @@ function App() {
           onPlayPauseMedia={handlePlayPauseMedia}
           onStopMedia={handleStopMedia}
           isLibraryPlaying={isLibraryPlaying}
+          onWebcamStreamChange={handleWebcamStreamChange}
+          onWebcamRecordingDurationChange={handleWebcamRecordingDurationChange}
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
@@ -345,6 +373,8 @@ function App() {
           recordingState={recordingState}
           onStopRecording={handleStopRecording}
           libraryPlaybackCommand={libraryPlaybackCommand}
+          webcamStream={webcamStream}
+          webcamRecordingDuration={webcamRecordingDuration}
         />
         <TimelineClipsPanel
           clips={timeline.clips}
