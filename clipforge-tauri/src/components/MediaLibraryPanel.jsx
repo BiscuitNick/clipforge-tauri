@@ -282,9 +282,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
       console.log('[MediaLibraryPanel] Recording started:', result);
 
-      // Notify parent about recording start
+      // Notify parent about recording start with source information
       if (onRecordingStateChange) {
-        onRecordingStateChange({ ...result, isRecording: true });
+        onRecordingStateChange({
+          ...result,
+          isRecording: true,
+          source: selectedRecordingSource.source,
+          config: selectedRecordingSource.config
+        });
       }
 
       setMessage("");
@@ -464,69 +469,33 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
         {mode === "record-screen" && (
           <div className="recording-mode-view">
-            <div className="recording-mode-content">
-              <svg
-                className="recording-mode-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-              <h3>Screen Recording</h3>
-
-              {!selectedRecordingSource ? (
-                <>
-                  <p>Select a screen or window to record</p>
+            {!selectedRecordingSource ? (
+              <div className="recording-mode-centered">
+                <button
+                  className="select-source-button"
+                  onClick={() => setIsRecordingModalOpen(true)}
+                  disabled={isLoading || isRecording}
+                >
+                  Select Screen/Window
+                </button>
+              </div>
+            ) : (
+              <div className="recording-mode-centered">
+                <div className="selected-source-compact">
+                  <span className="source-details">
+                    {selectedRecordingSource.source.name} • {selectedRecordingSource.config.width} × {selectedRecordingSource.config.height}
+                    {selectedRecordingSource.resolution !== 'native' && ` (${selectedRecordingSource.resolution})`}
+                  </span>
                   <button
-                    className="record-button large"
-                    onClick={() => setIsRecordingModalOpen(true)}
+                    className="change-source-button-compact"
+                    onClick={handleChangeSource}
                     disabled={isLoading || isRecording}
                   >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Select Screen/Window
+                    Change Source
                   </button>
-                </>
-              ) : (
-                <>
-                  <div className="selected-source-info">
-                    <p className="source-name-display">{selectedRecordingSource.source.name}</p>
-                    <p className="source-resolution-display">
-                      {selectedRecordingSource.config.width} × {selectedRecordingSource.config.height}
-                      {selectedRecordingSource.resolution !== 'native' && ` (${selectedRecordingSource.resolution})`}
-                    </p>
-                  </div>
-                  <div className="recording-actions">
-                    <button
-                      className="record-button large primary"
-                      onClick={handleStartRecording}
-                      disabled={isLoading || isRecording}
-                    >
-                      <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                        <circle cx="10" cy="10" r="6" />
-                      </svg>
-                      Start Recording
-                    </button>
-                    <button
-                      className="change-source-button"
-                      onClick={handleChangeSource}
-                      disabled={isLoading || isRecording}
-                    >
-                      Change Source
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

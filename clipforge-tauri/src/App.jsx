@@ -98,6 +98,10 @@ function App() {
         .then((result) => {
           console.log("[App] Recording imported:", result);
           mediaLibrary.addMediaItems(result);
+          // Select the newly imported recording
+          if (result && result.length > 0) {
+            setSelectedMedia(result[0]);
+          }
         })
         .catch((error) => {
           console.error("[App] Failed to import recording:", error);
@@ -286,7 +290,11 @@ function App() {
   React.useEffect(() => {
     const unlisten = listen('recording:duration-update', (event) => {
       console.log("[App] Recording duration update:", event.payload);
-      setRecordingState(event.payload);
+      // Merge duration update with existing state to preserve type and source info
+      setRecordingState(prev => ({
+        ...prev,
+        ...event.payload
+      }));
     });
 
     return () => {
