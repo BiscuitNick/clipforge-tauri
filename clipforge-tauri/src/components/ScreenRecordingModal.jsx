@@ -4,16 +4,14 @@ import { listen } from '@tauri-apps/api/event';
 import './ScreenRecordingModal.css';
 
 /**
- * Screen Recording Modal - Select screen/window source and control recording
+ * Screen Recording Modal - Select screen/window source and resolution
  */
-function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
-  const [step, setStep] = useState('select'); // 'select', 'recording'
+function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
   const [sources, setSources] = useState([]);
   const [selectedSource, setSelectedSource] = useState(null);
   const [sourceType, setSourceType] = useState('screen'); // 'screen' or 'window'
   const [includeAudio, setIncludeAudio] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingState, setRecordingState] = useState(null);
+  const [resolution, setResolution] = useState('native'); // 'native', '1080p', '720p', '480p'
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,35 +20,10 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
     if (isOpen) {
       fetchSources();
     } else {
-      // Reset state when modal closes
-      setStep('select');
-      setSelectedSource(null);
+      // Reset error when modal closes
       setError('');
-      setRecordingState(null);
     }
   }, [isOpen]);
-
-  // Listen for recording duration updates
-  useEffect(() => {
-    let unlisten;
-
-    const setupListener = async () => {
-      unlisten = await listen('recording:duration-update', (event) => {
-        console.log('Duration update:', event.payload);
-        setRecordingState(event.payload);
-      });
-    };
-
-    if (isRecording) {
-      setupListener();
-    }
-
-    return () => {
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [isRecording]);
 
   const fetchSources = async () => {
     setIsLoading(true);
@@ -75,102 +48,78 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
     }
   };
 
-  const handleStartRecording = async () => {
+  // Calculate actual recording dimensions based on resolution setting
+  const getRecordingDimensions = () => {
+    if (!selectedSource) return { width: 1920, height: 1080 };
+
+    if (resolution === 'native') {
+      return { width: selectedSource.width, height: selectedSource.height };
+    }
+
+    // Calculate aspect ratio
+    const aspectRatio = selectedSource.width / selectedSource.height;
+
+    switch (resolution) {
+      case '1080p':
+        return { width: 1920, height: 1080 };
+      case '720p':
+        return { width: 1280, height: 720 };
+      case '480p':
+        return { width: 854, height: 480 };
+      default:
+        return { width: selectedSource.width, height: selectedSource.height };
+    }
+  };
+
+  const handleConfirmSelection = () => {
     if (!selectedSource) {
       setError('Please select a screen or window to record');
       return;
     }
 
-    setIsLoading(true);
-    setError('');
+    const dimensions = getRecordingDimensions();
 
-    try {
-      // Create config with source dimensions
-      const config = {
-        width: selectedSource.width,
-        height: selectedSource.height,
-        frame_rate: 30,
-        video_bitrate: 5000,
-        video_codec: "h264",
-        audio_sample_rate: 48000,
-        audio_channels: 2,
-        audio_bitrate: 128,
-        audio_codec: "aac",
-        output_format: "mp4"
-      };
+    // Create config with selected resolution
+    const config = {
+      width: dimensions.width,
+      height: dimensions.height,
+      frame_rate: 30,
+      video_bitrate: 5000,
+      video_codec: "h264",
+      audio_sample_rate: 48000,
+      audio_channels: 2,
+      audio_bitrate: 128,
+      audio_codec: "aac",
+      output_format: "mp4"
+    };
 
-      console.log('[ScreenRecordingModal] Starting recording with config:', config);
+    console.log('[ScreenRecordingModal] Source selected with config:', config);
 
-      const result = await invoke('start_recording', {
-        recordingType: 'screen',
-        sourceId: selectedSource.id,
+    // Pass selection to parent
+    if (onSourceSelect) {
+      onSourceSelect({
+        source: selectedSource,
         config: config,
-        includeAudio: includeAudio
+        includeAudio: includeAudio,
+        resolution: resolution
       });
-
-      console.log('Recording started:', result);
-      setRecordingState(result);
-      setIsRecording(true);
-
-      // Close modal immediately after starting recording
-      // Parent component will handle showing recording status and preview
-      onClose();
-
-      // Notify parent about recording start
-      if (onRecordingComplete) {
-        // Pass recording state to parent so it can show live preview
-        onRecordingComplete({ ...result, isRecording: true });
-      }
-    } catch (err) {
-      console.error('Failed to start recording:', err);
-      setError(`Failed to start recording: ${err}`);
-    } finally {
-      setIsLoading(false);
     }
-  };
 
-  const handleStopRecording = async () => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const result = await invoke('stop_recording');
-      console.log('Recording stopped:', result);
-
-      setIsRecording(false);
-
-      // Notify parent component
-      if (onRecordingComplete) {
-        onRecordingComplete(result);
-      }
-
-      // Close modal
-      onClose();
-    } catch (err) {
-      console.error('Failed to stop recording:', err);
-      setError(`Failed to stop recording: ${err}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    // Close modal
+    onClose();
   };
 
   if (!isOpen) {
     return null;
   }
 
+  const recordingDimensions = getRecordingDimensions();
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content screen-recording-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>
-            {step === 'select' ? 'Select Recording Source' : 'Recording'}
-          </h2>
+          <h2>Select Recording Source</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -181,8 +130,7 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
             </div>
           )}
 
-          {step === 'select' && (
-            <>
+          <>
               {/* Source type tabs */}
               <div className="source-tabs">
                 <button
@@ -246,6 +194,48 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
                 )}
               </div>
 
+              {/* Resolution selector */}
+              <div className="resolution-controls">
+                <label className="resolution-label">Recording Resolution:</label>
+                <div className="resolution-options">
+                  <button
+                    className={`resolution-btn ${resolution === 'native' ? 'active' : ''}`}
+                    onClick={() => setResolution('native')}
+                  >
+                    Native
+                    {selectedSource && (
+                      <span className="resolution-info">
+                        {selectedSource.width} × {selectedSource.height}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className={`resolution-btn ${resolution === '1080p' ? 'active' : ''}`}
+                    onClick={() => setResolution('1080p')}
+                  >
+                    1080p
+                    <span className="resolution-info">1920 × 1080</span>
+                  </button>
+                  <button
+                    className={`resolution-btn ${resolution === '720p' ? 'active' : ''}`}
+                    onClick={() => setResolution('720p')}
+                  >
+                    720p
+                    <span className="resolution-info">1280 × 720</span>
+                  </button>
+                  <button
+                    className={`resolution-btn ${resolution === '480p' ? 'active' : ''}`}
+                    onClick={() => setResolution('480p')}
+                  >
+                    480p
+                    <span className="resolution-info">854 × 480</span>
+                  </button>
+                </div>
+                <div className="selected-resolution">
+                  Will record at: {recordingDimensions.width} × {recordingDimensions.height}
+                </div>
+              </div>
+
               {/* Audio controls */}
               <div className="audio-controls">
                 <label className="checkbox-label">
@@ -258,52 +248,19 @@ function ScreenRecordingModal({ isOpen, onClose, onRecordingComplete }) {
                 </label>
               </div>
             </>
-          )}
-
-          {step === 'recording' && (
-            <div className="recording-view">
-              <div className="recording-indicator">
-                <div className="recording-dot"></div>
-                <span>Recording in progress...</span>
-              </div>
-
-              <div className="recording-timer">
-                {formatDuration(recordingState?.duration || 0)}
-              </div>
-
-              <div className="recording-info">
-                <p>Recording: {selectedSource?.name}</p>
-                {includeAudio && <p>System audio: Enabled</p>}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="modal-footer">
-          {step === 'select' ? (
-            <>
-              <button className="button-secondary" onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                className="button-primary"
-                onClick={handleStartRecording}
-                disabled={!selectedSource || isLoading}
-              >
-                {isLoading ? 'Starting...' : 'Start Recording'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="button-danger"
-                onClick={handleStopRecording}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Stopping...' : 'Stop Recording'}
-              </button>
-            </>
-          )}
+          <button className="button-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="button-primary"
+            onClick={handleConfirmSelection}
+            disabled={!selectedSource || isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Confirm Selection'}
+          </button>
         </div>
       </div>
     </div>

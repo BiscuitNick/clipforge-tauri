@@ -105,13 +105,14 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
   const [isLoading, setIsLoading] = useState(false);
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
   const [mode, setMode] = useState("media"); // "media", "record-screen", "record-video"
+  const [selectedRecordingSource, setSelectedRecordingSource] = useState(null); // Stores selected screen/window and config
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -239,19 +240,70 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     }
   };
 
-  const handleRecordingStateChange = (recordingState) => {
-    console.log("[MediaLibraryPanel] Recording state changed:", recordingState);
+  // Handle source selection from modal
+  const handleSourceSelect = (selection) => {
+    console.log("[MediaLibraryPanel] Source selected:", selection);
+    setSelectedRecordingSource(selection);
 
-    // Pass recording state to parent (App.jsx) for handling
+    // Notify parent to show live preview of selected source
     if (onRecordingStateChange) {
-      onRecordingStateChange(recordingState);
+      onRecordingStateChange({
+        type: 'source-selected',
+        source: selection.source,
+        config: selection.config
+      });
+    }
+  };
+
+  // Handle starting the recording
+  const handleStartRecording = async () => {
+    if (!selectedRecordingSource) {
+      setMessage("Please select a screen or window first");
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 3000);
+      return;
     }
 
-    // Switch back to media mode after recording starts
-    // (user will see live preview in VideoPreviewPanel)
-    if (recordingState.isRecording) {
-      setMode("media");
+    setIsLoading(true);
+    setMessage("Starting recording...");
+    setMessageType("loading");
+
+    try {
+      const result = await invoke('start_recording', {
+        recordingType: 'screen',
+        sourceId: selectedRecordingSource.source.id,
+        config: selectedRecordingSource.config,
+        includeAudio: selectedRecordingSource.includeAudio
+      });
+
+      console.log('[MediaLibraryPanel] Recording started:', result);
+
+      // Notify parent about recording start
+      if (onRecordingStateChange) {
+        onRecordingStateChange({ ...result, isRecording: true });
+      }
+
+      setMessage("");
+      setMessageType("");
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start recording:', err);
+      setMessage(`Failed to start recording: ${err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Handle changing screen/window selection
+  const handleChangeSource = () => {
+    setIsRecordingModalOpen(true);
   };
 
   return (
@@ -263,6 +315,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             className="mode-selector"
             value={mode}
             onChange={(e) => setMode(e.target.value)}
+            disabled={isRecording}
           >
             <option value="media">Media Files</option>
             <option value="record-screen">Record Screen</option>
@@ -351,17 +404,52 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
                 />
               </svg>
               <h3>Screen Recording</h3>
-              <p>Capture your screen or specific windows</p>
-              <button
-                className="record-button large"
-                onClick={() => setIsRecordingModalOpen(true)}
-                disabled={isLoading}
-              >
-                <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                  <circle cx="10" cy="10" r="6" />
-                </svg>
-                Start Recording
-              </button>
+
+              {!selectedRecordingSource ? (
+                <>
+                  <p>Select a screen or window to record</p>
+                  <button
+                    className="record-button large"
+                    onClick={() => setIsRecordingModalOpen(true)}
+                    disabled={isLoading || isRecording}
+                  >
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Select Screen/Window
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="selected-source-info">
+                    <p className="source-name-display">{selectedRecordingSource.source.name}</p>
+                    <p className="source-resolution-display">
+                      {selectedRecordingSource.config.width} × {selectedRecordingSource.config.height}
+                      {selectedRecordingSource.resolution !== 'native' && ` (${selectedRecordingSource.resolution})`}
+                    </p>
+                  </div>
+                  <div className="recording-actions">
+                    <button
+                      className="record-button large primary"
+                      onClick={handleStartRecording}
+                      disabled={isLoading || isRecording}
+                    >
+                      <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                        <circle cx="10" cy="10" r="6" />
+                      </svg>
+                      Start Recording
+                    </button>
+                    <button
+                      className="change-source-button"
+                      onClick={handleChangeSource}
+                      disabled={isLoading || isRecording}
+                    >
+                      Change Source
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -399,7 +487,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       <ScreenRecordingModal
         isOpen={isRecordingModalOpen}
         onClose={() => setIsRecordingModalOpen(false)}
-        onRecordingComplete={handleRecordingStateChange}
+        onSourceSelect={handleSourceSelect}
       />
     </div>
   );

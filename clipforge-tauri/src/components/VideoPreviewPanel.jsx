@@ -333,6 +333,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   // Get mode display text
   const getModeText = () => {
     if (mode === "recording") return "Recording";
+    if (mode === "recording-preview") return "Ready to Record";
     if (mode === "timeline") return "Timeline";
     return "Library";
   };
@@ -347,26 +348,89 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       <div className="panel-content">
         <div className="video-player">
           <div className="video-container">
-            {mode === "recording" && recordingState ? (
-              <div className="recording-preview">
+            {mode === "recording-preview" && recordingState ? (
+              <div className="recording-preview preview-mode">
                 <div className="recording-preview-content">
-                  <div className="recording-indicator-large">
-                    <div className="recording-dot-large"></div>
-                    <span className="recording-text">Recording in Progress</span>
-                  </div>
-                  <div className="recording-timer-large">
-                    {formatTime(recordingState.duration)}
-                  </div>
-                  <p className="recording-info">Your screen is being recorded</p>
-                  <button
-                    className="stop-recording-btn"
-                    onClick={onStopRecording}
-                  >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                      <path d="M6 6h12v12H6z" />
+                  <div className="preview-indicator">
+                    <svg
+                      className="preview-icon"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
                     </svg>
-                    Stop Recording
-                  </button>
+                    <span className="preview-text">Ready to Record</span>
+                  </div>
+
+                  {/* Show thumbnail preview if available */}
+                  {recordingState.source?.thumbnail && (
+                    <div className="preview-thumbnail-container">
+                      <img
+                        src={`data:image/png;base64,${recordingState.source.thumbnail}`}
+                        alt="Preview"
+                        className="preview-thumbnail-image"
+                      />
+                      <div className="preview-thumbnail-overlay">
+                        <div className="preview-play-icon">
+                          <svg fill="currentColor" viewBox="0 0 20 20" width="48" height="48">
+                            <circle cx="10" cy="10" r="8" fill="rgba(231, 76, 60, 0.9)" />
+                            <circle cx="10" cy="10" r="3" fill="white" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="preview-source-info">
+                    <p className="preview-source-name">{recordingState.source?.name}</p>
+                    <p className="preview-source-resolution">
+                      {recordingState.config?.width} × {recordingState.config?.height}
+                    </p>
+                  </div>
+                  <p className="preview-hint">Click "Start Recording" in the Media Library to begin</p>
+                </div>
+              </div>
+            ) : mode === "recording" && recordingState ? (
+              <div className="recording-preview">
+                {/* Show thumbnail preview if available */}
+                {recordingState.source?.thumbnail && (
+                  <div className="recording-preview-thumbnail">
+                    <img
+                      src={`data:image/png;base64,${recordingState.source.thumbnail}`}
+                      alt="Recording Preview"
+                      className="recording-thumbnail-image"
+                    />
+                  </div>
+                )}
+                <div className="recording-preview-overlay">
+                  <div className="recording-preview-content">
+                    <div className="recording-indicator-large">
+                      <div className="recording-dot-large"></div>
+                      <span className="recording-text">Recording in Progress</span>
+                    </div>
+                    <div className="recording-timer-large">
+                      {formatTime(recordingState.duration)}
+                    </div>
+                    {recordingState.source?.name && (
+                      <p className="recording-info">{recordingState.source.name}</p>
+                    )}
+                    <button
+                      className="stop-recording-btn"
+                      onClick={onStopRecording}
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M6 6h12v12H6z" />
+                      </svg>
+                      Stop Recording
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : showBlackScreen ? (

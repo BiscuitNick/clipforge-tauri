@@ -394,6 +394,73 @@
   box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
 }
 
+.media-library-panel .record-button.large.primary {
+  background-color: #e74c3c;
+}
+
+.media-library-panel .record-button.large.primary:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+/* Selected source info */
+.media-library-panel .selected-source-info {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #252525;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.media-library-panel .source-name-display {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f6f6f6;
+}
+
+.media-library-panel .source-resolution-display {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #999;
+}
+
+/* Recording actions */
+.media-library-panel .recording-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 300px;
+}
+
+.media-library-panel .change-source-button {
+  background-color: #333;
+  color: #f6f6f6;
+  border: 1px solid #444;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-library-panel .change-source-button:hover:not(:disabled) {
+  background-color: #3a3a3a;
+  border-color: #555;
+}
+
+.media-library-panel .change-source-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Disabled mode selector */
+.media-library-panel .mode-selector:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
   .media-library-panel {

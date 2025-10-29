@@ -63,23 +63,38 @@ function App() {
     setPreviewMode("library");
   };
 
-  // Handle recording state changes (start and complete)
+  // Handle recording state changes (source selection, start, and complete)
   const handleRecordingStateChange = (state) => {
     console.log("[App] Recording state changed:", state);
 
-    if (state.isRecording) {
-      // Recording just started - show live preview
-      setRecordingState(state);
+    if (state.type === 'source-selected') {
+      // User selected a screen/window - show live preview
+      setRecordingState({
+        type: 'preview',
+        source: state.source,
+        config: state.config
+      });
+      setPreviewMode("recording-preview");
+      setSelectedMedia(null);
+    } else if (state.isRecording) {
+      // Recording just started - update to recording state but keep source info
+      setRecordingState(prev => ({
+        ...state,
+        type: 'recording',
+        // Preserve source info from preview state
+        source: prev?.source,
+        config: prev?.config
+      }));
       setPreviewMode("recording");
       setSelectedMedia(null);
     } else if (state.file_path) {
       // Recording completed - import the video
       setRecordingState(null);
+      setPreviewMode("library");
       invoke("import_video", { paths: [state.file_path] })
         .then((result) => {
           console.log("[App] Recording imported:", result);
           mediaLibrary.addMediaItems(result);
-          setPreviewMode("library");
         })
         .catch((error) => {
           console.error("[App] Failed to import recording:", error);
@@ -286,6 +301,7 @@ function App() {
           onMediaSelect={handleMediaSelect}
           selectedMediaId={selectedMedia?.id}
           onRecordingStateChange={handleRecordingStateChange}
+          isRecording={recordingState?.type === 'recording'}
         />
         <VideoPreviewPanel
           selectedMedia={selectedMedia}
@@ -315,17 +331,23 @@ function App() {
           selectedClipId={timeline.selectedClipId}
           onClipSelect={timeline.setSelectedClipId}
           onPlayheadMove={(pos) => {
+            // Don't allow timeline interaction during recording
+            if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
             timeline.pause(); // Pause when manually moving playhead
             timeline.setPlayheadPosition(pos);
           }}
           onZoom={(delta) => {
+            // Don't allow timeline interaction during recording
+            if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
             timeline.zoom(delta);
           }}
           onPan={(delta) => {
+            // Don't allow timeline interaction during recording
+            if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
             timeline.pan(delta);
@@ -341,6 +363,8 @@ function App() {
           dragPreview={dragPreview}
           isPlaying={timeline.isPlaying}
           onTogglePlayback={() => {
+            // Don't allow timeline playback during recording
+            if (recordingState?.type === 'recording') return;
             setPreviewMode("timeline");
             setSelectedMedia(null);
             timeline.togglePlayback();
