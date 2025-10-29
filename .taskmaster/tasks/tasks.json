@@ -2,455 +2,716 @@
   "master": {
     "tasks": [
       {
-        "id": "1",
-        "title": "Set Up Tauri Desktop Application",
-        "description": "Configure and launch ClipForge as a native macOS desktop application using Tauri 2.x.",
-        "status": "done",
+        "id": 1,
+        "title": "Set up recording infrastructure and permissions",
+        "description": "Create the foundational recording system with proper permissions and state management",
+        "details": "Create a new `recording.rs` module in the Tauri commands directory. Implement system permission handling for screen capture, camera access, and microphone access. Set up recording state management to track active recordings, duration, and file paths. Create data structures for recording configuration (resolution, frame rate, codecs). Implement cleanup mechanisms for temporary files and error handling.",
+        "testStrategy": "Test permission dialogs appear correctly on first use. Verify state management tracks recording status accurately. Test cleanup of temporary files on errors and cancellation.",
+        "priority": "high",
         "dependencies": [],
-        "priority": "high",
-        "details": "Ensure Tauri project is initialized with `npm create tauri-app`. Update `tauri.conf.json` with app metadata (name, version, icon paths) and macOS-specific settings like minimum system version (10.15). Set window dimensions to at least 1280x720. Configure menu bar with File, Edit, and View menus. Use `tauri build` to create an .app bundle, and test launching from the bundle (not dev mode). Implement code signing with a development certificate for macOS compatibility.",
-        "testStrategy": "Verify app launches successfully from .app bundle on macOS (Intel & Apple Silicon). Check window dimensions meet minimum requirements. Confirm menu bar displays correctly with expected options. Test launch time is under 5 seconds using Activity Monitor or manual timing.",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
-            "title": "Initialize Tauri 2.x Project with `create-tauri-app`",
-            "description": "Set up the basic project structure for the ClipForge desktop application using the official Tauri CLI tool.",
+            "title": "Create recording.rs module structure with base architecture",
+            "description": "Set up the initial recording.rs module file in the Tauri commands directory with the foundational structure, imports, and module organization needed for the recording system",
             "dependencies": [],
-            "details": "Run `npm create tauri-app@latest` and follow the prompts to create a new project. Select the appropriate frontend framework (React) and Rust as the backend language. Ensure all initial dependencies are installed correctly.",
+            "details": "Create src-tauri/src/commands/recording.rs file with proper module declarations. Set up necessary imports for Tauri, serde, tokio, and platform-specific APIs. Define the module structure with separate sections for permissions, state management, configuration, and recording operations. Create placeholder functions for main recording commands that will be exposed to the frontend. Include proper error types and result handling structures.",
             "status": "done",
-            "testStrategy": "Verify the project directory is created with `src`, `src-tauri`, `package.json`, and `Cargo.toml`. Run `npm run tauri dev` to confirm the default application window opens without errors.",
-            "parentId": "undefined"
+            "testStrategy": "Verify module compiles without errors and is properly registered in main.rs. Test that placeholder commands are accessible from frontend."
           },
           {
             "id": 2,
-            "title": "Configure Application Metadata and Window Settings in `tauri.conf.json`",
-            "description": "Update the Tauri configuration file with all necessary application metadata, window settings, and macOS-specific parameters for ClipForge.",
+            "title": "Implement macOS permission handling for screen, camera, and microphone",
+            "description": "Build the macOS-specific permission handling system using AVFoundation and Core Media frameworks to request and check permissions for screen recording, camera access, and microphone access",
             "dependencies": [
               1
             ],
-            "details": "Edit `src-tauri/tauri.conf.json`. Set the `productName` to \"ClipForge\", update version number, and provide paths for app icons. Configure the main window to have a minimum dimension of 1280x720. Set the `macOS.minimumSystemVersion` to \"10.15\".",
+            "details": "Use objc and cocoa crates to interface with macOS permission APIs. Implement AVCaptureDevice authorization checks for camera and microphone. Handle screen recording permissions through CGDisplayStream and accessibility APIs. Create async functions to request permissions with proper error handling. Implement permission status checking functions that return current authorization states. Handle permission denial gracefully with informative error messages.",
             "status": "done",
-            "testStrategy": "Run `npm run tauri dev`. Check if the application window title is 'ClipForge' and if its initial size is at least 1280x720. Verify the application icon appears correctly in the dock (if configured).",
-            "parentId": "undefined"
+            "testStrategy": "Test permission dialogs appear on first request. Verify permission states are correctly reported. Test handling of denied permissions."
           },
           {
             "id": 3,
-            "title": "Implement Native macOS Menu Bar in Rust",
-            "description": "Create a custom native menu bar with \"File\", \"Edit\", and \"View\" menus using Tauri's Rust API to provide standard desktop application functionality.",
+            "title": "Set up cross-platform permission abstraction layer",
+            "description": "Create a platform-agnostic permission interface that abstracts platform-specific implementations for Windows, Linux, and macOS, providing a unified API for the frontend",
             "dependencies": [
-              1
+              2
             ],
-            "details": "In `src-tauri/src/main.rs`, use the `tauri::Menu` builder to construct the menu structure. Create submenus for File, Edit, and View with standard items like 'Quit', 'Copy', 'Paste', etc. Attach the created menu to the application builder.\n<info added on 2025-10-27T21:19:11.456Z>\n```json\n\"Successfully implemented the native macOS menu bar in `src-tauri/src/lib.rs` (lines 1-75). The menu includes 'File' (New, Open, Save), 'Edit' (Cut, Copy, Paste), and 'View' (zoom controls) with standard items. A minor unused import warning was also resolved. The application compiles and runs successfully in dev mode.\"\n```\n</info added on 2025-10-27T21:19:11.456Z>",
+            "details": "Design trait-based abstraction for permission operations across platforms. Implement conditional compilation using cfg attributes for platform-specific code. Create Windows permission handling using Windows Runtime APIs for camera/mic. Implement Linux permission checks using DBus and PipeWire/PulseAudio APIs. Build a unified permission manager that selects appropriate implementation at compile time. Include fallback mechanisms for unsupported platforms.",
             "status": "done",
-            "testStrategy": "Launch the application in development mode (`npm run tauri dev`) on macOS. Verify that the custom 'File', 'Edit', and 'View' menus appear in the top menu bar instead of the default Tauri menu. Check that basic actions like 'Quit' work.",
-            "parentId": "undefined"
+            "testStrategy": "Test compilation on all target platforms. Verify permission requests work on each OS. Test fallback behavior on unsupported systems."
           },
           {
             "id": 4,
-            "title": "Build and Code Sign the macOS Application Bundle",
-            "description": "Create the final `.app` bundle for ClipForge, implement macOS code signing with a development certificate, and verify the application launches successfully from the created bundle.",
+            "title": "Create recording state management system with lifecycle tracking",
+            "description": "Implement a comprehensive state management system to track active recordings, their status, duration, file paths, and handle concurrent recording sessions",
+            "dependencies": [
+              1
+            ],
+            "details": "Create RecordingState struct with fields for recording ID, type (screen/webcam), status, start time, duration, file path, and configuration. Implement a global state manager using Arc<Mutex<>> for thread-safe access. Build state transition functions for starting, pausing, stopping recordings. Create event emitter for state changes to update frontend. Implement recording session tracking with unique IDs. Add duration calculation and real-time updates using tokio intervals.",
+            "status": "done",
+            "testStrategy": "Test concurrent recording state management. Verify state transitions are atomic and thread-safe. Test duration tracking accuracy."
+          },
+          {
+            "id": 5,
+            "title": "Define recording configuration data structures and validation",
+            "description": "Create comprehensive data structures for recording configurations including video/audio settings, codecs, quality presets, and implement validation logic for these configurations",
+            "dependencies": [
+              1
+            ],
+            "details": "Define RecordingConfig struct with video settings (resolution, framerate, bitrate, codec), audio settings (sample rate, channels, codec, bitrate), and output format options. Create quality preset enums (Low, Medium, High, Custom) with predefined configurations. Implement configuration validation to ensure compatible codec/container combinations. Add serialization/deserialization for saving user preferences. Create builder pattern for easy configuration construction. Include platform-specific configuration adjustments.",
+            "status": "done",
+            "testStrategy": "Test configuration validation catches invalid combinations. Verify preset configurations produce expected settings. Test serialization round-trip."
+          },
+          {
+            "id": 6,
+            "title": "Implement cleanup and error recovery mechanisms",
+            "description": "Build robust cleanup systems for temporary files, handle recording failures gracefully, and implement recovery mechanisms for interrupted recordings",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Create temporary file management system with automatic cleanup on app exit or crash. Implement drop traits for recording resources to ensure cleanup. Build error recovery for common failures like disk space, permission revocation, or system interrupts. Create partial recording recovery to salvage interrupted recordings. Implement cleanup scheduler for orphaned temporary files on startup. Add comprehensive error types with user-friendly messages and recovery suggestions.",
+            "status": "done",
+            "testStrategy": "Test cleanup occurs on normal and abnormal termination. Verify partial recordings can be recovered. Test disk space handling and error messages."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement screen and window enumeration",
+        "description": "Create backend commands to list available screens and windows for recording selection",
+        "details": "Implement Tauri commands to enumerate available displays and windows. Return screen/window metadata including ID, name, type (screen/window), resolution, and optional thumbnail previews. Handle multiple monitor setups and different window types. Create data structures for screen sources with proper serialization for frontend consumption.",
+        "testStrategy": "Test enumeration works with single and multiple monitors. Verify window list updates when applications open/close. Test thumbnail generation for large numbers of windows.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement macOS screen/window enumeration using Core Graphics",
+            "description": "Create native macOS implementation for enumerating all available screens and windows using Core Graphics and Accessibility APIs",
+            "dependencies": [],
+            "details": "Use CGWindowListCopyWindowInfo and NSScreen APIs to enumerate all available displays and windows. Implement filtering to exclude system UI elements and invisible windows. Extract window metadata including CGWindowID, owner application name, window title, bounds, and layer information. Handle permission requests for screen recording access through macOS Security & Privacy settings.",
+            "status": "done",
+            "testStrategy": "Test enumeration with multiple monitors connected, verify all user windows are detected, test with various application types including fullscreen apps, validate permission handling flow"
+          },
+          {
+            "id": 2,
+            "title": "Create data structures for source metadata",
+            "description": "Design and implement Rust structs for screen and window metadata with proper serialization support",
+            "dependencies": [],
+            "details": "Create ScreenSource struct with fields for id, name, source_type (enum: Screen/Window), resolution (width/height), position (x/y), thumbnail (Option<Vec<u8>>), and is_primary flag. Implement serde serialization/deserialization for frontend communication. Add builder pattern for easy construction and validation of source objects. Include display scaling factor and color space information for accurate rendering.",
+            "status": "done",
+            "testStrategy": "Unit test struct serialization/deserialization, validate all field types serialize correctly to JSON, test builder pattern with various input combinations"
+          },
+          {
+            "id": 3,
+            "title": "Generate window/screen thumbnails",
+            "description": "Implement thumbnail generation for screens and windows to provide visual previews in the selection UI",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Use CGWindowListCreateImage to capture thumbnail images of screens and windows. Resize captured images to standardized thumbnail dimensions (320x180) using Core Graphics. Convert CGImage to PNG or JPEG format for efficient transmission. Implement caching mechanism to avoid repeated captures. Handle edge cases like minimized windows or off-screen windows. Add option to skip thumbnail generation for performance.",
+            "status": "done",
+            "testStrategy": "Test thumbnail generation for various window sizes, verify image quality and aspect ratio preservation, test performance with many windows, validate memory usage with thumbnail caching"
+          },
+          {
+            "id": 4,
+            "title": "Handle multi-monitor configurations",
+            "description": "Implement robust support for multiple monitor setups including different resolutions and arrangements",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Enumerate all connected displays using NSScreen.screens array. Calculate virtual desktop coordinates for proper window positioning across monitors. Handle different DPI scales between monitors (Retina vs non-Retina). Detect primary display and maintain monitor arrangement information. Support monitor hot-plugging with update notifications. Calculate correct capture regions for windows spanning multiple monitors.",
+            "status": "done",
+            "testStrategy": "Test with various multi-monitor configurations, verify coordinates are correct across different arrangements, test monitor connection/disconnection during enumeration, validate DPI handling"
+          },
+          {
+            "id": 5,
+            "title": "Implement frontend serialization and IPC commands",
+            "description": "Create Tauri commands for frontend communication and implement proper IPC serialization",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Create Tauri command 'enumerate_sources' that returns Vec<ScreenSource> to frontend. Implement proper error handling with Result types and custom error messages. Add command 'get_source_thumbnail' for on-demand thumbnail retrieval. Create TypeScript interfaces matching Rust structs for type safety. Implement debouncing for enumeration calls to prevent excessive API usage. Add source change detection and notification system.",
+            "status": "done",
+            "testStrategy": "Test IPC commands from frontend, verify TypeScript types match Rust structs, test error propagation to frontend, validate performance with rapid enumeration calls"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement core screen recording functionality",
+        "description": "Build the main screen recording system with configurable options",
+        "details": "Implement screen recording using platform-specific APIs (AVFoundation on macOS, DirectShow/Media Foundation on Windows, X11/Wayland on Linux). Support H.264 video codec and AAC audio codec with MP4 container. Configure recording at 1920x1080 or native resolution at 30fps. Include system audio capture option. Implement start/stop recording commands with real-time duration tracking and file size monitoring.",
+        "testStrategy": "Test recording full screen and specific windows. Verify audio inclusion/exclusion works correctly. Test recording duration accuracy and file size tracking. Validate output file format and quality.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement AVFoundation screen capture for macOS",
+            "description": "Set up AVFoundation framework integration for macOS screen recording with proper capture session configuration and screen source selection",
+            "dependencies": [],
+            "details": "Create Swift/Objective-C bridge for AVFoundation APIs in Tauri. Set up AVCaptureScreenInput for screen capture and configure AVCaptureSession with appropriate presets. Handle screen selection using CGDirectDisplayID and implement proper capture device authorization. Create data structures to pass capture configuration from Rust to native code. Ensure proper memory management and cleanup of AVFoundation resources.",
+            "status": "done",
+            "testStrategy": "Test screen capture initialization on different macOS versions. Verify proper authorization handling and screen selection. Test memory cleanup and resource deallocation."
+          },
+          {
+            "id": 2,
+            "title": "Configure H.264/AAC encoding pipeline",
+            "description": "Set up video and audio encoding with H.264 for video and AAC for audio, targeting MP4 container format with configurable quality settings",
+            "dependencies": [
+              1
+            ],
+            "details": "Configure AVAssetWriter with H.264 video codec settings including bitrate, keyframe interval, and profile level. Set up AAC audio encoder with sample rate and channel configuration. Implement quality presets (low/medium/high) mapping to specific encoder parameters. Configure MP4 container format with proper metadata. Handle encoder initialization errors and codec availability checks.",
+            "status": "done",
+            "testStrategy": "Verify encoded output matches H.264/AAC specifications. Test different quality presets produce expected file sizes and visual quality. Validate MP4 container compatibility."
+          },
+          {
+            "id": 3,
+            "title": "Add system audio capture integration",
+            "description": "Implement system audio capture alongside screen recording with proper audio routing and synchronization",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up AVCaptureAudioDataOutput for system audio capture on macOS. Configure audio session to capture system sounds using screen capture audio. Implement audio buffer management and synchronization with video frames. Handle audio device selection and routing changes during recording. Add toggle option to include/exclude system audio in recordings.",
+            "status": "done",
+            "testStrategy": "Test audio capture works with various audio sources. Verify audio/video synchronization in final output. Test audio inclusion toggle functionality."
+          },
+          {
+            "id": 4,
+            "title": "Implement recording controls (start/stop/pause)",
+            "description": "Create recording control mechanisms with proper state management for starting, stopping, and pausing recordings",
             "dependencies": [
               2,
               3
             ],
-            "details": "Set up macOS code signing environment variables (`APPLE_DEVELOPMENT_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`). Use `tauri build` to generate the `.app` bundle in `src-tauri/target/release/bundle/macos/`. Do not use the `--debug` flag.",
+            "details": "Implement start recording command that initializes capture session and begins writing to file. Create stop recording that properly finalizes the video file and releases resources. Add pause/resume functionality by managing capture session state and timestamps. Handle state transitions safely with proper error handling. Implement recording state notifications to update UI.",
             "status": "done",
-            "testStrategy": "Locate the `ClipForge.app` file in the build output directory. Double-click to launch it outside of the development environment. Confirm the app starts, window dimensions are correct, and the native menu bar is present. Ensure there are no Gatekeeper warnings about the app being from an unidentified developer.",
-            "parentId": "undefined",
-            "updatedAt": "2025-10-28T00:28:02.205Z"
-          }
-        ],
-        "complexity": 4,
-        "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down the Tauri setup into distinct steps: 1) Project initialization using `create-tauri-app`. 2) `tauri.conf.json` configuration for app metadata, window settings, and icons. 3) Rust-side implementation of the native menu bar. 4) A dedicated task for building the app, handling macOS code signing, and verifying the final `.app` bundle.",
-        "updatedAt": "2025-10-28T00:28:02.205Z"
-      },
-      {
-        "id": "2",
-        "title": "Implement Video Import via Drag & Drop",
-        "description": "Enable users to import video files (MP4/MOV) by dragging them from Finder into the app.",
-        "status": "done",
-        "dependencies": [
-          "1"
-        ],
-        "priority": "high",
-        "details": "Create an `ImportPanel` React component with a drag-and-drop zone using HTML5 drag events. Provide visual feedback (highlight drop zone) during drag. Validate file types to accept only MP4 and MOV formats, rejecting others with an error message. Display import progress or confirmation post-import. Use Tauri’s filesystem APIs to handle file paths and invoke a Rust command `import_video(path: String)` to process files and extract metadata.",
-        "testStrategy": "Test dragging MP4 and MOV files from Finder into the app; confirm visual feedback appears. Verify successful import with confirmation message and reject unsupported formats (e.g., .avi) with error. Check import works for single and multiple files, and test with large files (>500MB) for performance (<2s per file).",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create ImportPanel React component with drag-and-drop UI",
-            "description": "Develop the `ImportPanel` React component, including a designated drag-and-drop zone. Implement HTML5 drag events (`dragenter`, `dragleave`, `dragover`, `drop`) to detect files being dragged and dropped. Provide clear visual feedback to the user, such as highlighting the drop zone when files are dragged over it.",
-            "dependencies": [],
-            "details": "Use React hooks for state management of drag/drop events. Style the drop zone to clearly indicate its purpose. Implement CSS for visual feedback, e.g., adding a border or changing background color on `dragenter`/`dragover` and removing it on `dragleave`/`drop`. Ensure `preventDefault()` is called for `dragover` and `drop` events to prevent default browser behavior.",
-            "status": "done",
-            "testStrategy": "Test by dragging various files (supported and unsupported) over the component to verify visual feedback (e.g., highlight appears/disappears). Confirm that dropping files does not trigger default browser navigation or file opening.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Define `import_video` Tauri command in Rust backend",
-            "description": "Implement the `import_video` command in the Rust backend of the Tauri application. This command will be responsible for receiving an array of file paths (strings) from the frontend for subsequent video processing.",
-            "dependencies": [],
-            "details": "Create a new Rust module (e.g., `src-tauri/src/commands/video_import.rs`) and define a public `#[tauri::command]` function named `import_video`. This function should accept a `Vec<String>` argument representing the file paths. Initially, it can just log the received paths and return a success `Result` or a dummy value.",
-            "status": "done",
-            "testStrategy": "Use `tauri::Invoke` from the Rust side or a simple frontend call (e.g., via `window.__TAURI__.invoke`) to test if the command can be called successfully. Pass various arrays of dummy file paths and verify that the Rust backend correctly receives and logs them.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Implement frontend logic for file validation and command invocation",
-            "description": "Develop the frontend logic within the `ImportPanel` component to handle dropped files. This includes validating file types (accepting only MP4 and MOV), extracting file paths from the drag event, invoking the Rust `import_video` command with these paths, and managing UI states for loading, success, and error messages.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "On the `drop` event, access `event.dataTransfer.files`. Iterate through the files, checking their `type` property or file extension (`.mp4`, `.mov`). For valid files, extract their paths. Use `window.__TAURI__.invoke('import_video', { paths: [...] })` to call the backend command. Update the UI to show 'Importing...', 'Import successful!', or 'Error: Unsupported file type.' messages.\n<info added on 2025-10-27T21:23:55.567Z>\n{\n  \"content\": \"File validation for MP4/MOV extensions has been successfully implemented. The frontend invokes the `import_video` Rust command, located at `clipforge-tauri/src-tauri/src/commands/video_import.rs`, with the extracted file paths. The backend returns `VideoMetadata` objects containing the path, filename, and size. UI states for loading, success, and errors are now in place with appropriate styling.\"\n}\n</info added on 2025-10-27T21:23:55.567Z>",
-            "status": "done",
-            "testStrategy": "Drag and drop MP4 and MOV files from Finder; verify they are processed, and the `import_video` command is invoked. Drag and drop unsupported files (e.g., .txt, .avi); verify an appropriate error message is displayed. Test with multiple valid files dropped simultaneously and ensure all are handled. Test with large files to observe initial UI state changes.",
-            "parentId": "undefined"
-          }
-        ],
-        "complexity": 5,
-        "recommendedSubtasks": 3,
-        "expansionPrompt": "Decompose the drag & drop feature into three subtasks: 1) Create the `ImportPanel` React component with HTML5 drag/drop event handlers and visual feedback (e.g., highlighting). 2) Define the `import_video` Tauri command in Rust to receive file paths from the frontend. 3) Implement the frontend logic to invoke the command on file drop, perform file type validation, and manage loading/error UI states."
-      },
-      {
-        "id": "3",
-        "title": "Implement Video Import via File Picker",
-        "description": "Allow users to import video files using a native macOS file picker triggered by an 'Import Video' button.",
-        "status": "done",
-        "dependencies": [
-          "1"
-        ],
-        "priority": "high",
-        "details": "Add an 'Import Video' button in the main UI, linked to Tauri’s `open` dialog API. Configure the file picker to filter for MP4 and MOV files and support multiple selections. On selection, invoke the same `import_video` Rust command as drag-and-drop to process files and return metadata to the frontend for display in the media library.",
-        "testStrategy": "Click 'Import Video' button and confirm native file picker opens with MP4/MOV filter. Select multiple files and verify all are imported correctly. Test rejection of unsupported formats. Ensure import time is <2s per file for typical sizes (100MB).",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create 'Import Video' Button UI",
-            "description": "Develop a React component for the 'Import Video' button and integrate it into the main application UI, ensuring it's visible and clickable.",
-            "dependencies": [],
-            "details": "Implement a new React button component (e.g., <ImportVideoButton>) or integrate a standard button into an existing UI panel. Place it logically, perhaps near other import/add actions. Ensure basic styling and accessibility for the button.",
-            "status": "done",
-            "testStrategy": "Visually confirm the 'Import Video' button appears in the main UI. Check that it is clickable (even if no action yet) and not disabled.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Implement empty click handler for 'Import Video' button",
-            "description": "Add an `onClick` event handler to the newly created 'Import Video' button that logs a message to the console when clicked, serving as a placeholder for the file picker logic.",
-            "dependencies": [
-              1
-            ],
-            "details": "Modify the <ImportVideoButton> component or the parent component containing it to include an `onClick` prop. Inside the handler function, add a `console.log(\"Import Video button clicked\")` statement to confirm interaction.",
-            "status": "done",
-            "testStrategy": "Click the 'Import Video' button and verify that the console log message 'Import Video button clicked' appears in the browser's developer console.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Integrate Tauri `dialog.open` API",
-            "description": "Replace the placeholder `onClick` handler with a call to Tauri's `dialog.open` API to trigger the native file picker, without specific filters or multi-selection configured yet.",
-            "dependencies": [
-              2
-            ],
-            "details": "Import the `dialog` module from `@tauri-apps/api`. Within the `onClick` handler, call `dialog.open()` and await its result. Log the result (selected file paths or null) to the console to confirm basic file picker interaction.",
-            "status": "done",
-            "testStrategy": "Click the 'Import Video' button and confirm that the native macOS file picker dialog appears. Select any file and verify its path (or null if canceled) is logged to the console.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Configure file picker for MP4/MOV and multiple selections",
-            "description": "Enhance the `dialog.open` configuration to specifically filter for MP4 and MOV video file types and allow users to select multiple files simultaneously from the native file picker.",
-            "dependencies": [
-              3
-            ],
-            "details": "Pass an options object to `dialog.open()` including `multiple: true` and `filters: [{ name: 'Video', extensions: ['mp4', 'mov'] }]`. Ensure the dialog title is descriptive, e.g., 'Select Video Files to Import'.",
-            "status": "done",
-            "testStrategy": "Click the button, verify the file picker dialog's title and that only MP4/MOV files are selectable (or prominently displayed). Test selecting multiple files (e.g., using Cmd/Ctrl+click) and confirm the `dialog.open` result returns an array of paths.",
-            "parentId": "undefined"
+            "testStrategy": "Test rapid start/stop sequences don't cause crashes. Verify pause/resume maintains continuous video. Test state transitions handle errors gracefully."
           },
           {
             "id": 5,
-            "title": "Invoke `import_video` command with selected paths",
-            "description": "After files are successfully selected from the file picker, pass their paths to the existing `import_video` Rust command for processing and handle the response to update the frontend's media library.",
+            "title": "Add real-time duration and file size tracking",
+            "description": "Implement monitoring system for tracking recording duration and file size with real-time updates to the frontend",
             "dependencies": [
               4
             ],
-            "details": "Import `invoke` from `@tauri-apps/api/core`. Iterate over the array of selected file paths (if not null or empty) and call `invoke('import_video', { path: singleFilePath })` for each. Handle success and error responses, updating the media library display accordingly.\n<info added on 2025-10-27T21:29:09.529Z>\n{\n  \"update_text\": \"An 'Import Video' button was added to ImportPanel.jsx, using the @tauri-apps/plugin-dialog to open the native file picker. The dialog is configured for MP4/MOV files and multiple selections. The import logic was refactored to be shared with the drag-and-drop feature, and the button displays a loading state during import. The dialog plugin dependency was added to both Rust (Cargo.toml, lib.rs) and the frontend (package.json).\"\n}\n</info added on 2025-10-27T21:29:09.529Z>",
+            "details": "Create timer system to track recording duration from start timestamp with millisecond precision. Implement file size monitoring using periodic file system checks or write buffer tracking. Send regular updates to frontend via Tauri events (every 100ms for duration, every second for file size). Calculate estimated remaining recording time based on available disk space. Handle timer accuracy during system sleep or high CPU load.",
             "status": "done",
-            "testStrategy": "Click the button, select one or more MP4/MOV files. Verify that the files are processed (e.g., appear in the media library as per Task 2's `import_video` functionality). Test error handling for import failures and confirm performance for multiple files.",
-            "parentId": "undefined"
+            "testStrategy": "Verify duration accuracy over long recordings. Test file size updates match actual file growth. Validate updates continue during high system load."
+          },
+          {
+            "id": 6,
+            "title": "Handle recording to temporary then final locations",
+            "description": "Implement two-stage file handling with temporary recording location and atomic move to final destination",
+            "dependencies": [
+              4
+            ],
+            "details": "Create temporary file in system temp directory with unique naming to avoid conflicts. Stream recording data to temporary location during capture. Implement atomic file move operation to final user-selected location on recording completion. Handle insufficient disk space in both temporary and final locations. Clean up temporary files on cancellation or error. Add progress indication for file move operation on large recordings.",
+            "status": "done",
+            "testStrategy": "Test file moves across different volumes. Verify temporary files are cleaned up properly. Test disk space validation works correctly."
+          },
+          {
+            "id": 7,
+            "title": "Implement recording cancellation and cleanup",
+            "description": "Create robust cancellation system with proper resource cleanup and error recovery mechanisms",
+            "dependencies": [
+              5,
+              6
+            ],
+            "details": "Implement cancellation command that immediately stops capture session and releases all resources. Delete temporary recording files on cancellation without moving to final location. Properly close and release all AVFoundation objects including capture session, inputs, and outputs. Handle cleanup in error scenarios like disk full or encoder failures. Ensure no memory leaks or dangling resources after cancellation. Reset all recording state variables to initial values.",
+            "status": "done",
+            "testStrategy": "Test cancellation at various recording stages. Verify no temporary files remain after cancellation. Check for memory leaks using profiling tools."
           }
-        ],
-        "complexity": 2,
-        "recommendedSubtasks": 0,
-        "expansionPrompt": "Break down the file picker import into two steps: 1) Add an 'Import Video' button to the UI. 2) Implement the `onClick` handler to call Tauri's `open` dialog API, configure it for video files, and pass the selected file paths to the existing `import_video` command."
+        ]
       },
       {
-        "id": "4",
-        "title": "Develop Timeline UI with Canvas Rendering",
-        "description": "Create a timeline view to display imported video clips as visual blocks using HTML5 Canvas.",
-        "status": "done",
-        "dependencies": [
-          "2",
-          "3"
-        ],
+        "id": 4,
+        "title": "Create screen recording UI components",
+        "description": "Build React components for screen recording interface",
+        "details": "Create a recording button in the Media Library panel. Build a screen recording modal with thumbnail grid for screen/window selection. Implement recording status indicator with red dot and timer (MM:SS format). Add audio inclusion checkbox and start/stop controls. Include cancel option and error message display. Style components to match existing UI patterns.",
+        "testStrategy": "Test modal opens correctly and displays available screens/windows. Verify recording timer updates in real-time. Test audio checkbox toggles system audio capture. Validate error messages display correctly.",
         "priority": "medium",
-        "details": "Implement a `Timeline` React component using HTML5 Canvas for performance. Render clips as rectangles (min height 80px) with optional thumbnails (first frame or default icon). Display clip duration, position, and a playhead indicator. Add a time ruler with timestamps and grid lines. Enable horizontal scrolling for long sequences and default zoom to fit all clips. Use React hooks (`useTimeline.ts`) to manage state and canvas rendering loop for updates.\n<info added on 2025-10-27T22:02:46.094Z>\n```json\n\"Implementation is complete. The main UI is handled by the `Timeline.jsx` component, which uses an HTML5 Canvas for rendering. State management, including zoom, pan, and clip data, is encapsulated in the `src/hooks/useTimeline.js` hook. Styling is provided by `src/components/Timeline.css`.\\n\\nKey features implemented:\\n- A dynamic time ruler with adaptive major/minor ticks and MM:SS labels (implemented in `src/components/Timeline.jsx`, lines 66-103).\\n- Video clips are rendered as rectangles (min 80px height) showing filename and duration (`src/components/Timeline.jsx`, lines 105-140).\\n- Zoom functionality via Ctrl/Cmd + mouse wheel or UI buttons, with a 0.1x-10x range.\\n- Panning via mouse drag or horizontal scroll. Zoom/pan logic is in `src/components/Timeline.jsx`, lines 220-233.\\n- A draggable red playhead with a triangle handle (`src/components/Timeline.jsx`, lines 142-164).\\n- Clip selection with visual highlighting.\\n- Core coordinate transformation functions (`timeToPixel`, `pixelToTime`) are implemented in `Timeline.jsx` to manage view state.\"\n```\n</info added on 2025-10-27T22:02:46.094Z>",
-        "testStrategy": "Verify clips appear on timeline post-import as visual blocks with correct duration/position. Check playhead visibility and movement. Test horizontal scrolling with multiple/long clips. Confirm timeline renders at 60fps using browser dev tools during interactions.",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
-            "title": "Implement Timeline Component Structure and useTimeline Hook",
-            "description": "Create the `Timeline` React functional component, embed an HTML5 Canvas element within it, and initialize the custom `useTimeline` hook to manage canvas context, state, and the rendering loop.",
+            "title": "Create recording button and integrate into MediaLibraryPanel",
+            "description": "Add a recording button to the MediaLibraryPanel component that triggers the screen recording modal and follows existing UI patterns",
             "dependencies": [],
-            "details": "Develop the `Timeline.tsx` file, set up the canvas element, and create `useTimeline.ts` to encapsulate canvas rendering logic, drawing functions, and state management (e.g., zoom, scroll position). Establish the basic render loop for canvas updates.",
+            "details": "Create a RecordButton component using existing button styles from the codebase. Add the button to the MediaLibraryPanel toolbar section next to existing media controls. Implement onClick handler to trigger modal opening. Use existing icon system for recording icon (red circle or similar). Ensure button follows disabled state when recording is active. Add tooltip text 'Start Screen Recording' for better UX.",
             "status": "done",
-            "testStrategy": "Verify that the `Timeline` component mounts successfully, displays a canvas element, and the `useTimeline` hook initializes without errors. Check that the canvas context is accessible within the hook.",
-            "parentId": "undefined"
+            "testStrategy": "Test button renders correctly in MediaLibraryPanel. Verify onClick triggers modal open event. Test disabled state during active recording. Validate tooltip displays on hover."
           },
           {
             "id": 2,
-            "title": "Implement Time Ruler with Timestamps and Grid Lines",
-            "description": "Develop the logic within the `useTimeline` hook to render a time ruler at the top of the canvas, displaying accurate timestamps and vertical grid lines that adjust with zoom levels.",
+            "title": "Build screen selection modal with thumbnail grid",
+            "description": "Create a modal component displaying available screens and windows as a selectable thumbnail grid for recording source selection",
             "dependencies": [
               1
             ],
-            "details": "Implement canvas drawing functions to render a static time ruler area. Calculate and draw grid lines (e.g., per second, per minute) and corresponding time labels (HH:MM:SS:FF or similar) dynamically based on the current zoom level and visible time range. Ensure readability and accurate time representation.",
+            "details": "Build ScreenSelectionModal component using existing modal patterns from the codebase. Create a thumbnail grid layout displaying screens/windows from backend enumeration (task 2). Implement thumbnail hover effects and selection highlighting. Add title bars showing screen/window names below thumbnails. Include 'Select Screen' and 'Select Window' tab navigation if both types available. Add Cancel and Continue buttons at modal footer. Style grid to be responsive and handle varying numbers of sources.",
             "status": "done",
-            "testStrategy": "Visually inspect the time ruler for correct timestamp formatting and placement. Zoom in/out and scroll horizontally to ensure grid lines and timestamps adjust accurately and remain legible. Check for consistent spacing and alignment.",
-            "parentId": "undefined"
+            "testStrategy": "Test modal displays all available screens/windows from backend. Verify thumbnail selection highlights correctly. Test tab switching between screens and windows. Validate Cancel closes modal and Continue proceeds with selection."
           },
           {
             "id": 3,
-            "title": "Render Video Clips as Rectangular Blocks",
-            "description": "Implement the canvas rendering logic to draw video clips as visual rectangular blocks on the timeline, using their metadata (duration, start time) to determine size and position.",
+            "title": "Implement recording status indicator with timer",
+            "description": "Create a recording status component showing active recording state with animated red dot and elapsed time counter in MM:SS format",
+            "dependencies": [
+              2
+            ],
+            "details": "Build RecordingStatusIndicator component with pulsing red dot animation using CSS. Implement timer logic using useEffect and setInterval to update every second. Format time display as MM:SS using padStart for consistent formatting. Position indicator in a non-intrusive but visible location (e.g., top bar or floating corner). Add recording duration state management in parent component. Include smooth fade-in animation when recording starts. Ensure timer stops and resets when recording ends.",
+            "status": "done",
+            "testStrategy": "Test timer increments accurately every second. Verify MM:SS formatting handles single and double digits correctly. Test pulsing animation renders smoothly. Validate timer stops on recording end."
+          },
+          {
+            "id": 4,
+            "title": "Add audio controls and error display components",
+            "description": "Implement audio inclusion checkbox, start/stop controls, and error message display system for the recording interface",
+            "dependencies": [
+              3
+            ],
+            "details": "Create AudioControls component with checkbox for 'Include System Audio' option. Implement Start Recording and Stop Recording buttons with appropriate icons. Add loading states for buttons during recording initialization. Build ErrorMessage component for displaying recording errors (permissions, failures). Include proper error boundaries and fallback UI. Style all controls to match existing form elements and buttons. Add confirmation dialog for stop recording action. Integrate audio preference into recording configuration state.",
+            "status": "done",
+            "testStrategy": "Test audio checkbox toggles recording configuration correctly. Verify start/stop buttons trigger appropriate recording actions. Test error messages display for various failure scenarios. Validate confirmation dialog prevents accidental recording stops."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement webcam recording system",
+        "description": "Build webcam recording using MediaRecorder API with Tauri file saving",
+        "details": "Implement camera enumeration backend command. Use navigator.mediaDevices.getUserMedia() for camera access and MediaRecorder API for recording in frontend. Create Tauri command to save blob data to MP4 files. Add camera selection dropdown and live preview using HTML5 video element. Include audio capture toggle and recording controls (start/stop/pause).",
+        "testStrategy": "Test camera enumeration and selection. Verify live preview displays correctly. Test recording with and without audio. Validate blob to file conversion maintains quality.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement camera enumeration backend command",
+            "description": "Create a Tauri backend command that enumerates all available camera devices and returns their metadata including device IDs, labels, and capabilities",
+            "dependencies": [],
+            "details": "Build a Tauri command that uses platform-specific APIs to enumerate camera devices. Return an array of camera objects containing deviceId, label/name, and basic capabilities (resolution support, audio availability). Handle permissions gracefully and return appropriate error messages if camera access is denied. Ensure the command properly serializes data for frontend consumption.",
+            "status": "pending",
+            "testStrategy": "Test with no cameras, single camera, and multiple cameras connected. Verify correct metadata is returned for each device. Test permission denial scenarios."
+          },
+          {
+            "id": 2,
+            "title": "Set up MediaRecorder API with getUserMedia",
+            "description": "Implement the frontend logic to request camera access using getUserMedia and set up MediaRecorder for capturing video streams with configurable options",
+            "dependencies": [
+              1
+            ],
+            "details": "Use navigator.mediaDevices.getUserMedia() to request camera and microphone access with appropriate constraints (video resolution, frame rate, audio settings). Initialize MediaRecorder with the obtained MediaStream, configure MIME type as 'video/webm' or 'video/mp4' based on browser support. Set up event handlers for dataavailable, start, stop, and error events. Create a blob accumulator to collect recorded chunks.",
+            "status": "pending",
+            "testStrategy": "Test getUserMedia with different constraint combinations. Verify MediaRecorder initialization with various MIME types. Test recording start/stop lifecycle."
+          },
+          {
+            "id": 3,
+            "title": "Create blob-to-file Tauri command for MP4 saving",
+            "description": "Build a Tauri backend command that receives video blob data from the frontend and saves it as an MP4 file in the user's preferred location",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement a Tauri command that accepts base64-encoded blob data or binary array from the frontend. Convert the received data to a proper video file format, handling any necessary transcoding if the input is WebM and output needs to be MP4. Use Tauri's file system APIs to save the file with proper naming convention (timestamp-based). Return the saved file path to the frontend for media library integration.",
+            "status": "pending",
+            "testStrategy": "Test blob data conversion with various sizes. Verify file is saved in correct format and location. Test error handling for invalid data or disk space issues."
+          },
+          {
+            "id": 4,
+            "title": "Build camera selection UI and live preview",
+            "description": "Create React components for camera device selection dropdown and implement a live video preview using HTML5 video element",
             "dependencies": [
               1,
               2
             ],
-            "details": "Within the `useTimeline` hook's rendering function, iterate over the provided video clip data. For each clip, calculate its `x`, `y`, `width`, and `height` on the canvas based on its start time, duration, and the current zoom/scroll state. Draw a rectangle with a minimum height of 80px and optionally render a placeholder for thumbnails/icons.",
-            "status": "done",
-            "testStrategy": "Import several video clips with varying durations and start times. Verify that each clip appears as a distinct rectangular block on the timeline. Check that their horizontal positions and widths accurately reflect their start times and durations. Confirm minimum height is respected.",
-            "parentId": "undefined"
+            "details": "Build a dropdown component that displays available cameras from the enumeration command. Implement camera switching logic that stops current stream and starts new one with selected device. Create a video preview component using HTML5 video element with srcObject set to the MediaStream. Add visual indicators for active camera and preview status. Style components to match existing UI patterns with proper sizing and positioning.",
+            "status": "pending",
+            "testStrategy": "Test dropdown populates with available cameras. Verify camera switching works smoothly without memory leaks. Test preview displays correctly at different resolutions."
+          },
+          {
+            "id": 5,
+            "title": "Implement recording controls with audio toggle",
+            "description": "Create recording control buttons (start, stop, pause) and implement audio capture toggle functionality with proper state management",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Build recording control buttons with start, stop, and pause functionality that interact with MediaRecorder API. Implement audio toggle checkbox that modifies getUserMedia constraints to include/exclude audio track. Add visual recording indicators (red dot, timer showing MM:SS format). Manage recording state properly to prevent invalid operations (e.g., starting when already recording). Include error handling and user feedback for recording failures.",
+            "status": "pending",
+            "testStrategy": "Test all recording state transitions (idle->recording->paused->recording->stopped). Verify audio toggle works during and before recording. Test timer accuracy and UI updates."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Add audio capture and monitoring features",
+        "description": "Implement comprehensive audio capture with real-time level monitoring",
+        "details": "Create backend commands for audio device enumeration. Implement microphone selection for webcam recording. Build audio level indicator using Web Audio API with AnalyserNode for real-time VU meter display. Add mute/unmute toggle and visual feedback with color coding (green for normal levels, red for clipping). Integrate audio capture with both screen and webcam recording modes.",
+        "testStrategy": "Test audio device enumeration and selection. Verify audio level indicator responds to microphone input. Test mute/unmute functionality. Validate audio quality in recordings.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create audio device enumeration backend commands",
+            "description": "Implement Tauri backend commands to enumerate available audio input devices and return their metadata to the frontend",
+            "dependencies": [],
+            "details": "Create Tauri commands to list all available audio input devices using platform-specific APIs. Return device information including device ID, name, sample rate, and channel count. Handle default device selection and device availability changes. Serialize device data properly for frontend consumption.",
+            "status": "pending",
+            "testStrategy": "Test enumeration with multiple audio devices connected. Verify device list updates when devices are plugged/unplugged. Test default device selection works correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement Web Audio API analyzer for VU meter",
+            "description": "Set up Web Audio API with AnalyserNode to capture and analyze real-time audio levels from the selected microphone",
+            "dependencies": [
+              1
+            ],
+            "details": "Create Web Audio API context and connect to selected audio input device. Configure AnalyserNode with appropriate FFT size and smoothing parameters. Implement getByteFrequencyData sampling at 60fps for smooth visualization. Calculate RMS and peak levels from frequency data. Handle audio context permissions and browser compatibility.",
+            "status": "pending",
+            "testStrategy": "Test analyzer responds to different audio input levels. Verify smooth 60fps updates without performance issues. Test browser permission handling and fallbacks."
+          },
+          {
+            "id": 3,
+            "title": "Build audio level indicator UI component",
+            "description": "Create a React component that displays real-time audio levels as a VU meter with color-coded feedback",
+            "dependencies": [
+              2
+            ],
+            "details": "Build React component with CSS animations for smooth VU meter display. Implement green to yellow to red color transitions based on audio levels (green: -40dB to -12dB, yellow: -12dB to -3dB, red: above -3dB). Add peak hold indicator and numerical dB display. Style to match existing UI with responsive sizing.",
+            "status": "pending",
+            "testStrategy": "Test VU meter responds smoothly to audio level changes. Verify color transitions occur at correct dB thresholds. Test component renders correctly at different sizes."
           },
           {
             "id": 4,
-            "title": "Implement Horizontal Scrolling and Zoom Transformations",
-            "description": "Add functionality for horizontal scrolling of the timeline view and dynamic zooming, including the necessary coordinate transformation logic to convert time-based values to pixel-based canvas coordinates.",
+            "title": "Add mute/unmute controls with visual feedback",
+            "description": "Implement audio mute toggle functionality with clear visual indicators and state management",
             "dependencies": [
-              1,
               2,
               3
             ],
-            "details": "Integrate event listeners for mouse wheel (zoom) and mouse drag (scroll) or dedicated scrollbar/controls. Develop functions to update the `scrollOffset` and `zoomLevel` state variables within `useTimeline`. Crucially, implement time-to-pixel and pixel-to-time coordinate transformation methods that account for current zoom and scroll, ensuring all rendered elements (ruler, clips) respond correctly. Default zoom to fit all clips initially.",
-            "status": "done",
-            "testStrategy": "Verify that scrolling horizontally moves the timeline content without distorting elements. Test zooming in and out, observing that clips and ruler scale correctly around the mouse pointer or center. Confirm that the default zoom level correctly fits all imported clips into view on load.",
-            "parentId": "undefined"
+            "details": "Create mute/unmute toggle button with microphone icon that changes based on state. Implement audio stream muting at Web Audio API level to prevent audio capture. Add visual feedback with strikethrough icon when muted and grayed-out VU meter. Persist mute state across recording sessions. Include keyboard shortcut support (M key) for quick muting.",
+            "status": "pending",
+            "testStrategy": "Test mute toggle stops audio capture completely. Verify visual feedback updates immediately. Test keyboard shortcut works correctly. Validate mute state persists between recordings."
           },
           {
             "id": 5,
-            "title": "Implement and Update Playhead Indicator",
-            "description": "Develop the rendering logic for a vertical playhead indicator on the timeline and create a mechanism to update its position based on the current playback time.",
+            "title": "Integrate audio with screen and webcam recording",
+            "description": "Connect the audio capture system to both screen recording and webcam recording modes with proper synchronization",
             "dependencies": [
               1,
+              2,
+              3,
               4
             ],
-            "details": "Add a new drawing function to `useTimeline` to render a distinct vertical line (the playhead) at a specific time position on the canvas. This position needs to be translated from time (e.g., seconds) to canvas pixels using the implemented coordinate transformation logic. Create a method or expose a state update function for external components (like the video player) to set the playhead's current time, triggering a re-render.",
-            "status": "done",
-            "testStrategy": "Observe the playhead indicator on the timeline. Manually update its position (simulated playback) and verify it moves smoothly and accurately along the timeline. Confirm its position correctly corresponds to the provided time value, respecting zoom and scroll.",
-            "parentId": "undefined"
+            "details": "Integrate audio device selection into screen recording and webcam recording workflows. Ensure audio stream synchronizes properly with video capture. Handle audio-only recording for screen capture mode. Implement audio track multiplexing for recordings with both system and microphone audio. Add audio configuration to recording settings with bitrate and sample rate options.",
+            "status": "pending",
+            "testStrategy": "Test audio syncs correctly with video in both recording modes. Verify system and microphone audio can be captured simultaneously. Test audio quality at different bitrate settings."
           }
-        ],
-        "complexity": 9,
-        "recommendedSubtasks": 5,
-        "expansionPrompt": "Decompose the timeline development into several key features: 1) Create the base `Timeline` component with a Canvas element and a custom hook (`useTimeline`) for state. 2) Implement the time ruler rendering logic, including timestamps and grid lines. 3) Implement rendering for video clips as rectangles based on their metadata. 4) Add horizontal scrolling and zoom functionality, including the coordinate transformation logic. 5) Implement the playhead indicator and a mechanism to update its position."
+        ]
       },
       {
-        "id": "5",
-        "title": "Integrate Video Preview Player",
-        "description": "Add a video preview player to display and play selected clips from the timeline.",
-        "status": "done",
-        "dependencies": [
-          "4"
-        ],
-        "priority": "high",
-        "details": "Create a `PreviewPlayer` React component using the HTML5 `<video>` element as recommended for MVP. Use Tauri’s `convertFileSrc()` to generate a playable URL from the file path. Implement play/pause controls and ensure video maintains aspect ratio with synchronized audio. Load the clip into preview on timeline click. Sync playhead position with video `currentTime` for accurate playback feedback.\n<info added on 2025-10-27T22:09:42.299Z>\n\"Implementation Summary:\\nThe feature is complete, implemented via `clipforge-tauri/src/components/PreviewPlayer.jsx` (193 lines) and styled with `clipforge-tauri/src/components/PreviewPlayer.css` (223 lines).\\n\\nKey Features & Logic:\\n- An HTML5 video element with `object-fit: contain` maintains the correct aspect ratio.\\n- Custom controls were built, including a play/pause button, a seekable progress bar, a volume slider, and a time display showing current/total duration in MM:SS format.\\n- Local file playback is enabled by logic in `clipforge-tauri/src/App.jsx` (lines 17-27) which uses Tauri's `convertFileSrc()` to generate a playable URL for the selected clip.\\n- Two-way playhead synchronization is managed in `App.jsx` and `PreviewPlayer.jsx`:\\n  - Video → Timeline: The player's `onTimeUpdate` callback sends `currentTime` to `App.jsx`, which then calls `timeline.setPlayheadPosition`.\\n  - Timeline → Video: The `playheadPosition` prop passed to `PreviewPlayer` (from `App.jsx`, lines 37-41) triggers a `video.currentTime` update. The external seek handling logic is located in `PreviewPlayer.jsx` at lines 88-107.\\n  - A 0.5s threshold and separate seeking flags (`isSeeking`, `isExternalSeek`) are used to prevent update conflicts and feedback loops.\"\n</info added on 2025-10-27T22:09:42.299Z>",
-        "testStrategy": "Select a clip on timeline and confirm it loads in preview. Test play/pause functionality and verify audio sync with video. Check aspect ratio preservation (no stretching). Ensure playback achieves minimum 30fps for 1080p content using browser performance tools.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement basic PreviewPlayer React component",
-            "description": "Develop a React component named `PreviewPlayer` that encapsulates an HTML5 `<video>` element. This component will include essential user interface controls for playback, such as play/pause, volume adjustment, and a visual progress bar. The implementation must ensure that the video's aspect ratio is correctly maintained and that audio playback is synchronized with the video frames.",
-            "dependencies": [],
-            "details": "Create `src/components/PreviewPlayer.tsx`. Use an HTML5 `<video>` element with `controls` attribute set to false, and implement custom controls. Add React state for managing play/pause status and volume level. Implement event handlers for play/pause buttons, volume slider, and a custom progress bar. Use CSS properties like `object-fit: contain` to preserve aspect ratio. Initial player should load a placeholder or be ready for dynamic URL.",
-            "status": "done",
-            "testStrategy": "Manually mount the `PreviewPlayer` component in a test environment (e.g., Storybook or isolated React app) with a hardcoded, local video URL. Verify that play/pause, volume control, and progress bar interact correctly. Confirm that the video's aspect ratio is preserved and audio is synchronized.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Load selected timeline clip into PreviewPlayer",
-            "description": "Implement the necessary logic to dynamically load a video into the `PreviewPlayer` component whenever a user selects a video clip on the timeline. This involves retrieving the file path of the selected clip, converting it into a playable URL using Tauri's `convertFileSrc()` function, and passing this URL to the `PreviewPlayer` component.",
-            "dependencies": [
-              1
-            ],
-            "details": "Modify the `PreviewPlayer` to accept a `filePath` prop. In the `Timeline` component or a managing parent component (e.g., `App.tsx`), implement a state variable to track the `selectedClipFilePath`. When a clip is clicked in the timeline, update this state. Pass the `selectedClipFilePath` to the `PreviewPlayer`. Inside `PreviewPlayer`, use `tauri::convertFileSrc(props.filePath)` to generate the `src` attribute for the `<video>` element. Handle cases where no clip is selected by displaying a default message or placeholder.",
-            "status": "done",
-            "testStrategy": "After mounting the timeline and `PreviewPlayer`, import several video clips. Click on various clips in the timeline and observe if the corresponding video correctly loads and becomes playable (or starts playing) in the `PreviewPlayer`. Test with different video formats (MP4, MOV) to ensure `convertFileSrc` handles them properly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Implement two-way playhead synchronization",
-            "description": "Establish a robust, bidirectional synchronization mechanism between the `PreviewPlayer`'s video playback `currentTime` and the timeline's visual playhead position. This includes updating the timeline's playhead in real-time as the video plays, and conversely, allowing users to scrub or seek on the timeline to directly control the video's playback position.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "In `PreviewPlayer`, implement an `onTimeUpdate` prop that triggers periodically as the video plays, emitting the current video `currentTime`. In the `Timeline` component, subscribe to this `onTimeUpdate` event and update the visual playhead's position accordingly. For seeking, implement an `onSeek` prop in `PreviewPlayer` that accepts a time in seconds. When the user scrubs the timeline playhead, calculate the corresponding time and call `PreviewPlayer`'s `onSeek` function, which will set the video element's `currentTime`. Consider debouncing or throttling `onTimeUpdate` events to optimize performance, especially during scrubbing.",
-            "status": "done",
-            "testStrategy": "Load a video and play it; verify that the timeline playhead moves smoothly and accurately in sync with the video. Pause the video and confirm the playhead stops. Drag the timeline playhead to different positions (scrubbing) and ensure the video seeks precisely to the new time. Test repeated seeking operations and confirm audio/video synchronization is maintained.",
-            "parentId": "undefined"
-          }
-        ],
-        "complexity": 6,
-        "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down the video preview integration into three parts: 1) Create the `PreviewPlayer` React component using an HTML5 `<video>` tag and basic play/pause controls. 2) Implement logic to load a video when a clip is selected on the timeline, using Tauri's `convertFileSrc` API. 3) Implement two-way state synchronization: updating the timeline's playhead based on the video's `currentTime`, and seeking the video when the timeline playhead is scrubbed."
-      },
-      {
-        "id": "6",
-        "title": "Implement Basic Trim Functionality",
-        "description": "Enable users to trim video clips by setting in and out points using draggable handles on the timeline.",
-        "status": "done",
-        "dependencies": [
-          "4",
-          "5"
-        ],
+        "id": 7,
+        "title": "Build Picture-in-Picture recording system",
+        "description": "Implement simultaneous screen and webcam recording with overlay configuration",
+        "details": "Create backend commands for simultaneous screen + webcam capture. Implement PiP configuration system with position options (4 corners) and size options (small/medium/large). Record screen and webcam as separate files with metadata linking. Create PiP configuration UI with visual position selector and live preview. Store both file paths with overlay configuration for later compositing during export.",
+        "testStrategy": "Test simultaneous recording of screen and webcam. Verify PiP position and size configuration saves correctly. Test live preview shows accurate overlay positioning. Validate separate file recording maintains sync.",
         "priority": "medium",
-        "details": "Add trim handles to the `Timeline` component, visible when a clip is selected. Implement drag logic in `TrimControls.tsx` to update `inPoint` and `outPoint` in clip state (non-destructive edit). Visually distinguish trimmed vs. untrimmed regions on canvas (e.g., color/pattern). Update preview to reflect trimmed segment only. Display numeric IN/OUT timecodes and provide a reset option to original length.",
-        "testStrategy": "Select a clip and verify trim handles appear. Drag left handle to set IN point and right for OUT point; confirm preview updates to trimmed segment. Check timeline visually reflects trim. Play trimmed clip to ensure correct start/end. Test reset functionality to original duration.",
+        "dependencies": [
+          3,
+          5
+        ],
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Render Draggable Trim Handles on Selected Clip",
-            "description": "Add visual, draggable 'in' and 'out' handles to the representation of a selected video clip within the Timeline component. These handles will be the primary interface for users to define trim points.",
+            "title": "Implement simultaneous screen+webcam capture backend",
+            "description": "Create Tauri backend commands to handle simultaneous recording of both screen and webcam streams with proper synchronization",
             "dependencies": [],
-            "details": "Modify the `Timeline` component to render specific UI elements (e.g., styled `div` elements with resize cursors) at the start and end of a visually selected clip. Ensure these handles are styled to be clearly distinguishable and are only rendered when a video clip on the timeline is actively selected. Consider placing them within a new `TrimControls` sub-component.",
-            "status": "done",
-            "testStrategy": "Select various clips on the timeline and verify that 'in' and 'out' trim handles appear correctly on the selected clip's visual representation and disappear when no clip is selected or a different clip is selected. Check for correct positioning and basic styling.",
-            "updatedAt": "2025-10-27T22:53:25.073Z",
-            "parentId": "undefined"
+            "details": "Extend the existing recording infrastructure to support multiple concurrent MediaRecorder instances. Create new Tauri commands for starting/stopping dual recording sessions. Implement synchronization mechanisms to ensure both streams start and stop at the same time. Handle resource management for two simultaneous recording streams and ensure proper error handling when one stream fails.",
+            "status": "pending",
+            "testStrategy": "Test that both screen and webcam streams can be initiated simultaneously. Verify synchronization by checking timestamps. Test error handling when one stream fails while the other continues."
           },
           {
             "id": 2,
-            "title": "Implement Trim Handle Interaction Logic",
-            "description": "Develop the mouse event handling and drag state management for the 'in' and 'out' trim handles, allowing users to drag them along the timeline.",
-            "dependencies": [
-              1
-            ],
-            "details": "In `TrimControls.tsx` (or a dedicated hook), implement `mousedown`, `mousemove`, and `mouseup` event listeners for the 'in' and 'out' handles. During a `mousemove` event when dragging, calculate the potential new `inPoint` or `outPoint` based on the mouse's horizontal position relative to the timeline's scale. Manage a drag state to indicate which handle is being dragged and update its temporary visual position during the drag operation.",
-            "status": "done",
-            "testStrategy": "With a clip selected, attempt to drag the 'in' handle and then the 'out' handle. Verify that the handles visually move with the mouse pointer during the drag. Test dragging beyond clip boundaries and ensuring the handle visually clamps to valid ranges (start of clip for in-point, end for out-point).",
-            "parentId": "undefined",
-            "updatedAt": "2025-10-27T22:53:25.961Z"
+            "title": "Create PiP configuration data model",
+            "description": "Design and implement the data structures for storing Picture-in-Picture overlay configuration including position and size settings",
+            "dependencies": [],
+            "details": "Define TypeScript interfaces for PiP configuration including position enum (topLeft, topRight, bottomLeft, bottomRight) and size enum (small, medium, large). Create configuration storage in React state and persist settings to local storage. Implement conversion functions to translate position/size enums to actual pixel coordinates based on screen dimensions.",
+            "status": "pending",
+            "testStrategy": "Verify configuration objects serialize/deserialize correctly. Test position and size enum conversions produce correct pixel values. Validate settings persist across application restarts."
           },
           {
             "id": 3,
-            "title": "Update Clip State with Trim Points and Visual Feedback",
-            "description": "Integrate the draggable handle logic to non-destructively update the selected clip's `inPoint` and `outPoint` in the application state, and visually distinguish trimmed regions on the timeline.",
+            "title": "Build PiP position/size selector UI",
+            "description": "Create intuitive UI components for users to select webcam overlay position and size with visual feedback",
             "dependencies": [
               2
             ],
-            "details": "Upon `mouseup` after a handle drag (or possibly debounced during drag), dispatch an action to update the `inPoint` or `outPoint` property of the currently selected clip in the application's global state. These updates must preserve the original media duration (non-destructive). Enhance the `Timeline` component's clip rendering to visually differentiate the 'trimmed' (active) and 'untrimmed' (inactive/cut-off) portions of the clip, perhaps with different colors, transparency, or a hatched pattern.",
-            "status": "done",
-            "testStrategy": "Drag 'in' and 'out' handles for a selected clip. After releasing, verify that the visual representation of the clip on the timeline updates immediately, clearly showing the trimmed and untrimmed regions. Check the application state (e.g., Redux DevTools) to confirm `inPoint` and `outPoint` values are updated correctly and non-destructively.",
-            "parentId": "undefined",
-            "updatedAt": "2025-10-27T22:53:26.797Z"
+            "details": "Build a visual position selector showing four corner options as clickable buttons or a drag-and-drop interface. Implement size selector with three options (small: 15%, medium: 25%, large: 35% of screen). Create interactive preview area showing the selected position and size. Style components to match existing ClipForge UI patterns and ensure responsive design.",
+            "status": "pending",
+            "testStrategy": "Test all four corner positions can be selected and visually update. Verify size changes are reflected in the preview. Test UI responsiveness on different screen sizes."
           },
           {
             "id": 4,
-            "title": "Integrate Trim Points with Preview Player and UI Controls",
-            "description": "Ensure the `PreviewPlayer` respects the clip's `inPoint` and `outPoint` during playback and seeking, display numeric timecodes for these points, and provide a reset option.",
+            "title": "Implement live preview with overlay",
+            "description": "Create a real-time preview showing the webcam overlay on top of the screen capture before recording starts",
             "dependencies": [
+              1,
               3
             ],
-            "details": "Modify the `PreviewPlayer` component to use the selected clip's `inPoint` as the effective start time for playback and seeking, and its `outPoint` as the effective end time. Add UI elements near the timeline or player to display the current numeric `inPoint` and `outPoint` as formatted timecodes (e.g., MM:SS.ms). Implement a 'Reset Trim' button that, when clicked, reverts the selected clip's `inPoint` to 0 and `outPoint` to its original untrimmed duration, updating both the state and visual feedback.",
-            "status": "done",
-            "testStrategy": "Select a clip, trim it using the handles, and then play it in the `PreviewPlayer`. Verify playback starts precisely at the `inPoint` and ends precisely at the `outPoint`. Check that the displayed numeric timecodes update correctly as handles are dragged. Test the 'Reset Trim' button: confirm it restores the clip to its original length both visually and in the preview, and that timecodes reset.",
-            "parentId": "undefined",
-            "updatedAt": "2025-10-27T22:53:27.857Z"
-          }
-        ],
-        "complexity": 8,
-        "recommendedSubtasks": 4,
-        "expansionPrompt": "Decompose trim functionality: 1) Update timeline rendering to draw draggable 'in' and 'out' handles on a selected clip. 2) Implement mouse event handling (hit detection, drag state management) for the handles. 3) Update the application state with the non-destructive `inPoint` and `outPoint` values. 4) Modify the `PreviewPlayer` to respect the clip's trim points during playback and seeking.",
-        "updatedAt": "2025-10-27T22:53:27.857Z"
-      },
-      {
-        "id": "7",
-        "title": "Integrate FFmpeg for Video Processing",
-        "description": "Set up FFmpeg integration in the Tauri backend for video metadata extraction and processing.",
-        "status": "done",
-        "dependencies": [
-          "1"
-        ],
-        "priority": "high",
-        "details": "Bundle FFmpeg binary in `src-tauri/resources/ffmpeg` and configure Tauri to include it in the build (`tauri.conf.json`). Create Rust commands in `src-tauri/src/commands/` for metadata extraction (`metadata.rs`) using shell commands to FFmpeg. Handle duration, resolution, and frame rate extraction for imported clips. Use `std::process::Command` for execution and parse FFmpeg output. Fallback to `ffmpeg-sys-next` crate if binary approach fails.",
-        "testStrategy": "Import a video and verify metadata (duration, resolution, frame rate) is extracted correctly by cross-checking with known values (e.g., QuickTime info). Test with various MP4/MOV files for compatibility. Ensure extraction completes in <2s per file.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Configure Tauri for FFmpeg binary bundling",
-            "description": "Modify `tauri.conf.json` to include the FFmpeg/ffprobe binaries located in `src-tauri/resources/ffmpeg` in the final application bundle. This ensures the binaries are accessible at runtime.",
-            "dependencies": [],
-            "details": "Locate `src-tauri/tauri.conf.json`. Add the `src-tauri/resources/ffmpeg/*` path to the `bundle.resources` array. Ensure correct binaries (e.g., `ffmpeg`, `ffprobe` for macOS/Linux; `ffmpeg.exe`, `ffprobe.exe` for Windows) are placed in the specified directory. Document the process for obtaining and placing the correct architecture-specific binaries.",
-            "status": "done",
-            "testStrategy": "Build the Tauri application for at least one target (e.g., macOS or Windows). Inspect the application bundle contents (e.g., `.app/Contents/Resources` on macOS) to verify that `ffmpeg` and `ffprobe` binaries are correctly included in the resources folder. Attempt to locate and execute the bundled binary manually from the compiled app's resource path via a shell.",
-            "parentId": "undefined"
+            "details": "Use HTML5 video elements to display both screen preview and webcam preview. Implement CSS-based overlay positioning to show webcam on top of screen preview according to selected configuration. Update preview in real-time when user changes position or size settings. Handle aspect ratio preservation and ensure smooth preview rendering without performance issues.",
+            "status": "pending",
+            "testStrategy": "Verify live preview updates immediately when settings change. Test preview maintains correct aspect ratios. Validate preview performance with high-resolution streams."
           },
           {
-            "id": 2,
-            "title": "Implement Rust function for `ffprobe` execution and JSON output",
-            "description": "Develop a private Rust function within the Tauri backend that takes a video file path, constructs and executes an `ffprobe` command using `std::process::Command`, and captures its standard output as a JSON string.",
+            "id": 5,
+            "title": "Handle separate file recording with sync metadata",
+            "description": "Implement recording of screen and webcam as separate files with metadata to maintain synchronization for later compositing",
             "dependencies": [
               1
             ],
-            "details": "Create a new Rust module, e.g., `src-tauri/src/commands/metadata_extractor.rs`. Implement a private asynchronous function, `fn execute_ffprobe_json(file_path: &Path) -> Result<String, String>`. This function should: 1. Resolve the absolute path to the bundled `ffprobe` binary at runtime (e.g., using `tauri::api::path::resource_dir`). 2. Construct `std::process::Command` with arguments like `-v quiet -print_format json -show_format -show_streams <file_path>`. 3. Execute the command, handle `io::Error`, capture `stdout` and `stderr`. 4. Return the `stdout` as `Ok(json_string)` or an `Err(error_message)`.",
-            "status": "done",
-            "testStrategy": "Write unit tests for the `execute_ffprobe_json` function. Use a known, small video file (e.g., a 5-second MP4). Mock or provide a temporary `ffprobe` binary if needed for isolated testing, or execute against a real bundled binary if built. Assert that the function returns a `Result::Ok` containing a valid JSON string and `Result::Err` for non-existent files or execution failures. Validate basic JSON structure.",
-            "parentId": "undefined"
+            "details": "Record screen capture and webcam to separate MP4 files in the recordings directory. Generate unique but linked filenames (e.g., recording_001_screen.mp4 and recording_001_webcam.mp4). Create metadata JSON file containing timestamps, duration, PiP configuration, and file paths. Ensure both recordings start with synchronized timestamps for accurate compositing during export.",
+            "status": "pending",
+            "testStrategy": "Verify two separate video files are created with linked names. Test metadata file contains all required synchronization data. Validate timestamps allow for accurate alignment during playback."
+          },
+          {
+            "id": 6,
+            "title": "Store configuration for export compositing",
+            "description": "Save PiP overlay configuration and file references for use during the video export process",
+            "dependencies": [
+              2,
+              5
+            ],
+            "details": "Store PiP configuration (position, size) alongside recording metadata in a structured format. Create data structure linking screen recording, webcam recording, and overlay settings. Integrate with existing media library to make recordings available for timeline editing. Ensure configuration is accessible during export phase for proper video compositing with ffmpeg.",
+            "status": "pending",
+            "testStrategy": "Test configuration saves correctly with all recording metadata. Verify recordings appear in media library with proper references. Validate export process can access and use the saved configuration."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Integrate recordings with media library",
+        "description": "Auto-import completed recordings and generate thumbnails",
+        "details": "Implement automatic import of completed recordings to the media library. Generate thumbnails for recorded video files using existing thumbnail generation system. Update media library UI to display new recordings immediately. Handle file metadata extraction (duration, resolution, file size). Ensure recorded files integrate seamlessly with existing timeline and editing features.",
+        "testStrategy": "Test recordings automatically appear in media library after completion. Verify thumbnails generate correctly for all recording types. Test recorded files can be added to timeline and edited normally.",
+        "priority": "medium",
+        "dependencies": [
+          4,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Hook recording completion events to auto-import system",
+            "description": "Create event handlers that trigger when screen or webcam recordings complete, automatically initiating the import process to the media library",
+            "dependencies": [],
+            "details": "Implement recording completion detection in both RecordingInterface.jsx and any webcam recording components. Create a unified completion handler that emits events or calls callbacks when recordings finish. Set up event listeners in MediaLibraryPanel.jsx to respond to recording completion events. Pass the recorded file path and metadata through the event system for immediate processing.",
+            "status": "pending",
+            "testStrategy": "Test that completion events fire correctly for both screen and webcam recordings. Verify event data includes file path and basic metadata. Test that MediaLibraryPanel receives and processes events properly."
+          },
+          {
+            "id": 2,
+            "title": "Integrate with existing thumbnail generation system",
+            "description": "Connect newly recorded video files to the existing thumbnail generation pipeline to automatically create preview thumbnails",
+            "dependencies": [
+              1
+            ],
+            "details": "Locate and understand the existing thumbnail generation system used for imported media files. Create a function that takes a recorded video file path and generates a thumbnail using the same mechanism. Ensure thumbnails are saved in the correct location with proper naming conventions. Handle different video formats and resolutions appropriately. Add thumbnail generation to the recording completion flow.",
+            "status": "pending",
+            "testStrategy": "Verify thumbnails generate correctly for different recording formats (MP4, WebM). Test thumbnail quality and aspect ratio preservation. Validate thumbnail file paths and naming conventions match existing patterns."
           },
           {
             "id": 3,
-            "title": "Create Tauri command `extract_metadata` to parse and return structured data",
-            "description": "Implement the public Tauri command `extract_metadata` that calls the `ffprobe` execution function (Task 2), parses the returned JSON string into a structured Rust data type (e.g., a custom `VideoMetadata` struct), and returns this structured video metadata to the frontend.",
+            "title": "Update MediaLibraryPanel to display new recordings",
+            "description": "Modify the MediaLibraryPanel component to immediately show newly recorded files with their thumbnails and metadata",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Add state management in MediaLibraryPanel to track newly recorded files. Implement real-time UI updates when recording completion events are received. Ensure new recordings appear at the top of the media list or in a dedicated 'Recent Recordings' section. Display recording metadata including duration, resolution, and file size. Add visual indicators to distinguish recordings from imported media if needed.",
+            "status": "pending",
+            "testStrategy": "Test that new recordings appear immediately in the media library UI. Verify sorting and display order of recordings. Test UI responsiveness during multiple rapid recordings. Validate that all metadata displays correctly."
+          },
+          {
+            "id": 4,
+            "title": "Extract and display comprehensive file metadata",
+            "description": "Implement metadata extraction for recorded files including duration, resolution, codec, bitrate, and file size with proper display formatting",
+            "dependencies": [
+              1
+            ],
+            "details": "Create backend Tauri commands to extract video metadata using system tools or libraries. Extract key metadata: duration, resolution, frame rate, codec, bitrate, and file size. Format metadata for user-friendly display (e.g., '1920x1080', '5:32', '125 MB'). Store metadata alongside file references for quick access. Ensure metadata extraction works for both screen and webcam recordings. Handle metadata extraction failures gracefully.",
+            "status": "pending",
+            "testStrategy": "Test metadata extraction for various recording formats and resolutions. Verify accurate duration and file size calculations. Test display formatting for different value ranges. Validate error handling for corrupted or incomplete files."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement PiP export compositing",
+        "description": "Add FFmpeg-based video compositing for Picture-in-Picture export",
+        "details": "Extend the existing export system to handle PiP compositing using FFmpeg overlay filter. Calculate overlay position based on PiP configuration (corner position, size, margins). Implement video compositing during export process, combining screen recording with webcam overlay. Handle audio from screen recording only. Add progress indication for composite rendering.",
+        "testStrategy": "Test PiP export produces correctly positioned overlay. Verify audio only comes from screen recording. Test all position and size combinations. Validate export progress indication works correctly.",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend export system to detect and handle PiP mode",
+            "description": "Modify the existing export system to detect when Picture-in-Picture mode is active and route to composite export pipeline",
+            "dependencies": [],
+            "details": "Add PiP detection logic to the export handler by checking if both screen recording and webcam clips are present and PiP mode is enabled. Create a conditional branch in the export flow that routes to composite export when PiP is detected. Set up the basic structure for passing PiP configuration (position, size, margins) to the compositing pipeline.",
+            "status": "pending",
+            "testStrategy": "Test that export system correctly identifies PiP mode vs standard export. Verify routing logic works for all export scenarios."
+          },
+          {
+            "id": 2,
+            "title": "Calculate FFmpeg overlay filter parameters from PiP config",
+            "description": "Implement mathematical calculations to convert PiP configuration into FFmpeg overlay filter coordinates",
+            "dependencies": [
+              1
+            ],
+            "details": "Create functions to calculate overlay X/Y coordinates based on corner position (top-left, top-right, bottom-left, bottom-right), size percentage, and margin values. Convert percentage-based sizing to pixel dimensions based on main video resolution. Generate FFmpeg overlay filter string with calculated parameters including position and scaling.",
+            "status": "pending",
+            "testStrategy": "Unit test coordinate calculations for all corner positions. Verify margin calculations work correctly. Test scaling calculations maintain aspect ratio."
+          },
+          {
+            "id": 3,
+            "title": "Implement FFmpeg video compositing pipeline",
+            "description": "Build the core video compositing functionality using FFmpeg's overlay filter to combine screen and webcam recordings",
             "dependencies": [
               2
             ],
-            "details": "In `src-tauri/src/commands/metadata_extractor.rs` (or similar), define a new `#[tauri::command]` function: `async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String>`. This function will: 1. Call `execute_ffprobe_json` with the provided `file_path`. 2. Use `serde_json` to deserialize the JSON string into a custom `VideoMetadata` struct. Define `VideoMetadata` to hold `duration`, `width`, `height`, and `avg_frame_rate`, making it `#[derive(Debug, serde::Serialize, serde::Deserialize)]`. 3. Implement robust error handling for JSON parsing failures or `ffprobe` execution errors. 4. Return the `VideoMetadata` struct on success or an appropriate error message.",
-            "status": "done",
-            "testStrategy": "Integrate the `extract_metadata` command into the Tauri application and call it from a simple frontend component. Provide a known video file path. Verify that the frontend receives a structured object containing correct `duration`, `width`, `height`, and `avg_frame_rate` values by comparing against manually verified metadata for the test file. Test with various video formats (MP4, MOV) and edge cases like corrupted files to ensure graceful error handling.",
-            "parentId": "undefined"
+            "details": "Implement FFmpeg command builder that takes two input videos and applies overlay filter with calculated parameters. Handle video scaling for PiP overlay to maintain quality. Set up proper codec parameters for output video (H.264/AAC). Implement error handling for FFmpeg process failures and validate input video compatibility.",
+            "status": "pending",
+            "testStrategy": "Test compositing with various video resolutions and formats. Verify overlay positioning is accurate. Test error handling for invalid inputs."
+          },
+          {
+            "id": 4,
+            "title": "Handle audio track selection for composite export",
+            "description": "Implement audio routing to use only screen recording audio in the composite output",
+            "dependencies": [
+              3
+            ],
+            "details": "Configure FFmpeg to extract and use audio track only from the screen recording input. Suppress or remove audio track from webcam recording during compositing. Handle cases where screen recording may not have audio. Ensure audio sync is maintained throughout the composite video.",
+            "status": "pending",
+            "testStrategy": "Test audio is only from screen recording source. Verify audio sync with video. Test handling of silent screen recordings."
+          },
+          {
+            "id": 5,
+            "title": "Add progress tracking for composite rendering",
+            "description": "Implement progress indication system for the FFmpeg compositing process",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Parse FFmpeg progress output to extract completion percentage and estimated time remaining. Create progress event emitter to send updates to frontend. Implement progress bar UI component that displays during composite export. Add cancellation support for long-running composite operations.",
+            "status": "pending",
+            "testStrategy": "Test progress updates are accurate and smooth. Verify cancellation stops FFmpeg process cleanly. Test progress UI updates correctly."
           }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Add comprehensive error handling and edge cases",
+        "description": "Implement robust error handling for all recording scenarios",
+        "details": "Add comprehensive error handling for permission denied scenarios, device unavailability, disk space errors, and encoding failures. Implement user-friendly error messages for common issues. Add fallback options when devices are unavailable. Handle edge cases like long recordings (>30 min), no camera/microphone scenarios, and recording cancellation. Implement memory management and cleanup for interrupted recordings.",
+        "testStrategy": "Test all error scenarios: permission denied, no devices, disk full, recording cancellation. Verify user-friendly error messages display correctly. Test cleanup of temporary files on errors. Validate memory usage during long recordings.",
+        "priority": "high",
+        "dependencies": [
+          8,
+          9
         ],
-        "complexity": 7,
-        "recommendedSubtasks": 3,
-        "expansionPrompt": "Decompose FFmpeg integration into three steps: 1) Configure `tauri.conf.json` to correctly bundle the FFmpeg binary resource. 2) Create a Rust function using `std::process::Command` to execute `ffprobe` with JSON output arguments. 3) Create the Tauri command `extract_metadata` that calls this function, parses the JSON output into a Rust struct, and returns the structured data to the frontend."
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement permission error handling with user guidance",
+            "description": "Create comprehensive permission error handling system with clear user guidance for resolving permission issues across all recording types",
+            "dependencies": [],
+            "details": "Implement permission denied detection for screen capture, camera, and microphone access. Create user-friendly error dialogs with step-by-step instructions for granting permissions on different operating systems. Add retry mechanisms after permission grant. Include fallback options when permissions cannot be obtained. Log permission states for debugging.",
+            "status": "pending",
+            "testStrategy": "Test permission denial scenarios for each recording type. Verify error messages provide clear resolution steps. Test retry mechanisms after permission grant."
+          },
+          {
+            "id": 2,
+            "title": "Handle device unavailability gracefully",
+            "description": "Implement robust handling for unavailable or disconnected recording devices with appropriate fallback options",
+            "dependencies": [],
+            "details": "Detect device unavailability for cameras, microphones, and displays. Implement device enumeration with error handling. Create fallback recording modes when specific devices are unavailable. Add real-time device disconnection detection during recording. Provide options to continue recording without unavailable devices or switch to alternative devices.",
+            "status": "pending",
+            "testStrategy": "Test device disconnection during recording. Verify fallback modes activate correctly. Test switching between devices mid-recording."
+          },
+          {
+            "id": 3,
+            "title": "Add disk space monitoring and error handling",
+            "description": "Implement disk space checking and handling for insufficient storage scenarios during recording operations",
+            "dependencies": [],
+            "details": "Check available disk space before starting recording based on estimated file size. Monitor disk space during recording with configurable thresholds. Implement graceful recording stop when disk space is low. Add warnings at different disk space levels (e.g., <1GB, <500MB). Create auto-save mechanism when approaching disk limits. Display estimated recording time based on available space.",
+            "status": "pending",
+            "testStrategy": "Test recording behavior with limited disk space. Verify warnings appear at correct thresholds. Test auto-save mechanism triggers properly."
+          },
+          {
+            "id": 4,
+            "title": "Implement long recording memory management",
+            "description": "Create memory management system for handling extended recording sessions over 30 minutes",
+            "dependencies": [],
+            "details": "Implement chunked recording for long sessions to prevent memory overflow. Create automatic file segmentation for recordings exceeding time or size thresholds. Add memory usage monitoring during recording with automatic optimization. Implement buffer management to prevent memory leaks. Create background file processing to reduce memory footprint. Add configuration for maximum recording duration limits.",
+            "status": "pending",
+            "testStrategy": "Test recordings exceeding 30 minutes for memory stability. Verify file segmentation works correctly. Monitor memory usage patterns during extended sessions."
+          },
+          {
+            "id": 5,
+            "title": "Create comprehensive cleanup for all failure scenarios",
+            "description": "Implement thorough cleanup mechanisms for handling various recording failure and cancellation scenarios",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create cleanup registry to track all temporary files and resources. Implement cleanup for recording cancellation, encoding failures, and unexpected crashes. Add recovery mechanism for partial recordings after failures. Ensure all file handles, streams, and resources are properly released. Implement cleanup verification to confirm all temporary files are removed. Add cleanup retry mechanism for locked files.",
+            "status": "pending",
+            "testStrategy": "Test cleanup after various failure scenarios. Verify no temporary files remain after errors. Test recovery of partial recordings. Validate resource cleanup with system monitoring."
+          }
+        ]
       }
     ],
     "metadata": {
-      "version": "1.0.0",
-      "lastModified": "2025-10-28T00:28:02.206Z",
-      "taskCount": 7,
-      "completedCount": 7,
-      "tags": [
-        "master"
-      ]
+      "created": "2025-10-28T21:32:21.200Z",
+      "updated": "2025-10-28T22:39:43.286Z",
+      "description": "Tasks for master context"
     }
   }
 }

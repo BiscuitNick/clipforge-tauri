@@ -1,0 +1,764 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Core Application Layout and State Management",
+        "description": "Establish the fundamental UI structure with the three-panel top section and the full-width bottom timeline. Define the core state management contracts for MediaItem and TimelineClip.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Implement the main application shell using CSS Grid or Flexbox to create the specified layout: a top container split into three equal columns (Media Library, Video Preview, Timeline Clips Panel) and a bottom container for the timeline. Define the TypeScript interfaces for `MediaItem` and `TimelineClip` in a central state management store (e.g., Zustand, Redux Toolkit, or React Context). This initial setup will not contain any functionality, only placeholder components for each panel and the defined data structures.",
+        "testStrategy": "Verify the layout renders correctly at different viewport sizes. Ensure the three top panels are of equal width and the overall height distribution (2/3 top, 1/3 bottom) is correct. Check that the TypeScript interfaces can be imported and used without errors. No interactive tests are needed at this stage.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement three-panel top layout with timeline footer",
+            "description": "Create the application shell containing the three-column top section and full-width bottom timeline placeholder.",
+            "dependencies": [],
+            "details": "Use CSS Grid or Flexbox within the main layout component to render three equal-width panels (Media Library, Video Preview, Timeline Clips) occupying the top two-thirds of the viewport and a timeline container occupying the bottom third. Include placeholder components for each panel and ensure height proportions are enforced via CSS.\n<info added on 2025-10-28T02:22:58.003Z>\nRefactor the existing vertical stack (ImportPanel → PreviewPlayer → Timeline) into a JSX-based CSS Grid layout within the React + Vite + Tauri app so the three equal-width top panels (Media Library, Video Preview, Timeline Clips) share roughly two-thirds of the viewport while the timeline footer occupies the remaining third, and create placeholder components for each panel to enforce the 2:1 height ratio.\n</info added on 2025-10-28T02:22:58.003Z>\n<info added on 2025-10-28T02:27:34.783Z>\nImplemented MediaLibraryPanel, VideoPreviewPanel, and TimelineClipsPanel components with placeholder content and wired them into the new CSS Grid layout in App.jsx. Updated App.css to define grid-template-rows: 2fr 1fr and grid-template-columns: 1fr 1fr 1fr, achieving the required 2:1 vertical ratio and equal-width top panels with visible borders for panel separation. Confirmed the app runs on http://localhost:1420/, the layout renders as expected, and vite build completes without errors (38 modules transformed).\n</info added on 2025-10-28T02:27:34.783Z>",
+            "status": "done",
+            "testStrategy": "Render the layout locally and verify the panels align correctly with no overlapping or overflow issues at default viewport size.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Define MediaItem and TimelineClip state contracts",
+            "description": "Establish the TypeScript interfaces and central store for media items and timeline clips.",
+            "dependencies": [],
+            "details": "Create TypeScript interfaces for MediaItem and TimelineClip matching project requirements (ids, metadata, timing fields). Initialize the chosen state management solution (e.g., Zustand or Redux Toolkit slice) to export these interfaces and set up placeholder collections/state slices to be consumed by UI components.\n<info added on 2025-10-28T02:23:10.178Z>\nDefine a TypeScript module (e.g., src/state/mediaTypes.ts) exporting MediaItem and TimelineClip interfaces with the fields: MediaItem { id: string; filename: string; filepath: string; duration: number; thumbnailPath: string; usedInTimeline: boolean } and TimelineClip { id: string; mediaId: string; position: number; inPoint: number; outPoint: number }. Convert the state store and any consuming components to .ts/.tsx so they import these interfaces natively, initializing placeholder collections such as mediaItems: MediaItem[] = [] and timelineClips: TimelineClip[] = [] within the chosen state management solution.\n</info added on 2025-10-28T02:23:10.178Z>\n<info added on 2025-10-28T02:29:59.352Z>\nCompleted TypeScript environment setup by adding typescript, @types/react, and @types/react-dom packages and configuring tsconfig.json plus tsconfig.node.json. Implemented interfaces in src/types/media.ts (MediaItem, TimelineClip) and established centralized exports via src/types/index.ts. Added src/types/state.ts defining AppState and initialAppState along with src/utils/stateHelpers.ts to exercise the contracts. Type-check and build pipelines verified with npx tsc --noEmit and npm run build, both succeeding without errors.\n</info added on 2025-10-28T02:29:59.352Z>",
+            "status": "done",
+            "testStrategy": "Run TypeScript type checks or build command to ensure interfaces compile and can be imported without errors.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Verify layout responsiveness across breakpoints",
+            "description": "Ensure the new layout adapts properly on different viewport sizes and remains usable.",
+            "dependencies": [
+              1
+            ],
+            "details": "Test the implemented layout on desktop, tablet, and mobile viewports, adjusting CSS as needed so the three top panels remain legible (stacking or resizing if necessary) and the timeline remains full-width. Document any responsive adjustments or media queries added.\n<info added on 2025-10-28T02:31:34.278Z>\nImplemented responsive styles with media queries in App.css covering desktop over 1024px with a default three column 2:1 ratio, tablet landscape between 768px and 1024px with a three column 1.5:1 ratio, tablet portrait under 768px with stacked vertical panels capped at 60vh and scrollable content, and small mobile under 480px with stacked panels capped at 50vh to preserve timeline space. Updated MediaLibraryPanel.css, VideoPreviewPanel.css, and TimelineClipsPanel.css to enforce a 200px minimum height when stacked, tighten padding, reduce mobile font sizes, and ensure overflow rules prevent layout clipping. Authored LAYOUT_RESPONSIVE.md documenting breakpoint definitions, diagrams, testing checklist, known limitations, and future enhancement notes. Confirmed npm run build and development server hot reload succeed after changes.\n</info added on 2025-10-28T02:31:34.278Z>",
+            "status": "done",
+            "testStrategy": "Use browser dev tools to simulate multiple viewport widths, capturing screenshots to confirm correct panel arrangement and absence of horizontal scrolling.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break this task into subtasks covering layout scaffolding, state management interface definition, and responsive layout verification."
+      },
+      {
+        "id": 2,
+        "title": "Implement Media Library Panel with Staging Area",
+        "description": "Develop the top-left panel for media import and staging. Users will import media files which will then be listed in this panel, ready to be added to the timeline, but not yet part of the edit.",
+        "status": "done",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "high",
+        "details": "Create the Media Library component. Implement a file drop zone and a file input button for importing media (video/audio). Use a library like `ffmpeg.wasm` or a server-side process to extract metadata (duration, thumbnail). On import, create a `MediaItem` object and add it to the application state. Render the list of `MediaItem`s, each showing a thumbnail, filename, and duration. A green dot indicator should be prepared to show `usedInTimeline`, but will be non-functional for now.",
+        "testStrategy": "Drag and drop a video file onto the drop zone; verify it appears in the Media Library list. Check that a thumbnail and correct media duration are displayed. Import multiple files. Confirm that importing does not add anything to the timeline area. State inspection should show new `MediaItem` objects being created.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Build media import drop zone and picker",
+            "description": "Create the Media Library panel UI with drag-and-drop and file picker controls for ingesting media files.",
+            "dependencies": [],
+            "details": "Implement a React component housing the drop zone with drag-over styling, integrate file input button, and wire both to a shared handler that normalizes selected File objects for later processing.\n<info added on 2025-10-28T02:39:19.201Z>\nIntegrated Tauri drag-enter/over/leave/drop listeners, wired the @tauri-apps/plugin-dialog picker into the shared import handler with MP4/MOV validation, added loading plus auto-dismissing success/error feedback, toggled between empty-state drop zone and populated media list with animated drag styling, and surfaced a media-count badge in the panel header.\n</info added on 2025-10-28T02:39:19.201Z>",
+            "status": "done",
+            "testStrategy": "Manually drop and select multiple files; confirm the handler receives File objects and UI states respond to drag events.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement media metadata extraction flow",
+            "description": "Extract duration and thumbnail metadata for imported audio/video files using ffmpeg.wasm or backend service.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create an async pipeline that takes queued File objects, runs ffmpeg.wasm (or calls the server) to obtain duration and a representative frame, handles fallbacks, and emits structured metadata payloads.\n<info added on 2025-10-28T02:40:04.062Z>\nLeverage the src-tauri/src/commands/video_import.rs import_video command to hand off queued paths to the backend. extract_metadata in src-tauri/src/commands/metadata.rs already invokes FFprobe and parses its JSON response to return a VideoMetadata struct (path, filename, duration, width, height, frame_rate). The pipeline should invoke(\"import_video\") to receive metadata for each file, tolerate per-file failures, and continue processing subsequent items. Document that thumbnail generation remains a TODO and currently falls back to placeholder imagery until a first-frame extractor is added.\n</info added on 2025-10-28T02:40:04.062Z>",
+            "status": "done",
+            "testStrategy": "Use sample media files to verify duration and thumbnail data are produced and errors are surfaced for unsupported formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create MediaItem state management updates",
+            "description": "Store imported media and metadata in application state as MediaItem objects ready for staging.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Define the MediaItem interface, add state slice or context actions to insert new items with unique IDs, metadata, and default usedInTimeline flag, ensuring idempotent updates.\n<info added on 2025-10-28T02:41:15.672Z>\nImplemented src/hooks/useMediaLibrary.js to manage MediaItem state with addMediaItems() transforming VideoMetadata entries, plus removeMediaItem(), markAsUsed(), getMediaItem(), and clearMediaLibrary(). Each MediaItem now receives a media-{timestamp}-{random} identifier, ensuring idempotent inserts. Integrated the hook into App.jsx via handleMediaImport and passed mediaItems/onMediaImport through to MediaLibraryPanel, confirming end-to-end flow from backend metadata to rendered library.\n</info added on 2025-10-28T02:41:15.672Z>",
+            "status": "done",
+            "testStrategy": "Trigger imports and inspect state to confirm MediaItems are created with required fields and no duplicates appear.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Render media library list with staging indicators",
+            "description": "Display staged MediaItems in the panel with thumbnail, filename, duration, and a non-functional used indicator.",
+            "dependencies": [
+              3
+            ],
+            "details": "Map state to UI elements, render responsive grid or list entries showing thumbnail previews, text details, and a placeholder green dot element ready to reflect usedInTimeline status.\n<info added on 2025-10-28T02:42:20.356Z>\nImplemented formatDuration helper for MM:SS display; rendered each media item with video icon thumbnail placeholder, ellipsized filename, duration, and resolution; displayed green usage indicator (●, #4ade80) when usedInTimeline is true; applied hover-styled media cards with 60px thumbnails, text truncation, and 0.5rem gaps in the scrollable list; build succeeded (46 modules, CSS 8.27 kB +1.1 kB, JS 221.55 kB); ready for user testing after validation step completes.\n</info added on 2025-10-28T02:42:20.356Z>",
+            "status": "done",
+            "testStrategy": "Visually confirm list rendering for multiple items, verify thumbnail and duration text align with metadata, and ensure layout handles overflow gracefully.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Plan and perform media panel validation",
+            "description": "Execute validation steps covering ingestion, metadata, state sync, and rendering behaviors for the media library panel.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Draft a checklist of manual and automated tests across different media types, run through drag-and-drop scenarios, metadata accuracy checks, state inspection, and confirm the timeline remains unaffected.\n<info added on 2025-10-28T02:43:31.398Z>\nDocumented MEDIA_LIBRARY_VALIDATION.md with completion checkmarks and ten manual validation scenarios covering drag-and-drop, file picker, invalid files, multiple imports, metadata accuracy, usage indicator, timeline isolation, state persistence, responsive layout, and error handling. Captured build metrics (46 modules, CSS 8.27kB, JS 221.55kB, ~350ms build time), listed current limitations (no real thumbnails, no drag-to-timeline, no delete/search/sort), outlined future enhancements and integration points for Tasks 3, 4, and 5, and set validation status to READY FOR USER TESTING.\n</info added on 2025-10-28T02:43:31.398Z>",
+            "status": "cancelled",
+            "testStrategy": "Follow the validation checklist, logging results for each scenario and capturing any regressions for follow-up fixes.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Decompose into subtasks for file ingestion UI, metadata extraction pipeline, state updates, media list rendering, and validation/testing steps."
+      },
+      {
+        "id": 3,
+        "title": "Develop Video Preview Panel with Paused-on-Load Behavior",
+        "description": "Build the top-middle video preview panel. It should load a selected media item from the library but remain paused at the first frame until the user explicitly clicks the play button.",
+        "status": "done",
+        "dependencies": [
+          "2"
+        ],
+        "priority": "high",
+        "details": "Create the Video Preview component with a standard HTML5 `<video>` element and custom player controls (Play/Pause, scrubber, time display). When a user clicks a `MediaItem` in the library, its `filepath` should be loaded into the `<video>` element's `src` attribute. Crucially, the video must not autoplay. The `currentTime` should be set to 0. Implement the Play/Pause button logic. Media library previews should loop when played.",
+        "testStrategy": "Click on a media item in the library. Verify the video player loads the first frame of the correct video and is paused. Click the play button; verify the video plays. Click pause; verify it pauses. Check that the video loops when it reaches the end. Select another media item; verify the player updates to the new video, again paused at the first frame.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design video preview component UI layout",
+            "description": "Build the VideoPreview component skeleton with HTML5 video element and custom control placeholders.",
+            "dependencies": [],
+            "details": "Create the component structure, place the <video> tag, add containers for controls (play button, scrubber, time display) with appropriate styling hooks.",
+            "status": "done",
+            "testStrategy": "Render the component in isolation and verify DOM structure and styling hooks appear as expected.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Wire media selection to video source loading",
+            "description": "Connect application state so selecting a MediaItem loads its filepath into the video element without starting playback.",
+            "dependencies": [
+              1
+            ],
+            "details": "Subscribe to selected media state, update video.src via ref or binding, call load() and set currentTime to 0, ensure no autoplay attributes are present.",
+            "status": "done",
+            "testStrategy": "Simulate selecting different MediaItems and confirm the video element shows the first frame with currentTime at 0 and no playback starts.",
+            "updatedAt": "2025-10-28T02:51:20.360Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement play/pause control logic and scrubber",
+            "description": "Add functional play/pause button, time display, and scrubber tied to the video element.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Attach click handlers to toggle play(), pause(), update button states, sync scrubber and time display using timeupdate events, handle user scrubbing to seek.",
+            "status": "done",
+            "testStrategy": "Manually click play and pause, observe time display updates, drag the scrubber and verify video seeks accurately.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-28T02:51:21.193Z"
+          },
+          {
+            "id": 4,
+            "title": "Enforce paused-on-load and looping playback behavior",
+            "description": "Ensure videos remain paused on load, resume correctly, and loop during preview playback.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Use loadedmetadata/loadstart events to pause and reset currentTime, handle ended event to restart playback, guard against unintended autoplay when switching media.",
+            "status": "done",
+            "testStrategy": "Load a media item, verify it stays paused; play to the end and confirm it loops; select a new item and ensure it resets to first frame without autoplay.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-28T02:51:22.010Z"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Outline subtasks for player UI construction, state-driven media loading, playback control logic, and loop/paused-on-load behaviors.",
+        "updatedAt": "2025-10-28T02:51:22.010Z"
+      },
+      {
+        "id": 4,
+        "title": "Build Timeline UI Foundation",
+        "description": "Construct the bottom timeline panel, including the toolbar, time ruler, and video track area. This task focuses on the static UI elements without interactive clip functionality.",
+        "status": "done",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "high",
+        "details": "Develop the timeline component. Create a toolbar with placeholder buttons for zoom, delete, copy, and paste. Implement the time ruler, which should display timecodes (e.g., 00:00:00, 00:00:01, ...). The main track area should be a container where clips will eventually be rendered. Add a horizontal scrollbar. The ruler and track should be horizontally pannable together. Clicking the ruler should update the playhead's visual position (a vertical line overlay).",
+        "testStrategy": "Verify the timeline panel is rendered correctly with a toolbar, ruler, and an empty track area. Check that the time ruler displays legible time increments. Click on the ruler at various points; verify a playhead indicator line moves to the clicked position. Ensure the horizontal scrollbar works and pans both the ruler and the track area in sync.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up timeline layout structure",
+            "description": "Create the base timeline panel layout with toolbar, ruler, and track containers.",
+            "dependencies": [],
+            "details": "Build the timeline component markup and CSS to position toolbar, time ruler, main track area, and horizontal scrollbar within the bottom panel.",
+            "status": "done",
+            "testStrategy": "Render the timeline component and verify all structural sections appear and align correctly at various viewport sizes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Render static time ruler with timecodes",
+            "description": "Implement the time ruler element that shows formatted time markers across the timeline.",
+            "dependencies": [
+              1
+            ],
+            "details": "Generate evenly spaced time ticks and labels (e.g., 00:00:00, 00:00:01) within the ruler container using the established layout, ensuring scalability for different durations.",
+            "status": "done",
+            "testStrategy": "Inspect the ruler to confirm timecodes render sequentially and remain legible across widths; adjust container width to ensure labels stay aligned.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Enable ruler click to move playhead indicator",
+            "description": "Add playhead indicator element and update it when the user clicks on the ruler.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Render a vertical playhead line overlay and implement click handlers on the ruler to translate click positions into timeline offsets, re-positioning the playhead accordingly.",
+            "status": "done",
+            "testStrategy": "Click multiple positions on the ruler and confirm the playhead line moves to the corresponding location without visual artifacts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Synchronize horizontal panning of ruler and track",
+            "description": "Implement shared scroll/pan behavior between the time ruler and track area.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Link scroll events and drag gestures between the ruler and track containers so they move horizontally in unison, while maintaining scrollbar control.",
+            "status": "done",
+            "testStrategy": "Scroll or drag horizontally in either the ruler or track area and verify both sections move together, with the scrollbar reflecting the shared position.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Split into subtasks for layout structure, time ruler rendering, playhead interactions, and synchronized scrolling implementation."
+      },
+      {
+        "id": 6,
+        "title": "Implement Drag-to-Timeline with Independent Clip Instances",
+        "description": "Enable dragging a media item from the Media Library to the timeline. Each drop creates a new, independent TimelineClip instance with a unique ID.",
+        "status": "done",
+        "dependencies": [
+          "2",
+          "4"
+        ],
+        "priority": "high",
+        "details": "Use a drag-and-drop library (e.g., `dnd-kit` or `react-dnd`). When a `MediaItem` is dragged from the library and dropped onto the timeline track, a new `TimelineClip` object must be created. This object gets a new unique `id` and references the source `mediaId`. Its `inPoint` defaults to 0 and `outPoint` to the media's full duration. The `position` is calculated: 0 for the first clip, or `lastClipPosition + (lastClip.outPoint - lastClip.inPoint)` for subsequent clips. Update the application state with the new clip.",
+        "testStrategy": "Drag a media item from the library and drop it on the empty timeline. Verify a visual representation of the clip appears at position 00:00. Drag a second media item; verify it appears at the end of the first clip. Drag the same media item again; verify a second, distinct clip instance is created at the end of the timeline. Inspect the state to confirm new `TimelineClip` objects with unique IDs are created for each drop.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure Media Library drag sources",
+            "description": "Enable media items to initiate drag operations using the chosen library.",
+            "dependencies": [],
+            "details": "Integrate dnd-kit or react-dnd into the Media Library component, wrap each MediaItem with the provider hooks, and ensure drag metadata includes mediaId and duration.",
+            "status": "done",
+            "testStrategy": "Attempt to drag a media item and confirm the drag preview appears with correct metadata.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement timeline drop zone and handlers",
+            "description": "Set up the timeline track to accept drops from media items.",
+            "dependencies": [
+              1
+            ],
+            "details": "Register the timeline track as a valid drop target, handle drag enter/over for styling, and on drop retrieve payload data from the drag event.",
+            "status": "done",
+            "testStrategy": "Drag a media item over the timeline and verify the drop zone activates and accepts the drop without errors.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create TimelineClip instantiation logic",
+            "description": "Generate new clip instances with unique IDs and computed positions.",
+            "dependencies": [
+              2
+            ],
+            "details": "Build a factory or helper that constructs TimelineClip objects, assigns unique IDs, sets in/out points based on media duration, and calculates the placement relative to existing clips.",
+            "status": "done",
+            "testStrategy": "Call the factory with mock media data and existing clips to ensure IDs are unique and positions increment correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Wire clip creation into application state",
+            "description": "Update the store when a drop occurs to insert new clips.",
+            "dependencies": [
+              3
+            ],
+            "details": "Invoke the clip factory inside the drop handler, dispatch state update actions to append the new clip, and ensure the timeline data structure reacts to additions.",
+            "status": "done",
+            "testStrategy": "Perform a drag-and-drop in the app and inspect state or logs to confirm the new clip appears in the timeline array.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement visual feedback and regression tests",
+            "description": "Provide UI feedback for drop success and outline manual and automated checks.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Add temporary highlight or animation on drop, ensure the clip renders at the computed position, and document manual test steps plus integration tests for drag-to-timeline flow.",
+            "status": "done",
+            "testStrategy": "Follow the documented manual script: drop clips sequentially, verify positioning, and run automated drag-drop test to confirm rendering feedback.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into subtasks covering drag source setup, drop handling on timeline, clip instantiation logic, state updates, and visual feedback/testing."
+      },
+      {
+        "id": 7,
+        "title": "Implement Absolute Positioning, Gap Handling, and Collision Detection",
+        "description": "Enable clips to be dragged to absolute positions on the timeline, allowing gaps. Implement collision detection to prevent clips from being dropped on top of each other.",
+        "status": "done",
+        "dependencies": [
+          "6"
+        ],
+        "priority": "high",
+        "details": "Modify the timeline drag-and-drop logic. When dragging a clip (either from the library or an existing clip on the timeline), calculate the target `position`. Use the `canDropAtPosition` function logic from the PRD to validate the drop. If the space is occupied, prevent the drop and show a 'not allowed' cursor. If valid, update the clip's `position` property in the state. The UI should re-render to show the clip at its new absolute position, leaving a visual gap if it's not contiguous with another clip.",
+        "testStrategy": "Add two clips to the timeline, A and B, contiguously. Drag clip B to a later time, creating a gap. Verify the gap is visually represented as empty space. Try to drag clip B to a position that partially or fully overlaps clip A; verify the action is disallowed. Try to drag a new clip from the library into the gap; verify it drops correctly if the gap is large enough.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement absolute drop position calculation",
+            "description": "Create logic to compute a clip’s absolute target position when dragged.",
+            "dependencies": [],
+            "details": "Use timeline scale utilities to translate drag coordinates into absolute frame positions, normalizing to timeline bounds and frame rate.",
+            "status": "done",
+            "testStrategy": "Drag a clip to multiple positions and verify the computed position matches expected frame offsets in console logs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Integrate collision validation logic",
+            "description": "Wire the PRD canDropAtPosition rules into the drag workflow.",
+            "dependencies": [
+              1
+            ],
+            "details": "Invoke canDropAtPosition with current timeline clips and candidate position, ensuring returned booleans gate the drop operation reliably.",
+            "status": "done",
+            "testStrategy": "Attempt to drop clips onto occupied intervals and confirm validation blocks overlaps while allowing free slots.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Provide UI feedback for invalid drop targets",
+            "description": "Show not-allowed cursor and visual cues when drop is disallowed.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Listen to validation results and set drag cursor plus optional highlight states to indicate invalid drop zones in real time.",
+            "status": "done",
+            "testStrategy": "Drag over an occupied area and confirm the cursor switches to not-allowed and reverts when moving to open space.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Apply validated drops to timeline state",
+            "description": "Update timeline state with new clip positions after valid drops.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "On successful drop, update the clip’s position property, dispatching state changes that trigger re-render and maintaining immutability.",
+            "status": "done",
+            "testStrategy": "Drop a clip into a valid slot and verify the state store reflects the new position and persists after refresh if applicable.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Render gaps following clip repositioning",
+            "description": "Ensure timeline visually reflects empty spaces after moves.",
+            "dependencies": [
+              4
+            ],
+            "details": "Adjust rendering to leave visual gaps between clips based on their absolute positions, leveraging layout calculations to show empty segments.",
+            "status": "done",
+            "testStrategy": "Move a clip forward to create a gap and confirm timeline renders empty space with no phantom clips or overlaps.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Execute regression tests for drag timeline",
+            "description": "Validate end-to-end drag, collision, and gap behavior.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Run automated and manual scenarios covering library-to-timeline drops, repositioning, gap visualization, and collision handling across browsers.",
+            "status": "done",
+            "testStrategy": "Follow regression script: drop from library, reposition with gap, attempt invalid overlap, confirm UI feedback and final state remain correct.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Detail subtasks for position calculation, collision validation logic, UI feedback for invalid drops, state updates, gap rendering, and regression tests."
+      },
+      {
+        "id": 8,
+        "title": "Implement Timeline Playback with Gap Handling",
+        "description": "Develop the playback logic for the main timeline. Playback should proceed from the current playhead position to the end of the timeline, rendering a black screen for gaps between clips.",
+        "status": "done",
+        "dependencies": [
+          "3",
+          "7"
+        ],
+        "priority": "high",
+        "details": "When the main Play button is clicked, start a `requestAnimationFrame` loop. In each frame, update the playhead's `currentTime`. Check the playhead's position against the `TimelineClip` array. If it's within a clip's boundaries, show the corresponding video frame from that clip's `MediaItem` in the previewer, accounting for the clip's `inPoint`. If the playhead is in a gap, instruct the video previewer to display a black screen. Playback should not loop. Clicking a clip or ruler should set the playhead's position and pause playback.",
+        "testStrategy": "Create a timeline with 'Clip A -> Gap -> Clip B'. Place the playhead at the start and press play. Verify Clip A plays, then the previewer shows black for the duration of the gap, then Clip B plays. Verify playback stops at the end of Clip B. Click in the middle of Clip B; verify the playhead jumps there and playback is paused. Press play again; verify it plays from the new position.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement requestAnimationFrame-driven playhead loop",
+            "description": "Create the foundational playback loop triggered by the main Play action.",
+            "dependencies": [],
+            "details": "Instantiate a requestAnimationFrame loop that advances the playhead based on elapsed real time, persists the handle for cancellation, and stops automatically at the timeline end or when paused.",
+            "status": "done",
+            "testStrategy": "Use mocked time progression to confirm playhead advances correctly and the loop stops when reaching the final timeline timestamp.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Map playhead timestamps to active timeline clips",
+            "description": "Add logic to resolve which clip is active at the current playhead position.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement a search across the ordered TimelineClip array to find the clip whose position and duration range contains the playhead, and compute the source media timestamp using the clip inPoint offset.",
+            "status": "done",
+            "testStrategy": "Create unit tests feeding various playhead positions to validate the correct clip and media timestamps are returned, including edge boundaries.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Handle timeline gaps with black-screen fallback",
+            "description": "Detect playhead positions that land in gaps and trigger black frame rendering.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "When no clip matches the playhead position, dispatch a command to the preview subsystem to display a black frame and ensure existing clip playback stops cleanly during gaps.",
+            "status": "done",
+            "testStrategy": "Simulate alternating clip and gap positions to confirm black frames appear only during gaps and resume normal playback once a clip starts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Integrate clip frame and gap output with previewer",
+            "description": "Wire playback outputs to the video preview component for real-time updates.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Connect the clip frame data or black-frame directive to the previewer API, ensuring efficient updates, debouncing redundant renders, and proper cleanup when playback stops.",
+            "status": "done",
+            "testStrategy": "Run integration tests ensuring previewer receives the correct frames during clip playback and black frames during gaps without flicker or stale frames.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Synchronize playback controls and timeline interactions",
+            "description": "Ensure play/pause buttons and timeline clicks coordinate with the playhead loop.",
+            "dependencies": [
+              1,
+              4
+            ],
+            "details": "Bind Play/Pause UI events to start/stop the animation loop, cancel playback when the user clicks a clip or ruler to reposition the playhead, and update UI state consistently.",
+            "status": "done",
+            "testStrategy": "Perform interaction tests verifying playback toggles accurately, clicking the ruler pauses playback, and playhead positions update as expected.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Author automated playback flow regression tests",
+            "description": "Create test coverage for the end-to-end timeline playback scenario with gaps.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Implement automated integration tests replicating the Clip A → Gap → Clip B scenario, verifying frame sequencing, gap handling, and playback termination behaviors.",
+            "status": "done",
+            "testStrategy": "Execute the scripted end-to-end scenario, asserting preview output across clip and gap regions and confirming playback stops at the final clip boundary.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Plan subtasks for playhead timing loop, clip lookup and frame mapping, gap black-screen handling, preview integration, controls synchronization, and playback tests."
+      },
+      {
+        "id": 9,
+        "title": "Develop Timeline Clips Panel",
+        "description": "Build the top-right panel to list all clips currently on the timeline. The list should be sorted by position and allow each entry to be expanded to show trim details.",
+        "status": "done",
+        "dependencies": [
+          "6"
+        ],
+        "priority": "medium",
+        "details": "Create a new component for the Timeline Clips Panel. This component will subscribe to the application state and render a list of all `TimelineClip` objects. The list must be sorted chronologically based on each clip's `position`. Each item in the list should display the source filename and be expandable. When expanded, it should show editable fields for `inPoint`, `outPoint`, and `position`. Changing these values should update the state and re-render the main timeline.",
+        "testStrategy": "Add several clips to the timeline, including multiple instances of the same media. Verify the Timeline Clips Panel lists every instance, sorted by its start time. Drag a clip on the timeline to a new position; verify the list order updates. Expand a clip item and change its `inPoint` value in the input field; verify the clip's representation on the main timeline visually shortens.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Wire timeline state subscription and sorting logic",
+            "description": "Subscribe the panel component to the TimelineClip state and produce a position-sorted list.",
+            "dependencies": [],
+            "details": "Hook into the central store selector for TimelineClip objects, memoize the derived array, and ensure re-sorting on state updates using stable comparison of clip.position values.",
+            "status": "done",
+            "testStrategy": "Write a selector unit test feeding unsorted clip arrays and assert the output order matches ascending positions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Render expandable timeline clip list UI",
+            "description": "Create the list view with collapsible rows showing clip filenames and expansion controls.",
+            "dependencies": [
+              1
+            ],
+            "details": "Build the panel markup to map over the sorted clips, display filename and position summary, and manage expand/collapse state per row using controlled component state or keyed context.",
+            "status": "done",
+            "testStrategy": "Add component tests to toggle expansions and confirm the correct row expands while others stay collapsed.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement editable trim fields with validation",
+            "description": "Add inPoint, outPoint, and position editors within the expanded row with validation and state updates.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create controlled inputs bound to the clip data, validate numeric ranges and inPoint<outPoint before dispatching updates, and debounce or commit changes to the store to trigger timeline re-render.",
+            "status": "done",
+            "testStrategy": "Simulate user edits in component tests to verify invalid ranges show errors and valid edits call the update action with correct payloads.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Verify panel-timeline synchronization behavior",
+            "description": "Test that panel edits reflect on the main timeline and sorted list stays accurate after timeline actions.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Perform end-to-end checks ensuring clip edits via the panel update the global state, cause main timeline rerenders, and respond correctly when other timeline interactions adjust clip positions.",
+            "status": "done",
+            "testStrategy": "Run integration scenarios where clips are moved or trimmed and assert both the panel list order and timeline visuals update in real time.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Divide into subtasks for state subscription/sorting, list and expansion UI, editable fields with validation, and synchronization testing with the timeline."
+      },
+      {
+        "id": 10,
+        "title": "Implement Clip Manipulation: Trimming and Copy/Paste",
+        "description": "Add functionality for users to trim clips directly on the timeline via drag handles, and implement the copy/paste system for duplicating clips.",
+        "status": "done",
+        "dependencies": [
+          "7",
+          "9"
+        ],
+        "priority": "medium",
+        "details": "For trimming, when a clip on the timeline is selected, show handles at its start and end. Dragging these handles should update the clip's `inPoint` and `outPoint` respectively. For copy/paste, implement a clipboard state slice. When a clip is copied (Cmd/Ctrl+C or button), store its data (excluding unique ID) in the clipboard. On paste (Cmd/Ctrl+V or button), create a new `TimelineClip` from the clipboard data, give it a new unique ID, and append it to the end of the timeline.",
+        "testStrategy": "Select a clip and drag its start handle to the right; verify the clip's `inPoint` is updated and its visual length shrinks. Copy a trimmed clip. Paste it. Verify a new, identical clip instance appears at the end of the timeline. Inspect the state to confirm the pasted clip is a new, independent object with a unique ID but the same `mediaId` and trim points as the original.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create timeline clip trim handle UI",
+            "description": "Add visible start/end drag handles when a timeline clip is selected.",
+            "dependencies": [],
+            "details": "Update clip component styles and conditional rendering to display interactive handles aligned with clip bounds on selection.",
+            "status": "done",
+            "testStrategy": "Visual check ensuring handles appear only for the selected clip and align with clip edges.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement trim drag logic for in/out points",
+            "description": "Wire handle dragging to update clip inPoint and outPoint in state.",
+            "dependencies": [
+              1
+            ],
+            "details": "Attach pointer/drag events to handles, throttle updates, clamp values to media duration, and dispatch state updates on drag progress and release.",
+            "status": "done",
+            "testStrategy": "Unit-test reducer updates; manually drag handles to confirm state changes and timeline length adjustments.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Build clipboard state slice for clip copy",
+            "description": "Create clipboard slice to store copied clip data without unique ID.",
+            "dependencies": [],
+            "details": "Define slice with initial empty state, copy action that clones selected clip minus ID, and selectors for clipboard availability.",
+            "status": "done",
+            "testStrategy": "Write reducer tests verifying copy action stores expected payload and resets correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement paste workflow appending new clip",
+            "description": "Use clipboard data to create new clip with fresh ID appended at timeline end.",
+            "dependencies": [
+              3
+            ],
+            "details": "On paste action, validate clipboard payload, generate unique ID, compute append position, instantiate TimelineClip, and update state.",
+            "status": "done",
+            "testStrategy": "Integration test dispatching copy then paste to ensure new clip appended with unique ID and correct timing.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Test trimming and copy/paste interactions",
+            "description": "Execute manual and automated scenarios covering trimming and clipboard operations.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Prepare QA checklist combining handle drags, copy/paste of trimmed clips, verifying timeline rendering, and ensuring no shared references between clips.",
+            "status": "done",
+            "testStrategy": "Follow scripted manual runs plus automated tests to confirm state integrity and UI feedback for each interaction.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Outline subtasks for trim handle UI, in/out point adjustment logic, clipboard state slice, paste placement, and interaction testing."
+      },
+      {
+        "id": 11,
+        "title": "Implement Keyboard Shortcuts",
+        "description": "Integrate all specified keyboard shortcuts for enhanced usability, including playback controls, clip manipulation, navigation, and zooming.",
+        "status": "done",
+        "dependencies": [
+          "8",
+          "10"
+        ],
+        "priority": "low",
+        "details": "Add a global keyboard event listener. Use a `switch` statement or a key map to handle different `event.key` or `event.code` values. Hook these events to the corresponding state-changing actions:\n- `Space`/`K`: Toggle play/pause.\n- `Delete`/`Backspace`: Remove the currently selected `TimelineClip`.\n- `Cmd/Ctrl+C`, `Cmd/Ctrl+V`: Trigger copy/paste actions.\n- `J`/`L`: Seek playhead by -5s/+5s.\n- `ArrowLeft`/`ArrowRight`: Seek playhead by one frame.\n- `Tab`: Cycle selection through `TimelineClip`s.\n- `Escape`: Clear current selection.",
+        "testStrategy": "Select a clip and press 'Delete'; verify it's removed and a gap is left. Press 'Space'; verify playback toggles. Press 'L'; verify the playhead jumps forward 5 seconds. Select a clip, press 'Ctrl+C' then 'Ctrl+V'; verify it's pasted. Press 'Tab' repeatedly; verify selection cycles through the clips on the timeline.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement global keyboard listener scaffolding",
+            "description": "Set up the shared keyboard listener infrastructure for the application.",
+            "dependencies": [],
+            "details": "Create a module that registers a single window-level keydown listener during app mount, exposes subscribe/unsubscribe hooks, and ensures cleanup on unmount to prevent duplicate bindings.",
+            "status": "done",
+            "testStrategy": "Mount and unmount the listener in isolation; assert only one event handler is attached and removed appropriately.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Map keyboard shortcuts to timeline actions",
+            "description": "Connect defined key combinations to the appropriate playback and clip commands.",
+            "dependencies": [
+              1
+            ],
+            "details": "Extend the listener handler with a switch or key map covering Space/K, Delete/Backspace, Cmd/Ctrl+C, Cmd/Ctrl+V, J/L, Arrow keys, Tab, and Escape, invoking the corresponding state actions with debouncing where needed.",
+            "status": "done",
+            "testStrategy": "Mock timeline actions and dispatch each shortcut; verify the correct action is called once with expected arguments.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Handle focus state and accessibility safeguards",
+            "description": "Ensure shortcuts respect focus context and remain accessible.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Introduce guard clauses that bypass shortcuts when focus is inside editable inputs, manage focus outlines for Tab cycling, and document ARIA considerations so assistive users are not blocked by the global listener.",
+            "status": "done",
+            "testStrategy": "Simulate key presses while focus is in inputs versus the timeline canvas; confirm shortcuts are suppressed or allowed accordingly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create integration tests for shortcut sequences",
+            "description": "Author end-to-end tests covering realistic shortcut usage flows.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Write integration scenarios that mount the editor, execute sequences like play toggle, seek, delete, copy-paste, and selection cycling, then assert timeline state and UI changes reflect the expected outcomes.",
+            "status": "done",
+            "testStrategy": "Use the UI test harness to send key events in sequence and validate resulting timeline state and rendered indicators for each shortcut path.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Create subtasks for global listener management, shortcut-to-action mapping, focus and accessibility considerations, and integration tests for key sequences."
+      },
+      {
+        "id": 12,
+        "title": "Implement Advanced Clip Handling Updates",
+        "description": "Enhance the clip handling system with improved performance, better visual feedback, and additional manipulation features for timeline clips.",
+        "details": "Implement performance optimizations for clip rendering by introducing virtualization for large numbers of clips and debouncing for frequent updates. Add visual enhancements including clip thumbnails, waveform previews for audio tracks, and improved selection indicators with multi-select capability using Ctrl+click. Implement advanced clip operations: split functionality to divide clips at the playhead position, merge adjacent clips of the same source media, and snap-to-grid behavior for precise positioning. Add undo/redo functionality for all clip operations using a command pattern. Implement clip grouping to allow multiple clips to be moved together as a unit. Add keyboard shortcuts for clip-specific operations like split (S key), merge (M key), and group/ungroup (G/Shift+G keys). Optimize the collision detection algorithm to handle overlapping checks more efficiently. Add visual feedback during drag operations showing ghost outlines and snap indicators.",
+        "testStrategy": "Test performance with 100+ clips on timeline; verify smooth scrolling and responsiveness. Test thumbnail generation for various video formats and verify they display correctly. Test multi-select by Ctrl+clicking multiple clips and verify they move together. Test split functionality by placing playhead in middle of clip and pressing S; verify two separate clips are created. Test merge by selecting two adjacent clips of same source and pressing M; verify they combine into single clip. Test snap-to-grid by dragging clips near grid lines and verify they automatically align. Test undo/redo by performing several clip operations and verify Ctrl+Z/Ctrl+Y correctly reverse and restore changes. Test grouping by selecting multiple clips, pressing G, then moving one clip and verifying the group moves together.",
+        "status": "cancelled",
+        "dependencies": [
+          10,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2025-10-28T02:51:22.011Z",
+      "taskCount": 11,
+      "completedCount": 3,
+      "tags": [
+        "master"
+      ],
+      "created": "2025-10-28T02:52:38.901Z",
+      "description": "Tasks for master context",
+      "updated": "2025-10-28T18:34:25.434Z"
+    }
+  }
+}

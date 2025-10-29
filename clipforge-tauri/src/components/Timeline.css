@@ -7,15 +7,47 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.timeline-drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background-color: transparent;
+  border: 2px dashed transparent;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.timeline-drop-overlay.active {
+  background-color: rgba(0, 123, 255, 0.1);
+  border-color: #007bff;
+}
+
+.timeline-drop-overlay.invalid {
+  background-color: rgba(255, 68, 68, 0.1);
+  border-color: #ff4444;
+  cursor: not-allowed;
 }
 
 .timeline-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.75rem 1rem;
   background-color: #2a2a2a;
   border-bottom: 1px solid #333;
+}
+
+.timeline-controls .toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .timeline-controls button {
@@ -36,6 +68,37 @@
 
 .timeline-controls button:active {
   background-color: #2a4f6d;
+}
+
+.timeline-controls button:disabled {
+  background-color: #333;
+  color: #666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.timeline-controls button:disabled:hover {
+  background-color: #333;
+}
+
+.timeline-controls .play-pause-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  background-color: #28a745;
+}
+
+.timeline-controls .play-pause-btn:hover {
+  background-color: #218838;
+}
+
+.timeline-controls .play-pause-btn.playing {
+  background-color: #ffc107;
+}
+
+.timeline-controls .play-pause-btn.playing:hover {
+  background-color: #e0a800;
 }
 
 .zoom-level {

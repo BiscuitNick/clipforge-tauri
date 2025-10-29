@@ -1,9 +1,9 @@
 {
 	"meta": {
-		"generatedAt": "2025-10-27T21:00:16.260Z",
-		"tasksAnalyzed": 7,
-		"totalTasks": 7,
-		"analysisCount": 7,
+		"generatedAt": "2025-10-28T21:38:03.551Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
 		"thresholdScore": 5,
 		"projectName": "Taskmaster",
 		"usedResearch": false
@@ -11,59 +11,83 @@
 	"complexityAnalysis": [
 		{
 			"taskId": 1,
-			"taskTitle": "Set Up Tauri Desktop Application",
-			"complexityScore": 4,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down the Tauri setup into distinct steps: 1) Project initialization using `create-tauri-app`. 2) `tauri.conf.json` configuration for app metadata, window settings, and icons. 3) Rust-side implementation of the native menu bar. 4) A dedicated task for building the app, handling macOS code signing, and verifying the final `.app` bundle.",
-			"reasoning": "While the initial setup is mostly boilerplate via Tauri's CLI, the complexity is elevated by the macOS-specific requirements. Implementing a custom menu bar in Rust and, more significantly, navigating the complexities of macOS code signing and certificate management present non-trivial challenges that require careful attention to documentation and potential troubleshooting."
+			"taskTitle": "Set up recording infrastructure and permissions",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Create recording.rs module structure, 2) Implement macOS permission handling (screen, camera, mic), 3) Set up cross-platform permission abstraction, 4) Create recording state management system, 5) Define recording configuration data structures, 6) Implement cleanup and error recovery mechanisms",
+			"reasoning": "High complexity due to platform-specific permission APIs, state management requirements, and need for robust error handling across multiple recording types. Requires deep Tauri integration and careful architectural design."
 		},
 		{
 			"taskId": 2,
-			"taskTitle": "Implement Video Import via Drag & Drop",
-			"complexityScore": 5,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Decompose the drag & drop feature into three subtasks: 1) Create the `ImportPanel` React component with HTML5 drag/drop event handlers and visual feedback (e.g., highlighting). 2) Define the `import_video` Tauri command in Rust to receive file paths from the frontend. 3) Implement the frontend logic to invoke the command on file drop, perform file type validation, and manage loading/error UI states.",
-			"reasoning": "This task spans the full stack, requiring frontend UI work for the drop zone, state management for visual feedback, and backend work to define the Tauri command. While not deeply complex in any single area, the coordination between the React frontend, HTML5 APIs, and the Rust backend bridge introduces a moderate level of complexity."
+			"taskTitle": "Implement screen and window enumeration",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Implement macOS screen/window enumeration using Core Graphics, 2) Create data structures for source metadata, 3) Generate window/screen thumbnails, 4) Handle multi-monitor configurations, 5) Implement frontend serialization and IPC commands",
+			"reasoning": "Requires platform-specific APIs for screen capture enumeration, thumbnail generation, and handling various edge cases like multiple monitors and different window types. Complex due to native API integration."
 		},
 		{
 			"taskId": 3,
-			"taskTitle": "Implement Video Import via File Picker",
-			"complexityScore": 2,
-			"recommendedSubtasks": 0,
-			"expansionPrompt": "Break down the file picker import into two steps: 1) Add an 'Import Video' button to the UI. 2) Implement the `onClick` handler to call Tauri's `open` dialog API, configure it for video files, and pass the selected file paths to the existing `import_video` command.",
-			"reasoning": "This task has low complexity because it primarily leverages a high-level, pre-built API (`@tauri-apps/api/dialog`). It also reuses the `import_video` backend command established in another task, making the implementation a straightforward frontend addition with minimal new logic."
+			"taskTitle": "Implement core screen recording functionality",
+			"complexityScore": 9,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break down into: 1) Implement AVFoundation screen capture for macOS, 2) Configure H.264/AAC encoding pipeline, 3) Add system audio capture integration, 4) Implement recording controls (start/stop/pause), 5) Add real-time duration and file size tracking, 6) Handle recording to temporary then final locations, 7) Implement recording cancellation and cleanup",
+			"reasoning": "Most complex task - requires deep platform API integration, video/audio encoding configuration, real-time monitoring, and careful resource management. AVFoundation complexity and cross-platform considerations make this very challenging."
 		},
 		{
 			"taskId": 4,
-			"taskTitle": "Develop Timeline UI with Canvas Rendering",
-			"complexityScore": 9,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Decompose the timeline development into several key features: 1) Create the base `Timeline` component with a Canvas element and a custom hook (`useTimeline`) for state. 2) Implement the time ruler rendering logic, including timestamps and grid lines. 3) Implement rendering for video clips as rectangles based on their metadata. 4) Add horizontal scrolling and zoom functionality, including the coordinate transformation logic. 5) Implement the playhead indicator and a mechanism to update its position.",
-			"reasoning": "This is the most complex task. Custom canvas rendering is imperative and does not align naturally with React's declarative model. It requires building a mini-rendering engine from scratch, involving complex state management, performance-critical rendering loops, and non-trivial math for coordinate transformations (time-to-pixel, zoom, scroll). This is greenfield development of a highly interactive and performance-sensitive component."
+			"taskTitle": "Create screen recording UI components",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Create recording button and integrate into MediaLibraryPanel, 2) Build screen selection modal with thumbnail grid, 3) Implement recording status indicator with timer, 4) Add audio controls and error display components",
+			"reasoning": "Moderate complexity - existing React patterns and UI components can be leveraged. Main challenges are state management integration and real-time timer updates."
 		},
 		{
 			"taskId": 5,
-			"taskTitle": "Integrate Video Preview Player",
+			"taskTitle": "Implement webcam recording system",
 			"complexityScore": 6,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down the video preview integration into three parts: 1) Create the `PreviewPlayer` React component using an HTML5 `<video>` tag and basic play/pause controls. 2) Implement logic to load a video when a clip is selected on the timeline, using Tauri's `convertFileSrc` API. 3) Implement two-way state synchronization: updating the timeline's playhead based on the video's `currentTime`, and seeking the video when the timeline playhead is scrubbed.",
-			"reasoning": "While the player component itself is simple (a wrapper around the `<video>` element), the complexity lies in the integration. Establishing robust, two-way state synchronization between the imperative Canvas timeline and the player component is challenging. This requires a well-designed state management strategy to handle events like clip selection, playback time updates, and user scrubbing without performance issues."
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Implement camera enumeration backend command, 2) Set up MediaRecorder API with getUserMedia, 3) Create blob-to-file Tauri command for MP4 saving, 4) Build camera selection UI and live preview, 5) Implement recording controls with audio toggle",
+			"reasoning": "Moderate complexity using web APIs but requires careful blob handling, Tauri file operations, and coordination between frontend MediaRecorder and backend file saving."
 		},
 		{
 			"taskId": 6,
-			"taskTitle": "Implement Basic Trim Functionality",
-			"complexityScore": 8,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Decompose trim functionality: 1) Update timeline rendering to draw draggable 'in' and 'out' handles on a selected clip. 2) Implement mouse event handling (hit detection, drag state management) for the handles. 3) Update the application state with the non-destructive `inPoint` and `outPoint` values. 4) Modify the `PreviewPlayer` to respect the clip's trim points during playback and seeking.",
-			"reasoning": "This task adds a significant layer of interaction logic onto the application's most complex component (the Canvas timeline). It requires hit detection, managing drag states, updating visuals in real-time during a drag, and propagating state changes to the preview player. This is a complex modification of an already complex system, making it a high-effort task."
+			"taskTitle": "Add audio capture and monitoring features",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Create audio device enumeration backend, 2) Implement Web Audio API analyzer for VU meter, 3) Build audio level indicator UI component, 4) Add mute/unmute controls with visual feedback, 5) Integrate audio with screen and webcam recording",
+			"reasoning": "Requires Web Audio API expertise for real-time analysis, backend audio enumeration, and integration with multiple recording modes. Moderate complexity with some technical challenges."
 		},
 		{
 			"taskId": 7,
-			"taskTitle": "Integrate FFmpeg for Video Processing",
+			"taskTitle": "Build Picture-in-Picture recording system",
 			"complexityScore": 7,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Decompose FFmpeg integration into three steps: 1) Configure `tauri.conf.json` to correctly bundle the FFmpeg binary resource. 2) Create a Rust function using `std::process::Command` to execute `ffprobe` with JSON output arguments. 3) Create the Tauri command `extract_metadata` that calls this function, parses the JSON output into a Rust struct, and returns the structured data to the frontend.",
-			"reasoning": "Complexity is high due to the challenges of managing an external binary. This includes correctly bundling the executable in the Tauri app, handling cross-platform/architecture differences (Intel vs. Apple Silicon), robustly managing the external process from Rust (including error handling and timeouts), and reliably parsing its output. While using JSON output simplifies parsing, the process management and bundling aspects remain significant hurdles."
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Implement simultaneous screen+webcam capture backend, 2) Create PiP configuration data model, 3) Build PiP position/size selector UI, 4) Implement live preview with overlay, 5) Handle separate file recording with sync metadata, 6) Store configuration for export compositing",
+			"reasoning": "Complex due to simultaneous recording coordination, UI preview requirements, and metadata management for later compositing. Requires careful synchronization handling."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Integrate recordings with media library",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Hook recording completion to auto-import system, 2) Integrate with existing thumbnail generation, 3) Update MediaLibraryPanel to show new recordings, 4) Extract and display file metadata",
+			"reasoning": "Lower complexity as it leverages existing systems. Main work is integration points and ensuring smooth data flow from recording to library display."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement PiP export compositing",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Extend export system for PiP detection, 2) Calculate FFmpeg overlay filter parameters, 3) Implement video compositing pipeline, 4) Handle audio track selection, 5) Add composite progress tracking",
+			"reasoning": "Moderate complexity requiring FFmpeg filter expertise and integration with existing export system. Mathematical calculations for overlay positioning add complexity."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Add comprehensive error handling and edge cases",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Implement permission error handling with user guidance, 2) Handle device unavailability gracefully, 3) Add disk space monitoring and errors, 4) Implement long recording memory management, 5) Create comprehensive cleanup for all failure scenarios",
+			"reasoning": "Moderate complexity spread across many edge cases. Requires thorough testing and consideration of various failure modes but builds on existing infrastructure."
 		}
 	]
 }
