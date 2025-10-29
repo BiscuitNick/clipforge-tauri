@@ -1195,3 +1195,90 @@ pub struct ErrorDetails {
     pub message: String,
     pub suggestion: Option<String>,
 }
+
+/// Save webcam recording from blob data
+#[tauri::command]
+pub async fn save_webcam_recording(
+    data: Vec<u8>,
+    mime_type: String,
+    duration: f64,
+    state: State<'_, RecordingManagerState>,
+) -> Result<String, String> {
+    use std::fs;
+    use std::io::Write;
+    use std::process::Command;
+
+    let manager = state.lock().map_err(|e| e.to_string())?;
+    let temp_manager = manager.get_temp_manager();
+    let mut temp_mgr = temp_manager.lock().map_err(|e| e.to_string())?;
+
+    // Determine file extension from MIME type
+    let extension = if mime_type.contains("webm") {
+        "webm"
+    } else if mime_type.contains("mp4") {
+        "mp4"
+    } else {
+        "webm" // Default to webm
+    };
+
+    // Create unique filename with timestamp
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let temp_filename = format!("webcam_recording_{}_temp.{}", timestamp, extension);
+    let final_filename = format!("webcam_recording_{}.{}", timestamp, extension);
+
+    // Get temp directory path (direct field access)
+    let temp_file_path = temp_mgr.temp_dir.join(&temp_filename);
+    let final_file_path = temp_mgr.temp_dir.join(&final_filename);
+
+    // Write blob data to temporary file
+    let mut file = fs::File::create(&temp_file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    file.write_all(&data)
+        .map_err(|e| format!("Failed to write data: {}", e))?;
+
+    file.flush()
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
+
+    drop(file); // Close file before ffmpeg processes it
+
+    // Remux with FFmpeg to embed duration metadata
+    // This ensures the file has proper duration information
+    let ffmpeg_path = super::ffmpeg_utils::find_ffmpeg()
+        .ok_or_else(|| "FFmpeg not found".to_string())?;
+
+    let ffmpeg_output = Command::new(&ffmpeg_path)
+        .arg("-i")
+        .arg(&temp_file_path)
+        .arg("-c")
+        .arg("copy") // Copy streams without re-encoding
+        .arg("-t")
+        .arg(duration.to_string()) // Set duration
+        .arg("-y") // Overwrite output file
+        .arg(&final_file_path)
+        .output()
+        .map_err(|e| format!("Failed to run FFmpeg: {}", e))?;
+
+    if !ffmpeg_output.status.success() {
+        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
+        println!("FFmpeg stderr: {}", stderr);
+        // If FFmpeg fails, use the original file anyway
+        fs::rename(&temp_file_path, &final_file_path)
+            .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+    } else {
+        // Remove temporary file
+        let _ = fs::remove_file(&temp_file_path);
+    }
+
+    // Track final file in the temp manager
+    temp_mgr.active_files.push(final_file_path.clone());
+
+    // Return absolute file path
+    final_file_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())
+        .map(|s| s.to_string())
+}

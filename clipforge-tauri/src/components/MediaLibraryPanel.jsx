@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useDraggable } from "@dnd-kit/core";
 import ScreenRecordingModal from "./ScreenRecordingModal";
+import WebcamRecordingPanel from "./WebcamRecordingPanel";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -519,26 +520,55 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         )}
 
         {mode === "record-video" && (
-          <div className="recording-mode-view">
-            <div className="recording-mode-content">
-              <svg
-                className="recording-mode-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-              <h3>Webcam Recording</h3>
-              <p>Coming soon...</p>
-            </div>
-          </div>
+          <WebcamRecordingPanel
+            onRecordingComplete={async (recordingData) => {
+              console.log('[MediaLibraryPanel] Webcam recording complete:', recordingData);
+
+              try {
+                setIsLoading(true);
+                setMessage("Processing recording...");
+                setMessageType("loading");
+
+                // Import the recorded file to media library
+                const result = await invoke("import_video", { paths: [recordingData.filePath] });
+                console.log('[MediaLibraryPanel] Webcam recording imported:', result);
+
+                // Call onMediaImport callback with the imported video metadata
+                if (onMediaImport && result.length > 0) {
+                  onMediaImport(result);
+                }
+
+                // Switch to media files view
+                setMode("media");
+                setMessage(`Recording saved successfully! (${Math.floor(recordingData.duration)}s)`);
+                setMessageType("success");
+
+                setTimeout(() => {
+                  setMessage("");
+                  setMessageType("");
+                }, 3000);
+              } catch (err) {
+                console.error('[MediaLibraryPanel] Failed to import webcam recording:', err);
+                setMessage(`Failed to import recording: ${err}`);
+                setMessageType("error");
+                setTimeout(() => {
+                  setMessage("");
+                  setMessageType("");
+                }, 5000);
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            onError={(errorMessage) => {
+              console.error('[MediaLibraryPanel] Webcam recording error:', errorMessage);
+              setMessage(errorMessage);
+              setMessageType("error");
+              setTimeout(() => {
+                setMessage("");
+                setMessageType("");
+              }, 5000);
+            }}
+          />
         )}
 
         {message && (
