@@ -547,6 +547,67 @@ pub enum PermissionStatus {
 pub struct PermissionResult {
     pub permission_type: PermissionType,
     pub status: PermissionStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<Vec<String>>,
+}
+
+impl PermissionResult {
+    /// Create a new permission result with guidance
+    pub fn new(permission_type: PermissionType, status: PermissionStatus) -> Self {
+        let (error_message, help_url, instructions) = match (&permission_type, &status) {
+            (PermissionType::Screen, PermissionStatus::Denied) => (
+                Some("Screen recording permission denied".to_string()),
+                Some("https://support.apple.com/guide/mac-help/control-access-screen-recording-mchld6aa7d23/mac".to_string()),
+                Some(vec![
+                    "1. Open System Preferences/Settings".to_string(),
+                    "2. Go to Security & Privacy > Privacy > Screen Recording".to_string(),
+                    "3. Enable ClipForge in the list".to_string(),
+                    "4. Restart ClipForge for changes to take effect".to_string(),
+                ]),
+            ),
+            (PermissionType::Camera, PermissionStatus::Denied) => (
+                Some("Camera permission denied".to_string()),
+                Some("https://support.apple.com/guide/mac-help/control-access-camera-mchlf6d108da/mac".to_string()),
+                Some(vec![
+                    "1. Open System Preferences/Settings".to_string(),
+                    "2. Go to Security & Privacy > Privacy > Camera".to_string(),
+                    "3. Enable ClipForge in the list".to_string(),
+                    "4. Click 'Request Permission' to try again".to_string(),
+                ]),
+            ),
+            (PermissionType::Microphone, PermissionStatus::Denied) => (
+                Some("Microphone permission denied".to_string()),
+                Some("https://support.apple.com/guide/mac-help/control-access-microphone-mchla1b1e1fe/mac".to_string()),
+                Some(vec![
+                    "1. Open System Preferences/Settings".to_string(),
+                    "2. Go to Security & Privacy > Privacy > Microphone".to_string(),
+                    "3. Enable ClipForge in the list".to_string(),
+                    "4. Click 'Request Permission' to try again".to_string(),
+                ]),
+            ),
+            (_, PermissionStatus::Restricted) => (
+                Some("Permission restricted by system policy".to_string()),
+                None,
+                Some(vec![
+                    "This permission is restricted by your system administrator or parental controls.".to_string(),
+                    "Contact your administrator for assistance.".to_string(),
+                ]),
+            ),
+            _ => (None, None, None),
+        };
+
+        Self {
+            permission_type,
+            status,
+            error_message,
+            help_url,
+            instructions,
+        }
+    }
 }
 
 // ============================================================================
@@ -834,6 +895,323 @@ impl Drop for RecordingResources {
             }
         }
     }
+}
+
+// ============================================================================
+// Device Availability and Validation
+// ============================================================================
+
+/// Device availability status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceAvailability {
+    pub device_type: String,
+    pub device_id: Option<String>,
+    pub is_available: bool,
+    pub error_message: Option<String>,
+    pub fallback_available: bool,
+    pub fallback_device_id: Option<String>,
+}
+
+/// Validate device availability before starting recording
+#[tauri::command]
+pub async fn validate_device_availability(
+    device_type: String,
+    device_id: Option<String>,
+) -> Result<DeviceAvailability, String> {
+    use crate::commands::camera_sources::{CameraEnumerator, PlatformEnumerator as CameraEnum};
+    use crate::commands::screen_sources::{SourceEnumerator, PlatformEnumerator as ScreenEnum};
+
+    match device_type.as_str() {
+        "camera" => {
+            let cameras = CameraEnum::enumerate_cameras()
+                .map_err(|e| format!("Failed to enumerate cameras: {}", e))?;
+
+            if cameras.is_empty() {
+                return Ok(DeviceAvailability {
+                    device_type: "camera".to_string(),
+                    device_id: None,
+                    is_available: false,
+                    error_message: Some("No camera devices found".to_string()),
+                    fallback_available: false,
+                    fallback_device_id: None,
+                });
+            }
+
+            if let Some(ref id) = device_id {
+                let found = cameras.iter().find(|c| &c.id == id);
+                if let Some(camera) = found {
+                    Ok(DeviceAvailability {
+                        device_type: "camera".to_string(),
+                        device_id: Some(camera.id.clone()),
+                        is_available: true,
+                        error_message: None,
+                        fallback_available: cameras.len() > 1,
+                        fallback_device_id: cameras.iter()
+                            .find(|c| c.id != *id)
+                            .map(|c| c.id.clone()),
+                    })
+                } else {
+                    // Device not found, offer fallback
+                    let default_camera = cameras.iter().find(|c| c.is_default)
+                        .or_else(|| cameras.first());
+
+                    Ok(DeviceAvailability {
+                        device_type: "camera".to_string(),
+                        device_id: device_id.clone(),
+                        is_available: false,
+                        error_message: Some(format!("Camera '{}' not found or disconnected", id)),
+                        fallback_available: default_camera.is_some(),
+                        fallback_device_id: default_camera.map(|c| c.id.clone()),
+                    })
+                }
+            } else {
+                // No specific device requested, use default
+                let default_camera = cameras.iter().find(|c| c.is_default)
+                    .or_else(|| cameras.first());
+
+                Ok(DeviceAvailability {
+                    device_type: "camera".to_string(),
+                    device_id: default_camera.as_ref().map(|c| c.id.clone()),
+                    is_available: default_camera.is_some(),
+                    error_message: if default_camera.is_none() {
+                        Some("No default camera available".to_string())
+                    } else {
+                        None
+                    },
+                    fallback_available: cameras.len() > 1,
+                    fallback_device_id: cameras.get(1).map(|c| c.id.clone()),
+                })
+            }
+        }
+        "screen" => {
+            let screens = ScreenEnum::enumerate_screens()
+                .map_err(|e| format!("Failed to enumerate screens: {}", e))?;
+
+            if screens.is_empty() {
+                return Ok(DeviceAvailability {
+                    device_type: "screen".to_string(),
+                    device_id: None,
+                    is_available: false,
+                    error_message: Some("No screen devices found".to_string()),
+                    fallback_available: false,
+                    fallback_device_id: None,
+                });
+            }
+
+            if let Some(ref id) = device_id {
+                let found = screens.iter().find(|s| &s.id == id);
+                if let Some(screen) = found {
+                    Ok(DeviceAvailability {
+                        device_type: "screen".to_string(),
+                        device_id: Some(screen.id.clone()),
+                        is_available: true,
+                        error_message: None,
+                        fallback_available: screens.len() > 1,
+                        fallback_device_id: screens.iter()
+                            .find(|s| s.id != *id)
+                            .map(|s| s.id.clone()),
+                    })
+                } else {
+                    // Screen not found, offer fallback
+                    let primary_screen = screens.iter().find(|s| s.is_primary)
+                        .or_else(|| screens.first());
+
+                    Ok(DeviceAvailability {
+                        device_type: "screen".to_string(),
+                        device_id: device_id.clone(),
+                        is_available: false,
+                        error_message: Some(format!("Screen '{}' not found", id)),
+                        fallback_available: primary_screen.is_some(),
+                        fallback_device_id: primary_screen.map(|s| s.id.clone()),
+                    })
+                }
+            } else {
+                // No specific screen requested, use primary
+                let primary_screen = screens.iter().find(|s| s.is_primary)
+                    .or_else(|| screens.first());
+
+                Ok(DeviceAvailability {
+                    device_type: "screen".to_string(),
+                    device_id: primary_screen.as_ref().map(|s| s.id.clone()),
+                    is_available: primary_screen.is_some(),
+                    error_message: if primary_screen.is_none() {
+                        Some("No primary screen available".to_string())
+                    } else {
+                        None
+                    },
+                    fallback_available: screens.len() > 1,
+                    fallback_device_id: screens.get(1).map(|s| s.id.clone()),
+                })
+            }
+        }
+        _ => Err(format!("Unknown device type: {}", device_type)),
+    }
+}
+
+// ============================================================================
+// Cleanup Registry for Resource Tracking
+// ============================================================================
+
+/// Registry entry for tracking resources that need cleanup
+#[derive(Debug, Clone)]
+struct CleanupEntry {
+    resource_type: String,
+    resource_path: PathBuf,
+    created_at: std::time::SystemTime,
+    recording_id: Option<String>,
+}
+
+/// Comprehensive cleanup registry for tracking all recording resources
+pub struct CleanupRegistry {
+    entries: Vec<CleanupEntry>,
+    max_age_hours: u64,
+}
+
+impl CleanupRegistry {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_age_hours: 24, // Default: cleanup files older than 24 hours
+        }
+    }
+
+    /// Register a resource for cleanup
+    pub fn register(&mut self, resource_type: String, path: PathBuf, recording_id: Option<String>) {
+        self.entries.push(CleanupEntry {
+            resource_type,
+            resource_path: path,
+            created_at: std::time::SystemTime::now(),
+            recording_id,
+        });
+    }
+
+    /// Remove a resource from the registry (when successfully moved/processed)
+    pub fn unregister(&mut self, path: &PathBuf) {
+        self.entries.retain(|e| &e.resource_path != path);
+    }
+
+    /// Clean up all registered resources
+    pub fn cleanup_all(&mut self) -> Result<usize, String> {
+        let mut cleaned = 0;
+        let mut errors = Vec::new();
+
+        self.entries.retain(|entry| {
+            if entry.resource_path.exists() {
+                match fs::remove_file(&entry.resource_path) {
+                    Ok(_) => {
+                        println!("[CleanupRegistry] Removed: {:?}", entry.resource_path);
+                        cleaned += 1;
+                        false // Remove from registry
+                    }
+                    Err(e) => {
+                        errors.push(format!("Failed to remove {:?}: {}", entry.resource_path, e));
+                        true // Keep in registry for retry
+                    }
+                }
+            } else {
+                // File doesn't exist, remove from registry
+                false
+            }
+        });
+
+        if !errors.is_empty() {
+            eprintln!("[CleanupRegistry] Errors during cleanup: {:?}", errors);
+        }
+
+        Ok(cleaned)
+    }
+
+    /// Clean up old resources based on age
+    pub fn cleanup_old(&mut self) -> Result<usize, String> {
+        let now = std::time::SystemTime::now();
+        let max_age = std::time::Duration::from_secs(self.max_age_hours * 3600);
+        let mut cleaned = 0;
+
+        self.entries.retain(|entry| {
+            if let Ok(age) = now.duration_since(entry.created_at) {
+                if age > max_age && entry.resource_path.exists() {
+                    match fs::remove_file(&entry.resource_path) {
+                        Ok(_) => {
+                            println!("[CleanupRegistry] Removed old file: {:?}", entry.resource_path);
+                            cleaned += 1;
+                            return false;
+                        }
+                        Err(e) => {
+                            eprintln!("[CleanupRegistry] Failed to remove old file {:?}: {}", entry.resource_path, e);
+                        }
+                    }
+                }
+            }
+            true
+        });
+
+        Ok(cleaned)
+    }
+
+    /// Get count of tracked resources
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl Default for CleanupRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// Long Recording Memory Management
+// ============================================================================
+
+/// Configuration for long recording sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LongRecordingConfig {
+    /// Maximum recording duration in seconds before automatic stop (0 = unlimited)
+    pub max_duration_seconds: u64,
+    /// Enable automatic file chunking for long recordings
+    pub enable_chunking: bool,
+    /// Chunk duration in seconds (default: 1800 = 30 minutes)
+    pub chunk_duration_seconds: u64,
+    /// Maximum file size in MB before creating new chunk
+    pub max_chunk_size_mb: u64,
+    /// Enable memory monitoring
+    pub enable_memory_monitoring: bool,
+}
+
+impl Default for LongRecordingConfig {
+    fn default() -> Self {
+        Self {
+            max_duration_seconds: 0, // Unlimited by default
+            enable_chunking: true,
+            chunk_duration_seconds: 1800, // 30 minutes
+            max_chunk_size_mb: 2048, // 2 GB
+            enable_memory_monitoring: true,
+        }
+    }
+}
+
+/// Get default long recording configuration
+#[tauri::command]
+pub async fn get_long_recording_config() -> Result<LongRecordingConfig, String> {
+    Ok(LongRecordingConfig::default())
+}
+
+/// Validate long recording configuration
+#[tauri::command]
+pub async fn validate_long_recording_config(
+    config: LongRecordingConfig,
+) -> Result<bool, String> {
+    if config.chunk_duration_seconds < 60 {
+        return Err("Chunk duration must be at least 60 seconds".to_string());
+    }
+    if config.max_chunk_size_mb < 100 {
+        return Err("Max chunk size must be at least 100 MB".to_string());
+    }
+    if config.max_duration_seconds > 0 && config.max_duration_seconds < 60 {
+        return Err("Max duration must be at least 60 seconds if set".to_string());
+    }
+    Ok(true)
 }
 
 // ============================================================================
@@ -1194,6 +1572,132 @@ pub async fn get_error_details(error_type: String) -> Result<ErrorDetails, Strin
 pub struct ErrorDetails {
     pub message: String,
     pub suggestion: Option<String>,
+}
+
+/// Disk space information
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiskSpaceInfo {
+    pub available_bytes: u64,
+    pub total_bytes: u64,
+    pub available_mb: u64,
+    pub total_mb: u64,
+    pub percent_free: f64,
+    pub has_sufficient_space: bool,
+    pub estimated_recording_minutes: f64,
+    pub warning_level: String, // "ok", "low", "critical"
+}
+
+impl DiskSpaceInfo {
+    /// Estimate recording time based on bitrate and available space
+    pub fn estimate_recording_time(available_mb: u64, video_bitrate_kbps: u32, audio_bitrate_kbps: u32) -> f64 {
+        let total_bitrate_kbps = video_bitrate_kbps + audio_bitrate_kbps;
+        let total_bitrate_mbps = total_bitrate_kbps as f64 / 8.0 / 1024.0; // Convert to MB/s
+        if total_bitrate_mbps == 0.0 {
+            return 0.0;
+        }
+        (available_mb as f64 / total_bitrate_mbps) / 60.0 // Return minutes
+    }
+
+    /// Determine warning level based on available space
+    pub fn get_warning_level(available_mb: u64) -> String {
+        if available_mb < 500 {
+            "critical".to_string()
+        } else if available_mb < 2000 {
+            "low".to_string()
+        } else {
+            "ok".to_string()
+        }
+    }
+}
+
+/// Get detailed disk space information
+#[tauri::command]
+pub async fn get_disk_space_info(
+    video_bitrate_kbps: Option<u32>,
+    audio_bitrate_kbps: Option<u32>,
+) -> Result<DiskSpaceInfo, String> {
+    // Get the temp directory path
+    let temp_dir = std::env::temp_dir();
+
+    // Use platform-specific disk space check
+    #[cfg(target_os = "macos")]
+    {
+        use std::ffi::CString;
+        use std::mem;
+        use std::os::raw::{c_char, c_int};
+
+        #[repr(C)]
+        struct StatFs {
+            f_bsize: u32,
+            f_iosize: i32,
+            f_blocks: u64,
+            f_bfree: u64,
+            f_bavail: u64,
+            f_files: u64,
+            f_ffree: u64,
+            f_fsid: [i32; 2],
+            f_owner: u32,
+            f_type: u32,
+            f_flags: u32,
+            f_fssubtype: u32,
+            f_fstypename: [c_char; 16],
+            f_mntonname: [c_char; 1024],
+            f_mntfromname: [c_char; 1024],
+            f_reserved: [u32; 8],
+        }
+
+        extern "C" {
+            fn statfs(path: *const c_char, buf: *mut StatFs) -> c_int;
+        }
+
+        let path_str = temp_dir.to_str().ok_or("Invalid path")?;
+        let c_path = CString::new(path_str).map_err(|e| e.to_string())?;
+
+        unsafe {
+            let mut stat: StatFs = mem::zeroed();
+            if statfs(c_path.as_ptr(), &mut stat) == 0 {
+                let available_bytes = stat.f_bavail * stat.f_bsize as u64;
+                let total_bytes = stat.f_blocks * stat.f_bsize as u64;
+                let available_mb = available_bytes / 1_048_576;
+                let total_mb = total_bytes / 1_048_576;
+                let percent_free = (available_bytes as f64 / total_bytes as f64) * 100.0;
+
+                let video_br = video_bitrate_kbps.unwrap_or(5000);
+                let audio_br = audio_bitrate_kbps.unwrap_or(128);
+                let estimated_minutes = DiskSpaceInfo::estimate_recording_time(available_mb, video_br, audio_br);
+                let warning_level = DiskSpaceInfo::get_warning_level(available_mb);
+
+                Ok(DiskSpaceInfo {
+                    available_bytes,
+                    total_bytes,
+                    available_mb,
+                    total_mb,
+                    percent_free,
+                    has_sufficient_space: available_mb > 1000, // At least 1GB
+                    estimated_recording_minutes: estimated_minutes,
+                    warning_level,
+                })
+            } else {
+                Err("Failed to get disk space information".to_string())
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Fallback for other platforms - return placeholder data
+        // TODO: Implement Windows and Linux disk space checks
+        Ok(DiskSpaceInfo {
+            available_bytes: 10_000_000_000,
+            total_bytes: 100_000_000_000,
+            available_mb: 10_000,
+            total_mb: 100_000,
+            percent_free: 10.0,
+            has_sufficient_space: true,
+            estimated_recording_minutes: 300.0,
+            warning_level: "ok".to_string(),
+        })
+    }
 }
 
 /// Save PiP recording metadata to JSON file
