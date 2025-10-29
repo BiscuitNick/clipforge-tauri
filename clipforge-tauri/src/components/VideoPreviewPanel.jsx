@@ -29,6 +29,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const [isSeeking, setIsSeeking] = useState(false);
   const [videoSrc, setVideoSrc] = useState(null);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
+  const [currentClipId, setCurrentClipId] = useState(null); // Track currently loaded clip
 
   // Debug: Log props changes
   useEffect(() => {
@@ -52,6 +53,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   useEffect(() => {
     if (mode !== "timeline" || !timelineState) {
       console.log("[VideoPreview] Timeline mode check failed - mode:", mode, "hasTimelineState:", !!timelineState);
+      setCurrentClipId(null);
       return;
     }
 
@@ -64,6 +66,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       console.log("[VideoPreview] Timeline - No clip at playhead, showing black screen");
       setShowBlackScreen(true);
       setVideoSrc(null);
+      setCurrentClipId(null);
       if (videoRef.current) {
         videoRef.current.pause();
       }
@@ -81,12 +84,14 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
     // Load the clip's video if not already loaded
     const assetUrl = convertFileSrc(clip.videoPath);
-    console.log("[VideoPreview] Timeline - Current videoSrc:", videoSrc);
-    console.log("[VideoPreview] Timeline - New assetUrl:", assetUrl);
+    const isClipChange = currentClipId !== clip.id;
 
-    if (videoSrc !== assetUrl) {
+    console.log("[VideoPreview] Timeline - Current clip:", currentClipId, "New clip:", clip.id, "Changed:", isClipChange);
+
+    if (isClipChange) {
       console.log("[VideoPreview] Timeline - Loading new clip:", clip.filename);
       setVideoSrc(assetUrl);
+      setCurrentClipId(clip.id);
 
       // Set duration from clip
       if (clip.duration) {
@@ -117,15 +122,16 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
         };
       }
     } else {
-      // Same video, just sync time and play state
+      // Same clip - only sync if needed
       const video = videoRef.current;
       if (video && video.readyState >= 2) {
         const videoTime = video.currentTime;
         const timeDiff = Math.abs(videoTime - sourceTime);
 
-        // Only seek if significantly out of sync (> 0.1s)
-        if (timeDiff > 0.1) {
-          console.log("[VideoPreview] Timeline - Syncing time from", videoTime, "to", sourceTime);
+        // Only seek if severely out of sync (> 0.5s) or if paused
+        // This prevents constant seeking during playback which causes choppiness
+        if (timeDiff > 0.5 || !timelinePlaying) {
+          console.log("[VideoPreview] Timeline - Syncing time from", videoTime, "to", sourceTime, "(diff:", timeDiff, ")");
           video.currentTime = sourceTime;
         }
 
@@ -139,7 +145,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
         }
       }
     }
-  }, [mode, timelineState]);
+  }, [mode, timelineState, currentClipId]);
 
   // Load video when selectedMedia changes (library mode)
   useEffect(() => {
@@ -149,6 +155,9 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       console.log("[VideoPreview] Not in library mode, skipping");
       return;
     }
+
+    // Clear clip tracking when in library mode
+    setCurrentClipId(null);
 
     if (!selectedMedia) {
       console.log("[VideoPreview] No selectedMedia, clearing video");
