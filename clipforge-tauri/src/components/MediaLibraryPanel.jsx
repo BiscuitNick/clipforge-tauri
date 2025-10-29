@@ -17,6 +17,17 @@ function formatDuration(seconds) {
 }
 
 /**
+ * Format file size in bytes to human-readable format
+ */
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
  * Draggable wrapper for media items
  */
 function DraggableMediaItem({ item, isSelected, onSelect }) {
@@ -60,19 +71,27 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
         onClick={handleClick}
       >
         <div className="media-thumbnail" {...listeners}>
-          <svg
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          {item.thumbnailPath ? (
+            <img
+              src={`asset://localhost/${item.thumbnailPath}`}
+              alt={item.filename}
+              className="thumbnail-image"
             />
-          </svg>
+          ) : (
+            <svg
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          )}
         </div>
         <div className="media-info">
           <div className="media-title-row">
@@ -92,6 +111,11 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
             {item.width && item.height && (
               <span className="media-resolution">
                 {item.width}×{item.height}
+              </span>
+            )}
+            {item.fileSize && (
+              <span className="media-filesize">
+                {formatFileSize(item.fileSize)}
               </span>
             )}
           </div>

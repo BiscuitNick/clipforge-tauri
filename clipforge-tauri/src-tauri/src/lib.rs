@@ -41,6 +41,8 @@ pub fn run() {
             commands::recording::get_error_details,
             commands::recording::save_webcam_recording,
             commands::recording::save_pip_metadata,
+            commands::thumbnail::generate_thumbnail,
+            commands::thumbnail::cleanup_old_thumbnails,
             commands::screen_sources::enumerate_sources,
             commands::screen_sources::enumerate_screens,
             commands::screen_sources::enumerate_windows,

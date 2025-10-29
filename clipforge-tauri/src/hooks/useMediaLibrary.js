@@ -17,11 +17,12 @@ export function useMediaLibrary() {
       filename: video.filename,
       filepath: video.path,
       duration: video.duration,
-      thumbnailPath: "", // TODO: Implement thumbnail generation
+      thumbnailPath: video.thumbnail_path || "",
       usedInTimeline: false,
       width: video.width,
       height: video.height,
       frameRate: video.frame_rate,
+      fileSize: video.file_size,
     }));
 
     setMediaItems(prev => [...prev, ...newMediaItems]);
