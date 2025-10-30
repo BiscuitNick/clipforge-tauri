@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import './PreviewWindow.css';
+import usePreviewStream from '../hooks/usePreviewStream';
 
 /**
  * PreviewWindow - Real-time screen capture preview component
@@ -18,105 +18,16 @@ const PreviewWindow = React.memo(({
   onToggleVisibility,
   isPictureInPicture = false
 }) => {
-  // Canvas ref for single buffer rendering
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   // State
-  const [fps, setFps] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
-  const [metrics, setMetrics] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [size, setSize] = useState({ width: 320, height: 180 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [lastFrameTime, setLastFrameTime] = useState(null);
-  const [actualFps, setActualFps] = useState(0);
-  const [frameCount, setFrameCount] = useState(0);
-  const pendingImageRef = useRef(null);
-
-  // FPS calculation interval
-  const fpsIntervalRef = useRef(null);
-
-  /**
-   * Handle preview frame event from Tauri
-   * Decodes JPEG payloads and draws them into the canvas.
-   */
-  const handlePreviewFrame = useCallback((event) => {
-    const { imageData, width, height, timestamp, frameNumber, jpegSize } = event.payload;
-
-    if (frameNumber <= 5 || frameNumber % 60 === 0) {
-      console.log('[PreviewWindow] Frame received', {
-        frameNumber,
-        jpegSize,
-        base64Length: imageData?.length ?? 0,
-        width,
-        height,
-      });
-    }
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-
-    // Set canvas dimensions if changed to preserve pixel fidelity
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-
-    // Create image from base64 data
-    const pendingImage = pendingImageRef.current ?? new Image();
-    pendingImageRef.current = pendingImage;
-    pendingImage.onload = () => {
-      // Draw image to canvas
-      ctx.drawImage(pendingImage, 0, 0, width, height);
-
-      // Update FPS calculation
-      const now = performance.now();
-      if (lastFrameTime) {
-        const elapsed = (now - lastFrameTime) / 1000; // Convert to seconds
-        if (elapsed > 0) {
-          const currentFps = 1 / elapsed;
-          setActualFps(currentFps);
-        }
-      }
-      setLastFrameTime(now);
-      setFrameCount(prev => prev + 1);
-    };
-    pendingImage.onerror = (err) => {
-      console.error('[PreviewWindow] Failed to decode preview frame', err);
-    };
-    pendingImage.src = `data:image/jpeg;base64,${imageData}`;
-  }, [lastFrameTime]);
-
-  /**
-   * Handle preview metrics event from Tauri
-   */
-  const handlePreviewMetrics = useCallback((event) => {
-    const metricsData = event.payload;
-    setMetrics(metricsData);
-    setFps(metricsData.currentFps || 0);
-  }, []);
-
-  /**
-   * Handle preview lifecycle events
-   */
-  const handlePreviewStarted = useCallback(() => {
-    console.log('[PreviewWindow] Preview started');
-    setIsRecording(true);
-    setFrameCount(0);
-    setLastFrameTime(null);
-  }, []);
-
-  const handlePreviewStopped = useCallback(() => {
-    console.log('[PreviewWindow] Preview stopped');
-    setIsRecording(false);
-  }, []);
+  const { canvasRef, fps, actualFps, metrics, isRecording } = usePreviewStream(isVisible);
 
   /**
    * Start preview stream
@@ -167,47 +78,6 @@ const PreviewWindow = React.memo(({
       console.error('[PreviewWindow] Failed to update preview settings:', error);
     }
   }, []);
-
-  // Set up event listeners
-  useEffect(() => {
-    let unlistenFrame, unlistenMetrics, unlistenStarted, unlistenStopped;
-
-    const setupListeners = async () => {
-      unlistenFrame = await listen('preview-frame', handlePreviewFrame);
-      unlistenMetrics = await listen('preview-metrics', handlePreviewMetrics);
-      unlistenStarted = await listen('preview-started', handlePreviewStarted);
-      unlistenStopped = await listen('preview-stopped', handlePreviewStopped);
-    };
-
-    setupListeners();
-
-    return () => {
-      if (unlistenFrame) unlistenFrame();
-      if (unlistenMetrics) unlistenMetrics();
-      if (unlistenStarted) unlistenStarted();
-      if (unlistenStopped) unlistenStopped();
-    };
-  }, [handlePreviewFrame, handlePreviewMetrics, handlePreviewStarted, handlePreviewStopped]);
-
-  // FPS counter update interval (every second)
-  useEffect(() => {
-    if (isRecording) {
-      fpsIntervalRef.current = setInterval(() => {
-        // FPS is already being updated in handlePreviewFrame
-      }, 1000);
-    } else {
-      if (fpsIntervalRef.current) {
-        clearInterval(fpsIntervalRef.current);
-        fpsIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (fpsIntervalRef.current) {
-        clearInterval(fpsIntervalRef.current);
-      }
-    };
-  }, [isRecording]);
 
   /**
    * Drag functionality

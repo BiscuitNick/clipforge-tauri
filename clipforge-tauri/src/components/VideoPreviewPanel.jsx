@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import "./VideoPreviewPanel.css";
+import usePreviewStream from "../hooks/usePreviewStream";
 
 /**
  * Format time in seconds to MM:SS format
@@ -32,6 +33,13 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const [videoSrc, setVideoSrc] = useState(null);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
   const [currentClipId, setCurrentClipId] = useState(null); // Track currently loaded clip
+  const previewEnabled = mode === "recording" || mode === "recording-preview";
+  const {
+    canvasRef: previewCanvasRef,
+    hasFrame: hasPreviewFrame,
+    actualFps: previewActualFps,
+    isRecording: previewIsRecording,
+  } = usePreviewStream(previewEnabled);
 
   // Debug: Log props changes
   useEffect(() => {
@@ -435,45 +443,39 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                   </>
                 )}
               </>
-            ) : mode === "recording-preview" && recordingState ? (
-              <div className="recording-preview preview-mode">
-                {/* Show thumbnail preview if available */}
-                {recordingState.source?.thumbnail && (
-                  <div className="preview-thumbnail-container">
+            ) : previewEnabled ? (
+              <div className="live-preview-container">
+                <canvas
+                  ref={previewCanvasRef}
+                  className="video-element preview-stream-canvas"
+                />
+                {!hasPreviewFrame && recordingState?.source?.thumbnail && (
+                  <div className="preview-fallback-overlay">
                     <img
                       src={`data:image/png;base64,${recordingState.source.thumbnail}`}
                       alt="Preview"
                       className="preview-thumbnail-image"
                     />
-                    <div className="preview-thumbnail-overlay">
-                      <div className="preview-play-icon">
-                        <svg fill="currentColor" viewBox="0 0 20 20" width="48" height="48">
-                          <circle cx="10" cy="10" r="8" fill="rgba(231, 76, 60, 0.9)" />
-                          <circle cx="10" cy="10" r="3" fill="white" />
-                        </svg>
-                      </div>
+                  </div>
+                )}
+                {mode === "recording" && recordingState && (
+                  <>
+                    <div className="recording-indicator-bottom-left">
+                      <div className="recording-dot-pulse"></div>
                     </div>
+                    <div className="recording-timer-bottom-right">
+                      {formatTime(recordingState.duration)}
+                    </div>
+                  </>
+                )}
+                {mode === "recording-preview" && !hasPreviewFrame && (
+                  <div className="preview-status-badge">Preparing preview…</div>
+                )}
+                {mode === "recording" && previewIsRecording && (
+                  <div className="preview-fps-pill">
+                    {previewActualFps > 0 ? `${previewActualFps.toFixed(1)} FPS` : '-- FPS'}
                   </div>
                 )}
-              </div>
-            ) : mode === "recording" && recordingState ? (
-              <div className="recording-preview">
-                {/* Show thumbnail preview if available */}
-                {recordingState.source?.thumbnail && (
-                  <div className="recording-preview-thumbnail">
-                    <img
-                      src={`data:image/png;base64,${recordingState.source.thumbnail}`}
-                      alt="Recording Preview"
-                      className="recording-thumbnail-image"
-                    />
-                  </div>
-                )}
-                <div className="recording-indicator-bottom-left">
-                  <div className="recording-dot-pulse"></div>
-                </div>
-                <div className="recording-timer-bottom-right">
-                  {formatTime(recordingState.duration)}
-                </div>
               </div>
             ) : showBlackScreen ? (
               <div className="black-screen"></div>
