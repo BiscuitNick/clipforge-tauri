@@ -706,11 +706,181 @@
             "testStrategy": "Test cleanup after various failure scenarios. Verify no temporary files remain after errors. Test recovery of partial recordings. Validate resource cleanup with system monitoring."
           }
         ]
+      },
+      {
+        "id": 11,
+        "title": "Implement Split Clips functionality",
+        "description": "Add the ability to split clips at the playhead position with keyboard shortcuts and visual feedback",
+        "details": "**Backend:** Add `split_clip` function in timeline state to create two new clips from split point and adjust trim values for both halves. **Frontend:** Add Split button to timeline toolbar (or right-click menu), split at current playhead position with keyboard shortcut (Cmd/Ctrl + Shift + S), and provide visual feedback (scissor cursor at playhead).",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create backend split_clip function in timeline state",
+            "description": "Implement the core split functionality in the timeline state management",
+            "details": "Create a split_clip function that takes a clip ID and split timestamp as parameters. Calculate the split point relative to the clip's trimmed duration. Generate two new clips from the original: first clip keeps original start to split point, second clip from split point to original end. Adjust trim values appropriately for both clips. Update timeline state to replace original clip with two new clips. Handle edge cases like splitting at clip boundaries.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 11
+          },
+          {
+            "id": 2,
+            "title": "Add Split button to timeline toolbar and right-click menu",
+            "description": "Create UI controls for triggering the split functionality",
+            "details": "Add a Split button to the timeline toolbar with an appropriate icon (scissors or similar). Implement right-click context menu option for clips with 'Split at Playhead' action. Only enable split option when playhead is over a clip. Style button and menu items to match existing UI patterns. Connect UI elements to the split_clip function with proper clip ID and timestamp.",
+            "status": "done",
+            "dependencies": [
+              "11.1"
+            ],
+            "parentTaskId": 11
+          },
+          {
+            "id": 3,
+            "title": "Implement keyboard shortcut handling for split",
+            "description": "Add keyboard shortcut support for quick clip splitting",
+            "details": "Implement Cmd+Shift+S (Mac) / Ctrl+Shift+S (Windows/Linux) keyboard shortcut for split action. Add keyboard event listener to timeline component. Check if playhead is over a clip when shortcut is pressed. Trigger split_clip function with current playhead position. Add shortcut hint to tooltips and menu items. Ensure shortcut doesn't conflict with existing keyboard mappings.",
+            "status": "done",
+            "dependencies": [
+              "11.1",
+              "11.2"
+            ],
+            "parentTaskId": 11
+          },
+          {
+            "id": 4,
+            "title": "Add visual feedback with scissor cursor at playhead",
+            "description": "Implement visual indicators for split functionality",
+            "details": "Change cursor to scissors icon when hovering over clips with split mode active. Add visual indicator line at the exact split point on the timeline. Highlight the clip section that will be split. Show preview of where split will occur before committing. Add subtle animation when split is performed. Ensure visual feedback is clear and responsive to user actions.",
+            "status": "done",
+            "dependencies": [
+              "11.2",
+              "11.3"
+            ],
+            "parentTaskId": 11
+          },
+          {
+            "id": 5,
+            "title": "Handle edge cases and validation for split operations",
+            "description": "Implement robust error handling and validation for split functionality",
+            "details": "Validate split position is within clip boundaries (not at start or end). Handle minimum clip duration requirements (prevent splits creating clips shorter than 1 frame). Manage undo/redo operations for split actions. Handle split operations on clips with effects or transitions. Ensure timeline consistency after split operations. Add appropriate error messages for invalid split attempts.",
+            "status": "done",
+            "dependencies": [
+              "11.1",
+              "11.2",
+              "11.3",
+              "11.4"
+            ],
+            "parentTaskId": 11
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement Multiple Tracks functionality",
+        "description": "Extend the timeline to support multiple video tracks with visual layering and drag-and-drop between tracks",
+        "details": "**Backend:** Extend clip data structure to include track property, update overlap detection for multi-track, and modify export logic to composite multiple tracks. **Frontend:** Expand Timeline.jsx to render multiple track lanes with track headers and labels (Video 1, Video 2, Overlay), enable dragging clips between tracks, implement visual layering (top track renders over bottom), and add track height adjustment.",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend clip data structure to include track property",
+            "description": "Modify backend data structures to support multi-track timeline",
+            "details": "Add 'track' property to clip data structure (integer representing track index 0, 1, 2, etc.). Update clip creation functions to accept track parameter with default value of 0. Modify clip serialization/deserialization to include track information. Update timeline state management to handle clips on different tracks. Ensure backward compatibility with existing single-track projects.",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 12
+          },
+          {
+            "id": 2,
+            "title": "Update overlap detection logic for multi-track support",
+            "description": "Modify collision detection to only check overlaps within the same track",
+            "details": "Update overlap detection algorithm to consider track property when checking clip collisions. Allow clips to occupy same timeline position if on different tracks. Implement track-specific boundary checking for clip placement. Update snap-to-edge functionality to work within tracks. Ensure drag preview shows correct placement considering track context.",
+            "status": "pending",
+            "dependencies": [
+              "12.1"
+            ],
+            "parentTaskId": 12
+          },
+          {
+            "id": 3,
+            "title": "Modify export logic to composite multiple video tracks",
+            "description": "Update FFmpeg export to handle layering and compositing of multiple tracks",
+            "details": "Modify FFmpeg command generation to handle multiple input tracks. Implement video compositing with proper layering (higher tracks render on top). Handle transparency and alpha channels for overlay tracks. Update export progress calculation for multi-track rendering. Optimize rendering performance for multiple simultaneous video streams. Add audio mixing for clips with audio on different tracks.",
+            "status": "pending",
+            "dependencies": [
+              "12.1",
+              "12.2"
+            ],
+            "parentTaskId": 12
+          },
+          {
+            "id": 4,
+            "title": "Expand Timeline.jsx to render multiple track lanes",
+            "description": "Update the timeline UI component to display and manage multiple horizontal tracks",
+            "details": "Modify Timeline.jsx to render multiple horizontal track lanes stacked vertically. Create track headers with labels (Video 1, Video 2, Overlay, etc.). Implement visual separation between tracks with borders or spacing. Add track numbering or naming system for easy identification. Update timeline scrolling to handle vertical scrolling for many tracks. Ensure timeline ruler and playhead span all tracks correctly.",
+            "status": "pending",
+            "dependencies": [
+              "12.1"
+            ],
+            "parentTaskId": 12
+          },
+          {
+            "id": 5,
+            "title": "Implement drag-and-drop between tracks",
+            "description": "Enable users to move clips between different tracks using drag-and-drop",
+            "details": "Update drag-and-drop logic to detect target track during drag operations. Show visual feedback indicating which track the clip will be dropped on. Update clip's track property when dropped on a different track. Implement smooth visual transition when moving clips between tracks. Handle edge cases like dragging multiple selected clips between tracks. Ensure timeline state updates correctly after track changes.",
+            "status": "pending",
+            "dependencies": [
+              "12.2",
+              "12.4"
+            ],
+            "parentTaskId": 12
+          },
+          {
+            "id": 6,
+            "title": "Add track height adjustment controls",
+            "description": "Implement UI controls to adjust the height of individual tracks for better visibility",
+            "details": "Add track height adjustment handles or buttons in track headers. Implement three height presets: small, medium, large. Allow manual height adjustment by dragging track borders. Store track height preferences in project settings. Update clip thumbnail sizing based on track height. Ensure smooth animations during height changes. Handle minimum and maximum track height constraints.",
+            "status": "pending",
+            "dependencies": [
+              "12.4"
+            ],
+            "parentTaskId": 12
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-29T21:05:26.193Z",
+      "updated": "2025-10-30T02:41:59.806Z",
       "description": "Tasks for master context"
     }
   }

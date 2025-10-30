@@ -528,6 +528,7 @@ function App() {
           onCopyClip={timeline.copyClip}
           onPasteClip={timeline.pasteClip}
           onDeleteClip={timeline.removeClip}
+          onSplitClip={timeline.splitClip}
           hasClipboard={!!timeline.clipboardClip}
           onExport={handleExport}
           isExporting={isExporting}
