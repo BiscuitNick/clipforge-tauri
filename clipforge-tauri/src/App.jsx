@@ -106,6 +106,23 @@ function App() {
       });
       setPreviewMode("recording-preview");
       setSelectedMedia(null);
+
+      // Start live preview with ScreenCaptureKit
+      console.log("[App] Starting live preview for source:", state.source.id);
+      invoke('start_preview_for_source', {
+        sourceId: state.source.id,
+        width: state.config.width,
+        height: state.config.height,
+        frameRate: 15 // 15fps for preview
+      })
+        .then(() => {
+          console.log("[App] Live preview started successfully");
+          // Auto-show preview window
+          setIsPreviewWindowVisible(true);
+        })
+        .catch((error) => {
+          console.error("[App] Failed to start live preview:", error);
+        });
     } else if (state.isRecording) {
       // Recording just started - update to recording state but keep source info
       setRecordingState(prev => ({
@@ -118,7 +135,15 @@ function App() {
       setPreviewMode("recording");
       setSelectedMedia(null);
     } else if (state.file_path) {
-      // Recording completed - import the video
+      // Recording completed - stop preview and import the video
+      invoke('stop_preview_for_source')
+        .then(() => {
+          console.log("[App] Preview stopped after recording completed");
+        })
+        .catch((error) => {
+          console.error("[App] Failed to stop preview:", error);
+        });
+
       setRecordingState(null);
       setPreviewMode("library");
       invoke("import_video", { paths: [state.file_path] })

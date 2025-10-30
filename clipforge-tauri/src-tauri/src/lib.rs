@@ -23,9 +23,13 @@ pub fn run() {
     // Initialize preview state
     let preview_state = Arc::new(Mutex::new(commands::preview::PreviewState::new()));
 
+    // Initialize preview capture session
+    let preview_capture_session = Arc::new(Mutex::new(commands::preview::PreviewCaptureSession::new()));
+
     tauri::Builder::default()
         .manage(recording_manager)
         .manage(preview_state)
+        .manage(preview_capture_session)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -66,7 +70,9 @@ pub fn run() {
             commands::preview::stop_preview,
             commands::preview::update_preview_settings,
             commands::preview::get_preview_metrics,
-            commands::preview::get_preview_settings
+            commands::preview::get_preview_settings,
+            commands::preview::start_preview_for_source,
+            commands::preview::stop_preview_for_source
         ])
         .setup(|app| {
             // Create the menu

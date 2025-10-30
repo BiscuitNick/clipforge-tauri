@@ -38,6 +38,23 @@ pub struct Frame {
 /// Thread-safe frame queue for buffering captured frames
 pub type FrameQueue = Arc<Mutex<VecDeque<Frame>>>;
 
+/// Processed JPEG frame from Swift ScreenCaptureKit
+///
+/// Represents a JPEG-compressed frame ready for preview or streaming
+#[derive(Debug, Clone)]
+pub struct ProcessedJpegFrame {
+    /// JPEG-compressed image data
+    pub jpeg_data: Vec<u8>,
+    /// Frame width in pixels
+    pub width: usize,
+    /// Frame height in pixels
+    pub height: usize,
+    /// Presentation timestamp in seconds
+    pub timestamp: f64,
+    /// Sequential frame number
+    pub frame_number: u64,
+}
+
 /// Display information from SCDisplay (must match Swift CDisplayInfo)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -86,6 +103,42 @@ extern "C" {
 
     /// Pauses capture on a bridge instance
     fn screen_capture_bridge_pause(bridge: *mut c_void);
+
+    /// Dequeues a processed JPEG frame from the bridge
+    /// Returns 1 if frame retrieved, 0 if queue is empty
+    fn screen_capture_bridge_dequeue_frame(
+        bridge: *mut c_void,
+        out_data: *mut *mut u8,
+        out_length: *mut i32,
+        out_width: *mut i32,
+        out_height: *mut i32,
+        out_timestamp: *mut f64,
+        out_frame_number: *mut u64,
+    ) -> i32;
+
+    /// Gets the current frame queue size
+    /// Returns number of frames in queue, or -1 on error
+    fn screen_capture_bridge_get_frame_queue_size(bridge: *mut c_void) -> i32;
+
+    /// Clears the frame queue
+    fn screen_capture_bridge_clear_frame_queue(bridge: *mut c_void);
+
+    /// Configures the stream for capture
+    fn screen_capture_bridge_configure_stream(
+        bridge: *mut c_void,
+        width: i32,
+        height: i32,
+        frame_rate: i32,
+        capture_audio: u8,
+    );
+
+    /// Configures the content filter to capture a specific display
+    /// Returns 1 if successful, 0 otherwise
+    fn screen_capture_bridge_configure_display(bridge: *mut c_void, display_id: u32) -> i32;
+
+    /// Configures the content filter to capture a specific window
+    /// Returns 1 if successful, 0 otherwise
+    fn screen_capture_bridge_configure_window(bridge: *mut c_void, window_id: u32) -> i32;
 
     /// Checks if ScreenCaptureKit is available on this system
     /// Returns 1 if available, 0 otherwise
@@ -269,6 +322,116 @@ impl ScreenCaptureBridge {
         if let Ok(mut queue) = self.frame_queue.lock() {
             queue.clear();
             println!("[ScreenCapture FFI] Frame queue cleared");
+        }
+    }
+
+    /// Dequeues a JPEG-compressed frame from the Swift queue
+    ///
+    /// # Returns
+    /// - `Some(ProcessedJpegFrame)` if a frame is available
+    /// - `None` if the queue is empty
+    pub fn dequeue_jpeg_frame(&self) -> Option<ProcessedJpegFrame> {
+        unsafe {
+            let mut data_ptr: *mut u8 = std::ptr::null_mut();
+            let mut length: i32 = 0;
+            let mut width: i32 = 0;
+            let mut height: i32 = 0;
+            let mut timestamp: f64 = 0.0;
+            let mut frame_number: u64 = 0;
+
+            let result = screen_capture_bridge_dequeue_frame(
+                self.bridge_ptr.0,
+                &mut data_ptr,
+                &mut length,
+                &mut width,
+                &mut height,
+                &mut timestamp,
+                &mut frame_number,
+            );
+
+            if result == 1 && !data_ptr.is_null() && length > 0 {
+                // Copy JPEG data from Swift-allocated buffer
+                let jpeg_data = std::slice::from_raw_parts(data_ptr, length as usize).to_vec();
+
+                // Free the Swift-allocated buffer
+                libc::free(data_ptr as *mut libc::c_void);
+
+                Some(ProcessedJpegFrame {
+                    jpeg_data,
+                    width: width as usize,
+                    height: height as usize,
+                    timestamp,
+                    frame_number,
+                })
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Gets the current JPEG frame queue size from Swift
+    ///
+    /// # Returns
+    /// Number of frames in the Swift queue, or 0 if error
+    pub fn jpeg_frame_count(&self) -> usize {
+        unsafe {
+            let count = screen_capture_bridge_get_frame_queue_size(self.bridge_ptr.0);
+            if count >= 0 {
+                count as usize
+            } else {
+                0
+            }
+        }
+    }
+
+    /// Clears all JPEG frames from the Swift queue
+    pub fn clear_jpeg_frames(&self) {
+        unsafe {
+            screen_capture_bridge_clear_frame_queue(self.bridge_ptr.0);
+        }
+        println!("[ScreenCapture FFI] JPEG frame queue cleared");
+    }
+
+    /// Configures the stream settings
+    pub fn configure_stream(&self, width: u32, height: u32, frame_rate: u32, capture_audio: bool) {
+        unsafe {
+            screen_capture_bridge_configure_stream(
+                self.bridge_ptr.0,
+                width as i32,
+                height as i32,
+                frame_rate as i32,
+                if capture_audio { 1 } else { 0 },
+            );
+        }
+        println!("[ScreenCapture FFI] Stream configured: {}x{} @ {}fps, audio: {}",
+            width, height, frame_rate, capture_audio);
+    }
+
+    /// Configures to capture a specific display
+    pub fn configure_display(&self, display_id: u32) -> Result<(), String> {
+        let result = unsafe {
+            screen_capture_bridge_configure_display(self.bridge_ptr.0, display_id)
+        };
+
+        if result == 1 {
+            println!("[ScreenCapture FFI] Display filter configured: {}", display_id);
+            Ok(())
+        } else {
+            Err(format!("Failed to configure display filter for display {}", display_id))
+        }
+    }
+
+    /// Configures to capture a specific window
+    pub fn configure_window(&self, window_id: u32) -> Result<(), String> {
+        let result = unsafe {
+            screen_capture_bridge_configure_window(self.bridge_ptr.0, window_id)
+        };
+
+        if result == 1 {
+            println!("[ScreenCapture FFI] Window filter configured: {}", window_id);
+            Ok(())
+        } else {
+            Err(format!("Failed to configure window filter for window {}", window_id))
         }
     }
 }
