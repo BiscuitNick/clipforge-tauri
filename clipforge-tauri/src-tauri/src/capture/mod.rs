@@ -8,3 +8,11 @@ pub mod ffi;
 
 #[cfg(target_os = "macos")]
 pub use ffi::ScreenCaptureBridge;
+
+// Frame processing module for preview and encoding pipelines
+pub mod frame_processor;
+
+pub use frame_processor::{
+    FrameProcessor, PreviewFrameProcessor, EncodingFrameProcessor,
+    MultiFrameProcessor, ProcessedFrame,
+};

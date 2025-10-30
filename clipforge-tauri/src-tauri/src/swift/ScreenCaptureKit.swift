@@ -2,10 +2,28 @@ import Foundation
 import ScreenCaptureKit
 import AVFoundation
 import CoreMedia
+import Accelerate
 
 // MARK: - ScreenCaptureKit Bridge Module
 // This module provides Swift wrapper for ScreenCaptureKit APIs
 // to be called from Rust via FFI
+
+// MARK: - Frame Data Structures
+
+/// Represents a processed frame ready for preview or encoding
+@available(macOS 12.3, *)
+struct ProcessedFrame {
+    /// JPEG compressed frame data
+    let jpegData: Data
+    /// Frame width in pixels
+    let width: Int
+    /// Frame height in pixels
+    let height: Int
+    /// Presentation timestamp in seconds
+    let timestamp: Double
+    /// Frame number for debugging
+    let frameNumber: UInt64
+}
 
 // MARK: - Content Cache
 
@@ -77,6 +95,26 @@ class ScreenCaptureKitBridge: NSObject {
     /// Callback queue for stream output
     private var outputQueue: DispatchQueue?
 
+    /// Frame counter for throttling preview frames
+    private var frameCounter: UInt64 = 0
+
+    /// Frame throttle divisor (capture_fps / preview_fps)
+    /// Default: 60fps / 15fps = 4 (process every 4th frame)
+    private var frameThrottleDivisor: UInt64 = 4
+
+    /// JPEG compression quality (0.0 to 1.0)
+    /// Default: 0.5 (50% quality, balance between size and quality)
+    private var jpegQuality: CGFloat = 0.5
+
+    /// Frame queue for buffering processed frames
+    private var frameQueue: [ProcessedFrame] = []
+
+    /// Maximum frame queue size (default: 5 frames)
+    private var maxFrameQueueSize: Int = 5
+
+    /// Lock for thread-safe queue access
+    private let queueLock = NSLock()
+
     // MARK: - Initialization
 
     override init() {
@@ -90,6 +128,101 @@ class ScreenCaptureKitBridge: NSObject {
     }
 
     // MARK: - Configuration Methods
+
+    /// Configures the frame throttling for preview
+    /// - Parameters:
+    ///   - captureFrameRate: Capture frame rate (e.g., 60fps)
+    ///   - previewFrameRate: Desired preview frame rate (e.g., 15fps)
+    func configureFrameThrottling(captureFrameRate: Int, previewFrameRate: Int) {
+        guard previewFrameRate > 0 && captureFrameRate >= previewFrameRate else {
+            print("[ScreenCaptureKit Config] ⚠️ Invalid frame rates: capture=\(captureFrameRate), preview=\(previewFrameRate)")
+            return
+        }
+
+        frameThrottleDivisor = UInt64(captureFrameRate / previewFrameRate)
+        print("[ScreenCaptureKit Config] ✅ Frame throttling configured: \(captureFrameRate)fps -> \(previewFrameRate)fps (divisor: \(frameThrottleDivisor))")
+    }
+
+    /// Configures JPEG compression quality for preview frames
+    /// - Parameter quality: Quality value from 0.3 to 0.8 (30% to 80%)
+    func configureJPEGQuality(quality: CGFloat) {
+        let clampedQuality = max(0.3, min(0.8, quality))
+        jpegQuality = clampedQuality
+        print("[ScreenCaptureKit Config] ✅ JPEG quality configured: \(Int(clampedQuality * 100))%")
+    }
+
+    /// Configures the maximum frame queue size
+    /// - Parameter size: Maximum number of frames to buffer (1-20)
+    func configureFrameQueueSize(size: Int) {
+        let clampedSize = max(1, min(20, size))
+        queueLock.lock()
+        defer { queueLock.unlock() }
+
+        maxFrameQueueSize = clampedSize
+        print("[ScreenCaptureKit Config] ✅ Frame queue size configured: \(clampedSize) frames")
+    }
+
+    // MARK: - Frame Queue Methods
+
+    /// Enqueues a processed frame with overflow handling
+    /// - Parameter frame: The processed frame to enqueue
+    private func enqueueFrame(_ frame: ProcessedFrame) {
+        queueLock.lock()
+        defer { queueLock.unlock() }
+
+        // Check if queue is full
+        if frameQueue.count >= maxFrameQueueSize {
+            // Drop oldest frame (first in array)
+            let droppedFrame = frameQueue.removeFirst()
+            #if DEBUG
+            print("[ScreenCaptureKit Queue] ⚠️ Queue full, dropped frame #\(droppedFrame.frameNumber) (ts: \(String(format: "%.2f", droppedFrame.timestamp))s)")
+            #endif
+        }
+
+        // Add new frame to end of queue
+        frameQueue.append(frame)
+
+        #if DEBUG
+        if frame.frameNumber % 15 == 0 {  // Log occasionally
+            print("[ScreenCaptureKit Queue] 📦 Enqueued frame #\(frame.frameNumber), queue size: \(frameQueue.count)/\(maxFrameQueueSize)")
+        }
+        #endif
+    }
+
+    /// Dequeues the oldest frame from the queue
+    /// - Returns: The oldest frame, or nil if queue is empty
+    func dequeueFrame() -> ProcessedFrame? {
+        queueLock.lock()
+        defer { queueLock.unlock() }
+
+        guard !frameQueue.isEmpty else {
+            return nil
+        }
+
+        return frameQueue.removeFirst()
+    }
+
+    /// Gets the current queue size
+    /// - Returns: Number of frames in the queue
+    func getQueueSize() -> Int {
+        queueLock.lock()
+        defer { queueLock.unlock() }
+
+        return frameQueue.count
+    }
+
+    /// Clears all frames from the queue
+    func clearQueue() {
+        queueLock.lock()
+        defer { queueLock.unlock() }
+
+        let clearedCount = frameQueue.count
+        frameQueue.removeAll()
+
+        if clearedCount > 0 {
+            print("[ScreenCaptureKit Queue] 🗑️ Cleared \(clearedCount) frames from queue")
+        }
+    }
 
     /// Configures the stream settings for video capture
     /// - Parameters:
@@ -216,6 +349,9 @@ class ScreenCaptureKitBridge: NSObject {
         }
 
         do {
+            // Reset frame counter for clean start
+            frameCounter = 0
+
             // Create output queue for frame callbacks
             outputQueue = DispatchQueue(label: "com.clipforge.screencapture.output", qos: .userInitiated)
 
@@ -268,6 +404,9 @@ class ScreenCaptureKitBridge: NSObject {
     /// Stops the screen capture stream
     @objc func stopCapture() {
         print("[ScreenCaptureKit] 🛑 stopCapture() called")
+
+        // Clear the frame queue
+        clearQueue()
 
         guard let activeStream = stream else {
             print("[ScreenCaptureKit] ⚠️ No active stream to stop")
@@ -366,9 +505,124 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
 
     // MARK: - Private Frame Handlers
 
+    /// Compresses RGB pixel data to JPEG format
+    /// - Parameters:
+    ///   - rgbData: RGB pixel data
+    ///   - width: Frame width in pixels
+    ///   - height: Frame height in pixels
+    /// - Returns: JPEG compressed data, or nil if compression fails
+    private func compressRGBtoJPEG(rgbData: Data, width: Int, height: Int) -> Data? {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue)
+
+        // RGB is 3 bytes per pixel
+        let bytesPerRow = width * 3
+
+        // Create a data provider from RGB data
+        guard let dataProvider = CGDataProvider(data: rgbData as CFData) else {
+            print("[ScreenCaptureKit Compression] ⚠️ Failed to create data provider")
+            return nil
+        }
+
+        // Create CGImage from RGB data
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 24,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo,
+            provider: dataProvider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            print("[ScreenCaptureKit Compression] ⚠️ Failed to create CGImage")
+            return nil
+        }
+
+        // Compress to JPEG using ImageIO
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(mutableData, kUTTypeJPEG, 1, nil) else {
+            print("[ScreenCaptureKit Compression] ⚠️ Failed to create image destination")
+            return nil
+        }
+
+        // Set JPEG compression quality
+        let options: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: jpegQuality
+        ]
+
+        CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination) else {
+            print("[ScreenCaptureKit Compression] ⚠️ Failed to finalize JPEG compression")
+            return nil
+        }
+
+        return mutableData as Data
+    }
+
+    /// Converts BGRA pixel data to RGB format using Accelerate framework
+    /// - Parameters:
+    ///   - bgraData: Pointer to BGRA pixel data
+    ///   - width: Frame width in pixels
+    ///   - height: Frame height in pixels
+    ///   - bytesPerRow: Bytes per row (stride)
+    /// - Returns: RGB pixel data as Data, or nil if conversion fails
+    private func convertBGRAtoRGB(bgraData: UnsafeMutableRawPointer, width: Int, height: Int, bytesPerRow: Int) -> Data? {
+        // BGRA is 4 bytes per pixel, RGB is 3 bytes per pixel
+        let rgbBytesPerRow = width * 3
+        let rgbDataSize = rgbBytesPerRow * height
+
+        // Allocate buffer for RGB data
+        guard let rgbData = malloc(rgbDataSize) else {
+            print("[ScreenCaptureKit Conversion] ⚠️ Failed to allocate RGB buffer")
+            return nil
+        }
+        defer {
+            free(rgbData)
+        }
+
+        // Create vImage buffers for source (BGRA) and destination (RGB)
+        var srcBuffer = vImage_Buffer(
+            data: bgraData,
+            height: vImagePixelCount(height),
+            width: vImagePixelCount(width),
+            rowBytes: bytesPerRow
+        )
+
+        var destBuffer = vImage_Buffer(
+            data: rgbData,
+            height: vImagePixelCount(height),
+            width: vImagePixelCount(width),
+            rowBytes: rgbBytesPerRow
+        )
+
+        // Perform BGRA to RGB conversion
+        // vImageConvert_BGRA8888toRGB888 drops the alpha channel and reorders BGR to RGB
+        let error = vImageConvert_BGRA8888toRGB888(&srcBuffer, &destBuffer, UInt32(kvImageNoFlags))
+
+        if error != kvImageNoError {
+            print("[ScreenCaptureKit Conversion] ⚠️ vImage conversion failed with error: \(error)")
+            return nil
+        }
+
+        // Copy RGB data to a Data object
+        return Data(bytes: rgbData, count: rgbDataSize)
+    }
+
     /// Handles video frame buffers
     /// - Parameter sampleBuffer: The sample buffer containing video frame data
     private func handleVideoFrame(_ sampleBuffer: CMSampleBuffer) {
+        // Increment frame counter
+        frameCounter += 1
+
+        // Apply frame throttling for preview (reduce from capture rate to preview rate)
+        // Only process every Nth frame based on throttle divisor
+        let shouldProcessFrame = (frameCounter % frameThrottleDivisor) == 0
+
         // Extract pixel buffer from sample buffer
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             print("[ScreenCaptureKit Output] ⚠️ Failed to get pixel buffer from sample")
@@ -378,6 +632,11 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         // Get presentation timestamp for frame timing
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let timeSeconds = CMTimeGetSeconds(presentationTime)
+
+        // Skip this frame if throttling is active and it's not time to process
+        if !shouldProcessFrame {
+            return
+        }
 
         // Lock pixel buffer for reading
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -390,18 +649,58 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
 
-        // Log frame info (we'll process this data in subtask 13.8)
-        // For now, just verify we're receiving frames
+        // Extract pixel data from the pixel buffer
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+            print("[ScreenCaptureKit Output] ⚠️ Failed to get pixel buffer base address")
+            return
+        }
+
+        // Get bytes per row (stride) - important for proper data alignment
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+
+        // Calculate total buffer size
+        let dataSize = bytesPerRow * height
+
+        // Get the plane count (planar vs packed formats)
+        let planeCount = CVPixelBufferGetPlaneCount(pixelBuffer)
+
+        // Convert BGRA to RGB using Accelerate framework
+        guard let rgbData = convertBGRAtoRGB(bgraData: baseAddress, width: width, height: height, bytesPerRow: bytesPerRow) else {
+            print("[ScreenCaptureKit Output] ⚠️ Failed to convert BGRA to RGB")
+            return
+        }
+
+        // Compress RGB to JPEG for efficient preview transmission
+        guard let jpegData = compressRGBtoJPEG(rgbData: rgbData, width: width, height: height) else {
+            print("[ScreenCaptureKit Output] ⚠️ Failed to compress RGB to JPEG")
+            return
+        }
+
+        // Create processed frame with metadata
+        let processedFrame = ProcessedFrame(
+            jpegData: jpegData,
+            width: width,
+            height: height,
+            timestamp: timeSeconds,
+            frameNumber: frameCounter
+        )
+
+        // Enqueue the processed frame
+        enqueueFrame(processedFrame)
+
         #if DEBUG
         // Only log occasionally to avoid spam
         if Int(timeSeconds * 1000) % 1000 < 33 {  // Log roughly every second at 30fps
             let formatString = fourCCToString(pixelFormat)
-            print("[ScreenCaptureKit Output] 📹 Video frame: \(width)x\(height) format:\(formatString) time:\(String(format: "%.2f", timeSeconds))s")
+            let compressionRatio = Double(rgbData.count) / Double(jpegData.count)
+            print("[ScreenCaptureKit Output] 📹 Video frame: \(width)x\(height) format:\(formatString)->RGB->JPEG time:\(String(format: "%.2f", timeSeconds))s rgbSize:\(rgbData.count) jpegSize:\(jpegData.count) ratio:\(String(format: "%.1f", compressionRatio))x")
         }
         #endif
 
-        // TODO: In subtask 13.8, we'll extract pixel data and send to Rust callback
-        // for preview generation and FFmpeg encoding
+        // Successfully processed and queued frame:
+        // - Frame is now in the queue ready for retrieval via dequeueFrame()
+        // - Contains JPEG data, dimensions, timestamp, and frame number
+        // TODO: Expose dequeueFrame() via FFI for Rust to consume frames
     }
 
     /// Handles audio buffers
