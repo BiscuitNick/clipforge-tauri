@@ -1,0 +1,10 @@
+// Screen capture module using ScreenCaptureKit on macOS
+//
+// This module provides a high-level API for screen recording using
+// the native ScreenCaptureKit framework via Swift FFI bridge
+
+#[cfg(target_os = "macos")]
+pub mod ffi;
+
+#[cfg(target_os = "macos")]
+pub use ffi::ScreenCaptureBridge;

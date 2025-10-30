@@ -1072,7 +1072,7 @@
         "dependencies": [
           "13"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1080,9 +1080,10 @@
             "description": "Create the basic module structure for Swift-Rust FFI bridge with proper imports and module organization",
             "dependencies": [],
             "details": "Create src-tauri/src/capture/ffi.rs file with module structure. Add necessary use statements for objc, block, std::sync::{Arc, Mutex}, std::collections::VecDeque. Define basic module structure with proper error handling types and frame data structures. Set up conditional compilation for macOS platform.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify module compiles without errors and imports are resolved correctly",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:13:48.358Z"
           },
           {
             "id": 2,
@@ -1092,9 +1093,10 @@
               1
             ],
             "details": "Define extern 'C' functions with C-compatible signatures that match Swift @objc exports. Include functions for initializing capture session, starting/stopping recording, and receiving frame callbacks. Use proper C types (c_void, c_char, etc.) and ensure function signatures are ABI-compatible between Swift and Rust.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test FFI function signatures match Swift exports using symbol verification",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:13:49.116Z"
           },
           {
             "id": 3,
@@ -1104,9 +1106,10 @@
               1
             ],
             "details": "Add objc and block crate dependencies to Cargo.toml. Implement Objective-C runtime helpers for calling Swift methods and handling blocks. Set up proper block conversion utilities to handle Swift completion handlers and callbacks from Rust side.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test Objective-C runtime calls work correctly and blocks can be created and invoked",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:14:04.352Z"
           },
           {
             "id": 4,
@@ -1116,9 +1119,10 @@
               1
             ],
             "details": "Implement Frame struct with metadata (timestamp, width, height, format). Create thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>> for buffering frames from Swift callback thread. Add methods for pushing frames from Swift side and popping frames from Rust processing side with proper synchronization.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify thread safety with concurrent frame processing and test queue overflow handling",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:13:49.854Z"
           },
           {
             "id": 5,
@@ -1129,9 +1133,10 @@
               4
             ],
             "details": "Implement unsafe conversion from CVPixelBuffer pointer to Rust Vec<u8>. Handle different pixel formats (BGRA, YUV420, etc.) and extract frame metadata (width, height, stride, timestamp). Ensure proper memory copying and format conversion while maintaining data integrity.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test frame data transfer from Swift to Rust and validate pixel data integrity across conversion",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:15:10.008Z"
           },
           {
             "id": 6,
@@ -1141,9 +1146,10 @@
               3
             ],
             "details": "Use objc::rc::StrongPtr to handle Swift object lifecycle management. Implement proper retain/release for Swift objects passed to Rust. Handle autoreleased objects and ensure no memory leaks or premature deallocation. Create RAII wrappers for Swift objects used in Rust.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test memory safety with Miri or sanitizers and verify no memory leaks in object lifecycle",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:15:10.806Z"
           },
           {
             "id": 7,
@@ -1154,14 +1160,16 @@
               2
             ],
             "details": "Create build.rs script to compile Swift source files using swiftc. Configure linking of Swift runtime and Foundation frameworks. Set up proper library search paths and framework linking for macOS. Ensure Swift code is compiled with proper ABI compatibility for Rust FFI.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Validate error propagation across FFI boundary and test build process produces working executable",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:15:11.549Z"
           }
         ],
         "complexity": 9,
         "recommendedSubtasks": 7,
-        "expansionPrompt": "Break down into: 1) Create src-tauri/src/capture/ffi.rs module structure, 2) Implement extern 'C' functions matching Swift @objc exports, 3) Set up objc and block crates for Objective-C runtime handling, 4) Implement thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>>, 5) Create CVPixelBuffer to Rust Vec<u8> conversion, 6) Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr, 7) Add build.rs configuration to compile and link Swift code."
+        "expansionPrompt": "Break down into: 1) Create src-tauri/src/capture/ffi.rs module structure, 2) Implement extern 'C' functions matching Swift @objc exports, 3) Set up objc and block crates for Objective-C runtime handling, 4) Implement thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>>, 5) Create CVPixelBuffer to Rust Vec<u8> conversion, 6) Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr, 7) Add build.rs configuration to compile and link Swift code.",
+        "updatedAt": "2025-10-30T16:15:11.549Z"
       },
       {
         "id": "15",
@@ -1836,9 +1844,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-30T16:09:41.613Z",
+      "lastModified": "2025-10-30T16:15:11.550Z",
       "taskCount": 22,
-      "completedCount": 12,
+      "completedCount": 13,
       "tags": [
         "master"
       ]
