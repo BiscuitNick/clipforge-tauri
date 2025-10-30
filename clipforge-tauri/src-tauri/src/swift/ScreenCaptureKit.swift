@@ -520,22 +520,26 @@ class ScreenCaptureKitBridge: NSObject {
     }
 
     /// Pauses the screen capture stream
-    /// Note: ScreenCaptureKit doesn't have a direct pause API, so we stop and restart
+    /// Note: ScreenCaptureKit doesn't have a direct pause API, so we stop the stream
+    /// but maintain configuration and filter for seamless resume
     @objc func pauseCapture() {
         print("[ScreenCaptureKit] ⏸️ pauseCapture() called")
 
-        // For now, pause is equivalent to stop
-        // To implement true pause/resume, we'd need to:
-        // 1. Stop the stream but keep configuration
-        // 2. Track pause state
-        // 3. Resume by calling startCapture() again
-
-        if isCapturing {
-            stopCapture()
-            print("[ScreenCaptureKit] ⏸️ Capture paused (stream stopped)")
-        } else {
+        if !isCapturing {
             print("[ScreenCaptureKit] ⚠️ Cannot pause: not currently capturing")
+            return
         }
+
+        // Stop the stream but keep configuration and filter
+        // This allows resume to quickly restart with the same settings
+        stopCapture()
+
+        print("[ScreenCaptureKit] ⏸️ Capture paused - configuration maintained")
+        print("[ScreenCaptureKit] ⏸️ Frame queue size at pause: \(getQueueSize())")
+        print("[ScreenCaptureKit] ⏸️ Audio queue size at pause: \(getAudioQueueSize())")
+
+        // Note: Configuration (streamConfiguration) and filter (contentFilter) are preserved
+        // This enables resume to call startCapture() without reconfiguration
     }
 }
 

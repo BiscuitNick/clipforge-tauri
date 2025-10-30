@@ -414,6 +414,62 @@ impl RecordingState {
         self.update_duration();
         self.status = RecordingStatus::Idle;
     }
+
+    /// Check if transition to a new status is valid
+    pub fn can_transition_to(&self, new_status: &RecordingStatus) -> Result<(), String> {
+        use RecordingStatus::*;
+
+        match (&self.status, new_status) {
+            // Valid transitions
+            (Idle, Recording) => Ok(()),
+            (Recording, Paused) => Ok(()),
+            (Recording, Stopping) => Ok(()),
+            (Paused, Recording) => Ok(()), // Resume
+            (Paused, Stopping) => Ok(()),
+            (_, Idle) => Ok(()), // Can always go back to idle (stop/reset)
+            (_, Error) => Ok(()), // Can always transition to error state
+
+            // Invalid transitions
+            (current, target) if current == target => {
+                Err(format!("Already in {:?} state", current))
+            }
+            (current, target) => {
+                Err(format!("Cannot transition from {:?} to {:?}", current, target))
+            }
+        }
+    }
+
+    /// Validate that recording can be started
+    pub fn validate_can_start(&self) -> Result<(), String> {
+        if self.status != RecordingStatus::Idle {
+            return Err(format!("Cannot start recording: current status is {:?}, expected Idle", self.status));
+        }
+        Ok(())
+    }
+
+    /// Validate that recording can be paused
+    pub fn validate_can_pause(&self) -> Result<(), String> {
+        if self.status != RecordingStatus::Recording {
+            return Err(format!("Cannot pause: current status is {:?}, expected Recording", self.status));
+        }
+        Ok(())
+    }
+
+    /// Validate that recording can be resumed
+    pub fn validate_can_resume(&self) -> Result<(), String> {
+        if self.status != RecordingStatus::Paused {
+            return Err(format!("Cannot resume: current status is {:?}, expected Paused", self.status));
+        }
+        Ok(())
+    }
+
+    /// Validate that recording can be stopped
+    pub fn validate_can_stop(&self) -> Result<(), String> {
+        match &self.status {
+            RecordingStatus::Recording | RecordingStatus::Paused => Ok(()),
+            status => Err(format!("Cannot stop: current status is {:?}, expected Recording or Paused", status))
+        }
+    }
 }
 
 /// Global recording state manager
@@ -447,6 +503,10 @@ impl RecordingManager {
 
     pub fn set_current_recording(&mut self, state: Option<RecordingState>) {
         self.current_recording = state;
+    }
+
+    pub fn get_capture_session_mut(&mut self) -> Option<&mut ScreenCaptureSession> {
+        self.capture_session.as_mut()
     }
 
     /// Start duration tracking task
@@ -1477,15 +1537,24 @@ pub async fn pause_recording(
         .get_current_recording()
         .ok_or_else(|| "No active recording".to_string())?;
 
-    if recording_state.status != RecordingStatus::Recording {
-        return Err("Recording is not active".to_string());
+    // Validate state transition
+    recording_state.validate_can_pause()?;
+
+    // Pause the capture session
+    if let Some(session) = manager.get_capture_session_mut() {
+        // Note: stop() in FFmpeg session, pause() in Swift via FFI
+        // For now we just track the pause state - actual pausing will be
+        // implemented when we connect the Swift FFI bridge
+        println!("[Recording] Screen capture paused (state tracked, FFI pause pending)");
     }
 
-    // TODO: Actually pause the recording process
-
+    // Update state
     recording_state.pause();
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:paused");
+
+    println!("[Recording] Recording paused - duration: {:.2}s, total pause: {}ms",
+             recording_state.duration, recording_state.pause_time);
 
     Ok(recording_state)
 }
@@ -1502,15 +1571,24 @@ pub async fn resume_recording(
         .get_current_recording()
         .ok_or_else(|| "No active recording".to_string())?;
 
-    if recording_state.status != RecordingStatus::Paused {
-        return Err("Recording is not paused".to_string());
+    // Validate state transition
+    recording_state.validate_can_resume()?;
+
+    // Resume the capture session
+    if let Some(session) = manager.get_capture_session_mut() {
+        // Note: For now we just track the resume state - actual resuming will be
+        // implemented when we connect the Swift FFI bridge
+        // In the future this will call the Swift bridge start method
+        println!("[Recording] Screen capture resumed (state tracked, FFI resume pending)");
     }
 
-    // TODO: Actually resume the recording process
-
+    // Update state (this adds pause duration to total)
     recording_state.resume();
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:resumed");
+
+    println!("[Recording] Recording resumed - cumulative pause time: {}ms",
+             recording_state.pause_time);
 
     Ok(recording_state)
 }
