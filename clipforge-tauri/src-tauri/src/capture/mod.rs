@@ -11,8 +11,10 @@ pub use ffi::ScreenCaptureBridge;
 
 // Frame processing module for preview and encoding pipelines
 pub mod frame_processor;
+pub mod frame_timing;
 
 pub use frame_processor::{
     FrameProcessor, PreviewFrameProcessor, EncodingFrameProcessor,
     MultiFrameProcessor, ProcessedFrame,
 };
+pub use frame_timing::{FrameTimer, FrameTimingStats};

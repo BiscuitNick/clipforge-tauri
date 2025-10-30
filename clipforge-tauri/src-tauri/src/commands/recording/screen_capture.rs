@@ -1,11 +1,32 @@
 // Screen capture implementation using FFmpeg with AVFoundation on macOS
 
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
+use std::io::{Write, ErrorKind};
 use super::super::ffmpeg_utils;
 use super::{RecordingConfig, RecordingError};
+
+/// Input mode for FFmpeg
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InputMode {
+    /// Use AVFoundation to capture directly (legacy mode)
+    AVFoundation,
+    /// Accept raw video frames via stdin
+    RawStdin,
+}
+
+/// Encoding mode configuration
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EncodingMode {
+    /// Constant frame rate (CFR) - default, predictable timing
+    ConstantFrameRate,
+    /// Variable frame rate (VFR) - more efficient, adapts to content
+    VariableFrameRate,
+    /// Real-time encoding - prioritize low latency over quality
+    RealTime,
+}
 
 /// Platform-specific screen capture implementation
 pub struct ScreenCaptureSession {
@@ -21,6 +42,10 @@ pub struct ScreenCaptureSession {
     window_bounds: Option<(i32, i32, u32, u32)>,
     /// Screen device to record from (for window recording)
     screen_device: Option<String>,
+    /// Input mode (AVFoundation or raw stdin)
+    input_mode: InputMode,
+    /// Encoding mode (CFR, VFR, or real-time)
+    encoding_mode: EncodingMode,
 }
 
 impl ScreenCaptureSession {
@@ -33,7 +58,19 @@ impl ScreenCaptureSession {
             source_id,
             window_bounds: None,
             screen_device: None,
+            input_mode: InputMode::AVFoundation, // Default to AVFoundation for backward compatibility
+            encoding_mode: EncodingMode::ConstantFrameRate, // Default to CFR
         }
+    }
+
+    /// Set the input mode for FFmpeg
+    pub fn set_input_mode(&mut self, mode: InputMode) {
+        self.input_mode = mode;
+    }
+
+    /// Set the encoding mode for FFmpeg
+    pub fn set_encoding_mode(&mut self, mode: EncodingMode) {
+        self.encoding_mode = mode;
     }
 
     /// Detect the number of camera devices before screens in AVFoundation
@@ -127,14 +164,22 @@ impl ScreenCaptureSession {
 
         println!("[ScreenCapture] Building FFmpeg command:");
         println!("[ScreenCapture]   FFmpeg path: {}", ffmpeg_path.display());
+        println!("[ScreenCapture]   Input mode: {:?}", self.input_mode);
         println!("[ScreenCapture]   Source ID: {}", self.source_id);
         println!("[ScreenCapture]   Include audio: {}", include_audio);
         println!("[ScreenCapture]   Output path: {}", self.output_path.display());
 
-        // macOS-specific: Use AVFoundation for screen capture
-        #[cfg(target_os = "macos")]
-        {
-            self.add_macos_input_args(&mut command, include_audio);
+        // Add input arguments based on mode
+        match self.input_mode {
+            InputMode::AVFoundation => {
+                #[cfg(target_os = "macos")]
+                {
+                    self.add_macos_input_args(&mut command, include_audio);
+                }
+            }
+            InputMode::RawStdin => {
+                self.add_raw_stdin_input_args(&mut command);
+            }
         }
 
         // Add encoding parameters
@@ -220,6 +265,34 @@ impl ScreenCaptureSession {
         command.arg("-pix_fmt").arg("yuv420p");
     }
 
+    /// Add raw stdin input arguments
+    fn add_raw_stdin_input_args(&self, command: &mut Command) {
+        println!("[ScreenCapture] Configuring raw stdin input");
+
+        // Set input format to raw video
+        command.arg("-f").arg("rawvideo");
+
+        // Set pixel format (RGB24 for compatibility with Swift frame processing)
+        // Note: RGB24 uses 3 bytes per pixel (R, G, B)
+        command.arg("-pix_fmt").arg("rgb24");
+
+        // Set video size (resolution)
+        let video_size = format!("{}x{}", self.config.width, self.config.height);
+        println!("[ScreenCapture]   Video size: {}", video_size);
+        command.arg("-video_size").arg(&video_size);
+
+        // Set frame rate
+        println!("[ScreenCapture]   Frame rate: {}", self.config.frame_rate);
+        command.arg("-framerate").arg(self.config.frame_rate.to_string());
+
+        // Set input to stdin (pipe:0)
+        println!("[ScreenCapture]   Input: pipe:0 (stdin)");
+        command.arg("-i").arg("pipe:0");
+
+        // Convert RGB24 to YUV420p for encoding (required by most codecs)
+        // This will be added as part of encoding args, but we note it here for clarity
+    }
+
     /// Add encoding arguments based on configuration
     fn add_encoding_args(&self, command: &mut Command) {
         // Apply crop filter if window bounds are set
@@ -250,13 +323,47 @@ impl ScreenCaptureSession {
 
         // H.264 specific settings
         if self.config.video_codec == "h264" || self.config.video_codec == "libx264" {
-            command.arg("-preset").arg("medium"); // Balance between speed and quality
+            // Adjust preset based on encoding mode
+            match self.encoding_mode {
+                EncodingMode::RealTime => {
+                    command.arg("-preset").arg("ultrafast"); // Prioritize speed for real-time
+                    command.arg("-tune").arg("zerolatency"); // Minimize latency
+                }
+                EncodingMode::VariableFrameRate | EncodingMode::ConstantFrameRate => {
+                    command.arg("-preset").arg("medium"); // Balance between speed and quality
+                }
+            }
+
             command.arg("-profile:v").arg("high"); // H.264 High Profile
             command.arg("-level").arg("4.2"); // Support up to 4K
 
             // Use CRF for consistent quality instead of pure CBR
-            // CRF 18 = visually lossless, prevents blurry initial frames
-            command.arg("-crf").arg("18");
+            // Adjust CRF based on encoding mode
+            let crf_value = match self.encoding_mode {
+                EncodingMode::RealTime => "23", // Slightly lower quality for speed
+                _ => "18", // Visually lossless
+            };
+            command.arg("-crf").arg(crf_value);
+        }
+
+        // Variable frame rate support
+        if self.encoding_mode == EncodingMode::VariableFrameRate {
+            // Enable variable frame rate (VFR) mode
+            // This allows FFmpeg to encode frames at their actual timestamps
+            command.arg("-vsync").arg("vfr");
+            println!("[ScreenCapture] Enabled variable frame rate mode");
+        } else {
+            // Constant frame rate (CFR) mode - default
+            command.arg("-vsync").arg("cfr");
+        }
+
+        // Real-time encoding optimizations
+        if self.encoding_mode == EncodingMode::RealTime {
+            // Add real-time flag to prioritize encoding speed
+            command.arg("-re");
+            // Reduce buffer size for lower latency
+            command.arg("-bufsize").arg(format!("{}k", self.config.video_bitrate / 2));
+            println!("[ScreenCapture] Enabled real-time encoding mode");
         }
 
         // Audio codec (if configured)
@@ -369,6 +476,86 @@ impl ScreenCaptureSession {
     /// Get the output file path
     pub fn output_path(&self) -> &PathBuf {
         &self.output_path
+    }
+
+    /// Get mutable access to the FFmpeg stdin (for writing raw frames)
+    /// Returns None if not recording or stdin not available
+    pub fn stdin_mut(&mut self) -> Option<&mut ChildStdin> {
+        self.ffmpeg_process.as_mut()?.stdin.as_mut()
+    }
+
+    /// Write a raw frame to FFmpeg stdin
+    ///
+    /// # Arguments
+    /// * `frame_data` - Raw RGB24 pixel data (width * height * 3 bytes)
+    ///
+    /// # Returns
+    /// * `Ok(())` - Frame written successfully
+    /// * `Err(RecordingError)` - Error writing frame (EPIPE = FFmpeg terminated)
+    pub fn write_frame(&mut self, frame_data: &[u8]) -> Result<(), RecordingError> {
+        if self.input_mode != InputMode::RawStdin {
+            return Err(RecordingError::CaptureStopFailed(
+                "Cannot write frames in AVFoundation mode".to_string()
+            ));
+        }
+
+        let stdin = self.stdin_mut()
+            .ok_or_else(|| RecordingError::CaptureStopFailed(
+                "FFmpeg stdin not available".to_string()
+            ))?;
+
+        // Calculate expected frame size (width * height * 3 bytes for RGB24)
+        let expected_size = (self.config.width * self.config.height * 3) as usize;
+        if frame_data.len() != expected_size {
+            return Err(RecordingError::CaptureStopFailed(
+                format!("Invalid frame size: expected {} bytes, got {} bytes",
+                    expected_size, frame_data.len())
+            ));
+        }
+
+        // Write frame data to stdin
+        match stdin.write_all(frame_data) {
+            Ok(()) => {
+                // Flush to ensure frame is sent to FFmpeg
+                stdin.flush().map_err(|e| {
+                    if e.kind() == ErrorKind::BrokenPipe {
+                        RecordingError::CaptureStopFailed(
+                            "FFmpeg process terminated (EPIPE)".to_string()
+                        )
+                    } else {
+                        RecordingError::CaptureStopFailed(
+                            format!("Failed to flush frame to FFmpeg: {}", e)
+                        )
+                    }
+                })?;
+                Ok(())
+            }
+            Err(e) => {
+                if e.kind() == ErrorKind::BrokenPipe {
+                    Err(RecordingError::CaptureStopFailed(
+                        "FFmpeg process terminated (EPIPE)".to_string()
+                    ))
+                } else {
+                    Err(RecordingError::CaptureStopFailed(
+                        format!("Failed to write frame to FFmpeg: {}", e)
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Check if the FFmpeg process is still running
+    /// Returns false if process has terminated
+    pub fn is_process_alive(&mut self) -> bool {
+        if let Some(child) = &mut self.ffmpeg_process {
+            match child.try_wait() {
+                Ok(Some(_)) => false, // Process exited
+                Ok(None) => true,     // Process still running
+                Err(_) => false,      // Error checking status, assume dead
+            }
+        } else {
+            false
+        }
     }
 }
 

@@ -9,6 +9,9 @@ use super::permissions::{PermissionHandler, PlatformPermissions};
 mod screen_capture;
 use screen_capture::ScreenCaptureSession;
 
+// Re-export FFmpeg input and encoding modes for external use
+pub use screen_capture::{InputMode, EncodingMode};
+
 // ============================================================================
 // Data Structures
 // ============================================================================
