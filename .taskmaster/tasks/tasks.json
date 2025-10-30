@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Set up recording infrastructure and permissions",
         "description": "Create the foundational recording system with proper permissions and state management",
         "details": "Create a new `recording.rs` module in the Tauri commands directory. Implement system permission handling for screen capture, camera access, and microphone access. Set up recording state management to track active recordings, duration, and file paths. Create data structures for recording configuration (resolution, frame rate, codecs). Implement cleanup mechanisms for temporary files and error handling.",
@@ -18,7 +18,8 @@
             "dependencies": [],
             "details": "Create src-tauri/src/commands/recording.rs file with proper module declarations. Set up necessary imports for Tauri, serde, tokio, and platform-specific APIs. Define the module structure with separate sections for permissions, state management, configuration, and recording operations. Create placeholder functions for main recording commands that will be exposed to the frontend. Include proper error types and result handling structures.",
             "status": "done",
-            "testStrategy": "Verify module compiles without errors and is properly registered in main.rs. Test that placeholder commands are accessible from frontend."
+            "testStrategy": "Verify module compiles without errors and is properly registered in main.rs. Test that placeholder commands are accessible from frontend.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -29,7 +30,8 @@
             ],
             "details": "Use objc and cocoa crates to interface with macOS permission APIs. Implement AVCaptureDevice authorization checks for camera and microphone. Handle screen recording permissions through CGDisplayStream and accessibility APIs. Create async functions to request permissions with proper error handling. Implement permission status checking functions that return current authorization states. Handle permission denial gracefully with informative error messages.",
             "status": "done",
-            "testStrategy": "Test permission dialogs appear on first request. Verify permission states are correctly reported. Test handling of denied permissions."
+            "testStrategy": "Test permission dialogs appear on first request. Verify permission states are correctly reported. Test handling of denied permissions.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -40,7 +42,8 @@
             ],
             "details": "Design trait-based abstraction for permission operations across platforms. Implement conditional compilation using cfg attributes for platform-specific code. Create Windows permission handling using Windows Runtime APIs for camera/mic. Implement Linux permission checks using DBus and PipeWire/PulseAudio APIs. Build a unified permission manager that selects appropriate implementation at compile time. Include fallback mechanisms for unsupported platforms.",
             "status": "done",
-            "testStrategy": "Test compilation on all target platforms. Verify permission requests work on each OS. Test fallback behavior on unsupported systems."
+            "testStrategy": "Test compilation on all target platforms. Verify permission requests work on each OS. Test fallback behavior on unsupported systems.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -51,7 +54,8 @@
             ],
             "details": "Create RecordingState struct with fields for recording ID, type (screen/webcam), status, start time, duration, file path, and configuration. Implement a global state manager using Arc<Mutex<>> for thread-safe access. Build state transition functions for starting, pausing, stopping recordings. Create event emitter for state changes to update frontend. Implement recording session tracking with unique IDs. Add duration calculation and real-time updates using tokio intervals.",
             "status": "done",
-            "testStrategy": "Test concurrent recording state management. Verify state transitions are atomic and thread-safe. Test duration tracking accuracy."
+            "testStrategy": "Test concurrent recording state management. Verify state transitions are atomic and thread-safe. Test duration tracking accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -62,7 +66,8 @@
             ],
             "details": "Define RecordingConfig struct with video settings (resolution, framerate, bitrate, codec), audio settings (sample rate, channels, codec, bitrate), and output format options. Create quality preset enums (Low, Medium, High, Custom) with predefined configurations. Implement configuration validation to ensure compatible codec/container combinations. Add serialization/deserialization for saving user preferences. Create builder pattern for easy configuration construction. Include platform-specific configuration adjustments.",
             "status": "done",
-            "testStrategy": "Test configuration validation catches invalid combinations. Verify preset configurations produce expected settings. Test serialization round-trip."
+            "testStrategy": "Test configuration validation catches invalid combinations. Verify preset configurations produce expected settings. Test serialization round-trip.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -74,19 +79,20 @@
             ],
             "details": "Create temporary file management system with automatic cleanup on app exit or crash. Implement drop traits for recording resources to ensure cleanup. Build error recovery for common failures like disk space, permission revocation, or system interrupts. Create partial recording recovery to salvage interrupted recordings. Implement cleanup scheduler for orphaned temporary files on startup. Add comprehensive error types with user-friendly messages and recovery suggestions.",
             "status": "done",
-            "testStrategy": "Test cleanup occurs on normal and abnormal termination. Verify partial recordings can be recovered. Test disk space handling and error messages."
+            "testStrategy": "Test cleanup occurs on normal and abnormal termination. Verify partial recordings can be recovered. Test disk space handling and error messages.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Implement screen and window enumeration",
         "description": "Create backend commands to list available screens and windows for recording selection",
         "details": "Implement Tauri commands to enumerate available displays and windows. Return screen/window metadata including ID, name, type (screen/window), resolution, and optional thumbnail previews. Handle multiple monitor setups and different window types. Create data structures for screen sources with proper serialization for frontend consumption.",
         "testStrategy": "Test enumeration works with single and multiple monitors. Verify window list updates when applications open/close. Test thumbnail generation for large numbers of windows.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": [
@@ -97,7 +103,8 @@
             "dependencies": [],
             "details": "Use CGWindowListCopyWindowInfo and NSScreen APIs to enumerate all available displays and windows. Implement filtering to exclude system UI elements and invisible windows. Extract window metadata including CGWindowID, owner application name, window title, bounds, and layer information. Handle permission requests for screen recording access through macOS Security & Privacy settings.",
             "status": "done",
-            "testStrategy": "Test enumeration with multiple monitors connected, verify all user windows are detected, test with various application types including fullscreen apps, validate permission handling flow"
+            "testStrategy": "Test enumeration with multiple monitors connected, verify all user windows are detected, test with various application types including fullscreen apps, validate permission handling flow",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -106,7 +113,8 @@
             "dependencies": [],
             "details": "Create ScreenSource struct with fields for id, name, source_type (enum: Screen/Window), resolution (width/height), position (x/y), thumbnail (Option<Vec<u8>>), and is_primary flag. Implement serde serialization/deserialization for frontend communication. Add builder pattern for easy construction and validation of source objects. Include display scaling factor and color space information for accurate rendering.",
             "status": "done",
-            "testStrategy": "Unit test struct serialization/deserialization, validate all field types serialize correctly to JSON, test builder pattern with various input combinations"
+            "testStrategy": "Unit test struct serialization/deserialization, validate all field types serialize correctly to JSON, test builder pattern with various input combinations",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -118,7 +126,8 @@
             ],
             "details": "Use CGWindowListCreateImage to capture thumbnail images of screens and windows. Resize captured images to standardized thumbnail dimensions (320x180) using Core Graphics. Convert CGImage to PNG or JPEG format for efficient transmission. Implement caching mechanism to avoid repeated captures. Handle edge cases like minimized windows or off-screen windows. Add option to skip thumbnail generation for performance.",
             "status": "done",
-            "testStrategy": "Test thumbnail generation for various window sizes, verify image quality and aspect ratio preservation, test performance with many windows, validate memory usage with thumbnail caching"
+            "testStrategy": "Test thumbnail generation for various window sizes, verify image quality and aspect ratio preservation, test performance with many windows, validate memory usage with thumbnail caching",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -130,7 +139,8 @@
             ],
             "details": "Enumerate all connected displays using NSScreen.screens array. Calculate virtual desktop coordinates for proper window positioning across monitors. Handle different DPI scales between monitors (Retina vs non-Retina). Detect primary display and maintain monitor arrangement information. Support monitor hot-plugging with update notifications. Calculate correct capture regions for windows spanning multiple monitors.",
             "status": "done",
-            "testStrategy": "Test with various multi-monitor configurations, verify coordinates are correct across different arrangements, test monitor connection/disconnection during enumeration, validate DPI handling"
+            "testStrategy": "Test with various multi-monitor configurations, verify coordinates are correct across different arrangements, test monitor connection/disconnection during enumeration, validate DPI handling",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -143,19 +153,20 @@
             ],
             "details": "Create Tauri command 'enumerate_sources' that returns Vec<ScreenSource> to frontend. Implement proper error handling with Result types and custom error messages. Add command 'get_source_thumbnail' for on-demand thumbnail retrieval. Create TypeScript interfaces matching Rust structs for type safety. Implement debouncing for enumeration calls to prevent excessive API usage. Add source change detection and notification system.",
             "status": "done",
-            "testStrategy": "Test IPC commands from frontend, verify TypeScript types match Rust structs, test error propagation to frontend, validate performance with rapid enumeration calls"
+            "testStrategy": "Test IPC commands from frontend, verify TypeScript types match Rust structs, test error propagation to frontend, validate performance with rapid enumeration calls",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Implement core screen recording functionality",
         "description": "Build the main screen recording system with configurable options",
         "details": "Implement screen recording using platform-specific APIs (AVFoundation on macOS, DirectShow/Media Foundation on Windows, X11/Wayland on Linux). Support H.264 video codec and AAC audio codec with MP4 container. Configure recording at 1920x1080 or native resolution at 30fps. Include system audio capture option. Implement start/stop recording commands with real-time duration tracking and file size monitoring.",
         "testStrategy": "Test recording full screen and specific windows. Verify audio inclusion/exclusion works correctly. Test recording duration accuracy and file size tracking. Validate output file format and quality.",
         "priority": "high",
         "dependencies": [
-          2
+          "2"
         ],
         "status": "done",
         "subtasks": [
@@ -166,7 +177,8 @@
             "dependencies": [],
             "details": "Create Swift/Objective-C bridge for AVFoundation APIs in Tauri. Set up AVCaptureScreenInput for screen capture and configure AVCaptureSession with appropriate presets. Handle screen selection using CGDirectDisplayID and implement proper capture device authorization. Create data structures to pass capture configuration from Rust to native code. Ensure proper memory management and cleanup of AVFoundation resources.",
             "status": "done",
-            "testStrategy": "Test screen capture initialization on different macOS versions. Verify proper authorization handling and screen selection. Test memory cleanup and resource deallocation."
+            "testStrategy": "Test screen capture initialization on different macOS versions. Verify proper authorization handling and screen selection. Test memory cleanup and resource deallocation.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -177,7 +189,8 @@
             ],
             "details": "Configure AVAssetWriter with H.264 video codec settings including bitrate, keyframe interval, and profile level. Set up AAC audio encoder with sample rate and channel configuration. Implement quality presets (low/medium/high) mapping to specific encoder parameters. Configure MP4 container format with proper metadata. Handle encoder initialization errors and codec availability checks.",
             "status": "done",
-            "testStrategy": "Verify encoded output matches H.264/AAC specifications. Test different quality presets produce expected file sizes and visual quality. Validate MP4 container compatibility."
+            "testStrategy": "Verify encoded output matches H.264/AAC specifications. Test different quality presets produce expected file sizes and visual quality. Validate MP4 container compatibility.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -188,7 +201,8 @@
             ],
             "details": "Set up AVCaptureAudioDataOutput for system audio capture on macOS. Configure audio session to capture system sounds using screen capture audio. Implement audio buffer management and synchronization with video frames. Handle audio device selection and routing changes during recording. Add toggle option to include/exclude system audio in recordings.",
             "status": "done",
-            "testStrategy": "Test audio capture works with various audio sources. Verify audio/video synchronization in final output. Test audio inclusion toggle functionality."
+            "testStrategy": "Test audio capture works with various audio sources. Verify audio/video synchronization in final output. Test audio inclusion toggle functionality.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -200,7 +214,8 @@
             ],
             "details": "Implement start recording command that initializes capture session and begins writing to file. Create stop recording that properly finalizes the video file and releases resources. Add pause/resume functionality by managing capture session state and timestamps. Handle state transitions safely with proper error handling. Implement recording state notifications to update UI.",
             "status": "done",
-            "testStrategy": "Test rapid start/stop sequences don't cause crashes. Verify pause/resume maintains continuous video. Test state transitions handle errors gracefully."
+            "testStrategy": "Test rapid start/stop sequences don't cause crashes. Verify pause/resume maintains continuous video. Test state transitions handle errors gracefully.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -211,7 +226,8 @@
             ],
             "details": "Create timer system to track recording duration from start timestamp with millisecond precision. Implement file size monitoring using periodic file system checks or write buffer tracking. Send regular updates to frontend via Tauri events (every 100ms for duration, every second for file size). Calculate estimated remaining recording time based on available disk space. Handle timer accuracy during system sleep or high CPU load.",
             "status": "done",
-            "testStrategy": "Verify duration accuracy over long recordings. Test file size updates match actual file growth. Validate updates continue during high system load."
+            "testStrategy": "Verify duration accuracy over long recordings. Test file size updates match actual file growth. Validate updates continue during high system load.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -222,7 +238,8 @@
             ],
             "details": "Create temporary file in system temp directory with unique naming to avoid conflicts. Stream recording data to temporary location during capture. Implement atomic file move operation to final user-selected location on recording completion. Handle insufficient disk space in both temporary and final locations. Clean up temporary files on cancellation or error. Add progress indication for file move operation on large recordings.",
             "status": "done",
-            "testStrategy": "Test file moves across different volumes. Verify temporary files are cleaned up properly. Test disk space validation works correctly."
+            "testStrategy": "Test file moves across different volumes. Verify temporary files are cleaned up properly. Test disk space validation works correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -234,19 +251,20 @@
             ],
             "details": "Implement cancellation command that immediately stops capture session and releases all resources. Delete temporary recording files on cancellation without moving to final location. Properly close and release all AVFoundation objects including capture session, inputs, and outputs. Handle cleanup in error scenarios like disk full or encoder failures. Ensure no memory leaks or dangling resources after cancellation. Reset all recording state variables to initial values.",
             "status": "done",
-            "testStrategy": "Test cancellation at various recording stages. Verify no temporary files remain after cancellation. Check for memory leaks using profiling tools."
+            "testStrategy": "Test cancellation at various recording stages. Verify no temporary files remain after cancellation. Check for memory leaks using profiling tools.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Create screen recording UI components",
         "description": "Build React components for screen recording interface",
         "details": "Create a recording button in the Media Library panel. Build a screen recording modal with thumbnail grid for screen/window selection. Implement recording status indicator with red dot and timer (MM:SS format). Add audio inclusion checkbox and start/stop controls. Include cancel option and error message display. Style components to match existing UI patterns.",
         "testStrategy": "Test modal opens correctly and displays available screens/windows. Verify recording timer updates in real-time. Test audio checkbox toggles system audio capture. Validate error messages display correctly.",
         "priority": "medium",
         "dependencies": [
-          3
+          "3"
         ],
         "status": "done",
         "subtasks": [
@@ -257,7 +275,8 @@
             "dependencies": [],
             "details": "Create a RecordButton component using existing button styles from the codebase. Add the button to the MediaLibraryPanel toolbar section next to existing media controls. Implement onClick handler to trigger modal opening. Use existing icon system for recording icon (red circle or similar). Ensure button follows disabled state when recording is active. Add tooltip text 'Start Screen Recording' for better UX.",
             "status": "done",
-            "testStrategy": "Test button renders correctly in MediaLibraryPanel. Verify onClick triggers modal open event. Test disabled state during active recording. Validate tooltip displays on hover."
+            "testStrategy": "Test button renders correctly in MediaLibraryPanel. Verify onClick triggers modal open event. Test disabled state during active recording. Validate tooltip displays on hover.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -268,7 +287,8 @@
             ],
             "details": "Build ScreenSelectionModal component using existing modal patterns from the codebase. Create a thumbnail grid layout displaying screens/windows from backend enumeration (task 2). Implement thumbnail hover effects and selection highlighting. Add title bars showing screen/window names below thumbnails. Include 'Select Screen' and 'Select Window' tab navigation if both types available. Add Cancel and Continue buttons at modal footer. Style grid to be responsive and handle varying numbers of sources.",
             "status": "done",
-            "testStrategy": "Test modal displays all available screens/windows from backend. Verify thumbnail selection highlights correctly. Test tab switching between screens and windows. Validate Cancel closes modal and Continue proceeds with selection."
+            "testStrategy": "Test modal displays all available screens/windows from backend. Verify thumbnail selection highlights correctly. Test tab switching between screens and windows. Validate Cancel closes modal and Continue proceeds with selection.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -279,7 +299,8 @@
             ],
             "details": "Build RecordingStatusIndicator component with pulsing red dot animation using CSS. Implement timer logic using useEffect and setInterval to update every second. Format time display as MM:SS using padStart for consistent formatting. Position indicator in a non-intrusive but visible location (e.g., top bar or floating corner). Add recording duration state management in parent component. Include smooth fade-in animation when recording starts. Ensure timer stops and resets when recording ends.",
             "status": "done",
-            "testStrategy": "Test timer increments accurately every second. Verify MM:SS formatting handles single and double digits correctly. Test pulsing animation renders smoothly. Validate timer stops on recording end."
+            "testStrategy": "Test timer increments accurately every second. Verify MM:SS formatting handles single and double digits correctly. Test pulsing animation renders smoothly. Validate timer stops on recording end.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -290,19 +311,20 @@
             ],
             "details": "Create AudioControls component with checkbox for 'Include System Audio' option. Implement Start Recording and Stop Recording buttons with appropriate icons. Add loading states for buttons during recording initialization. Build ErrorMessage component for displaying recording errors (permissions, failures). Include proper error boundaries and fallback UI. Style all controls to match existing form elements and buttons. Add confirmation dialog for stop recording action. Integrate audio preference into recording configuration state.",
             "status": "done",
-            "testStrategy": "Test audio checkbox toggles recording configuration correctly. Verify start/stop buttons trigger appropriate recording actions. Test error messages display for various failure scenarios. Validate confirmation dialog prevents accidental recording stops."
+            "testStrategy": "Test audio checkbox toggles recording configuration correctly. Verify start/stop buttons trigger appropriate recording actions. Test error messages display for various failure scenarios. Validate confirmation dialog prevents accidental recording stops.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Implement webcam recording system",
         "description": "Build webcam recording using MediaRecorder API with Tauri file saving",
         "details": "Implement camera enumeration backend command. Use navigator.mediaDevices.getUserMedia() for camera access and MediaRecorder API for recording in frontend. Create Tauri command to save blob data to MP4 files. Add camera selection dropdown and live preview using HTML5 video element. Include audio capture toggle and recording controls (start/stop/pause).",
         "testStrategy": "Test camera enumeration and selection. Verify live preview displays correctly. Test recording with and without audio. Validate blob to file conversion maintains quality.",
         "priority": "medium",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": [
@@ -313,7 +335,8 @@
             "dependencies": [],
             "details": "Build a Tauri command that uses platform-specific APIs to enumerate camera devices. Return an array of camera objects containing deviceId, label/name, and basic capabilities (resolution support, audio availability). Handle permissions gracefully and return appropriate error messages if camera access is denied. Ensure the command properly serializes data for frontend consumption.",
             "status": "done",
-            "testStrategy": "Test with no cameras, single camera, and multiple cameras connected. Verify correct metadata is returned for each device. Test permission denial scenarios."
+            "testStrategy": "Test with no cameras, single camera, and multiple cameras connected. Verify correct metadata is returned for each device. Test permission denial scenarios.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -324,7 +347,8 @@
             ],
             "details": "Use navigator.mediaDevices.getUserMedia() to request camera and microphone access with appropriate constraints (video resolution, frame rate, audio settings). Initialize MediaRecorder with the obtained MediaStream, configure MIME type as 'video/webm' or 'video/mp4' based on browser support. Set up event handlers for dataavailable, start, stop, and error events. Create a blob accumulator to collect recorded chunks.",
             "status": "done",
-            "testStrategy": "Test getUserMedia with different constraint combinations. Verify MediaRecorder initialization with various MIME types. Test recording start/stop lifecycle."
+            "testStrategy": "Test getUserMedia with different constraint combinations. Verify MediaRecorder initialization with various MIME types. Test recording start/stop lifecycle.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -335,7 +359,8 @@
             ],
             "details": "Implement a Tauri command that accepts base64-encoded blob data or binary array from the frontend. Convert the received data to a proper video file format, handling any necessary transcoding if the input is WebM and output needs to be MP4. Use Tauri's file system APIs to save the file with proper naming convention (timestamp-based). Return the saved file path to the frontend for media library integration.",
             "status": "done",
-            "testStrategy": "Test blob data conversion with various sizes. Verify file is saved in correct format and location. Test error handling for invalid data or disk space issues."
+            "testStrategy": "Test blob data conversion with various sizes. Verify file is saved in correct format and location. Test error handling for invalid data or disk space issues.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -347,7 +372,8 @@
             ],
             "details": "Build a dropdown component that displays available cameras from the enumeration command. Implement camera switching logic that stops current stream and starts new one with selected device. Create a video preview component using HTML5 video element with srcObject set to the MediaStream. Add visual indicators for active camera and preview status. Style components to match existing UI patterns with proper sizing and positioning.",
             "status": "done",
-            "testStrategy": "Test dropdown populates with available cameras. Verify camera switching works smoothly without memory leaks. Test preview displays correctly at different resolutions."
+            "testStrategy": "Test dropdown populates with available cameras. Verify camera switching works smoothly without memory leaks. Test preview displays correctly at different resolutions.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -360,19 +386,20 @@
             ],
             "details": "Build recording control buttons with start, stop, and pause functionality that interact with MediaRecorder API. Implement audio toggle checkbox that modifies getUserMedia constraints to include/exclude audio track. Add visual recording indicators (red dot, timer showing MM:SS format). Manage recording state properly to prevent invalid operations (e.g., starting when already recording). Include error handling and user feedback for recording failures.",
             "status": "done",
-            "testStrategy": "Test all recording state transitions (idle->recording->paused->recording->stopped). Verify audio toggle works during and before recording. Test timer accuracy and UI updates."
+            "testStrategy": "Test all recording state transitions (idle->recording->paused->recording->stopped). Verify audio toggle works during and before recording. Test timer accuracy and UI updates.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Add audio capture and monitoring features",
         "description": "Implement comprehensive audio capture with real-time level monitoring",
         "details": "Create backend commands for audio device enumeration. Implement microphone selection for webcam recording. Build audio level indicator using Web Audio API with AnalyserNode for real-time VU meter display. Add mute/unmute toggle and visual feedback with color coding (green for normal levels, red for clipping). Integrate audio capture with both screen and webcam recording modes.",
         "testStrategy": "Test audio device enumeration and selection. Verify audio level indicator responds to microphone input. Test mute/unmute functionality. Validate audio quality in recordings.",
         "priority": "medium",
         "dependencies": [
-          5
+          "5"
         ],
         "status": "done",
         "subtasks": [
@@ -383,7 +410,8 @@
             "dependencies": [],
             "details": "Create Tauri commands to list all available audio input devices using platform-specific APIs. Return device information including device ID, name, sample rate, and channel count. Handle default device selection and device availability changes. Serialize device data properly for frontend consumption.",
             "status": "done",
-            "testStrategy": "Test enumeration with multiple audio devices connected. Verify device list updates when devices are plugged/unplugged. Test default device selection works correctly."
+            "testStrategy": "Test enumeration with multiple audio devices connected. Verify device list updates when devices are plugged/unplugged. Test default device selection works correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -394,7 +422,8 @@
             ],
             "details": "Create Web Audio API context and connect to selected audio input device. Configure AnalyserNode with appropriate FFT size and smoothing parameters. Implement getByteFrequencyData sampling at 60fps for smooth visualization. Calculate RMS and peak levels from frequency data. Handle audio context permissions and browser compatibility.",
             "status": "done",
-            "testStrategy": "Test analyzer responds to different audio input levels. Verify smooth 60fps updates without performance issues. Test browser permission handling and fallbacks."
+            "testStrategy": "Test analyzer responds to different audio input levels. Verify smooth 60fps updates without performance issues. Test browser permission handling and fallbacks.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -405,7 +434,8 @@
             ],
             "details": "Build React component with CSS animations for smooth VU meter display. Implement green to yellow to red color transitions based on audio levels (green: -40dB to -12dB, yellow: -12dB to -3dB, red: above -3dB). Add peak hold indicator and numerical dB display. Style to match existing UI with responsive sizing.",
             "status": "done",
-            "testStrategy": "Test VU meter responds smoothly to audio level changes. Verify color transitions occur at correct dB thresholds. Test component renders correctly at different sizes."
+            "testStrategy": "Test VU meter responds smoothly to audio level changes. Verify color transitions occur at correct dB thresholds. Test component renders correctly at different sizes.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -417,7 +447,8 @@
             ],
             "details": "Create mute/unmute toggle button with microphone icon that changes based on state. Implement audio stream muting at Web Audio API level to prevent audio capture. Add visual feedback with strikethrough icon when muted and grayed-out VU meter. Persist mute state across recording sessions. Include keyboard shortcut support (M key) for quick muting.",
             "status": "done",
-            "testStrategy": "Test mute toggle stops audio capture completely. Verify visual feedback updates immediately. Test keyboard shortcut works correctly. Validate mute state persists between recordings."
+            "testStrategy": "Test mute toggle stops audio capture completely. Verify visual feedback updates immediately. Test keyboard shortcut works correctly. Validate mute state persists between recordings.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -431,20 +462,21 @@
             ],
             "details": "Integrate audio device selection into screen recording and webcam recording workflows. Ensure audio stream synchronizes properly with video capture. Handle audio-only recording for screen capture mode. Implement audio track multiplexing for recordings with both system and microphone audio. Add audio configuration to recording settings with bitrate and sample rate options.",
             "status": "done",
-            "testStrategy": "Test audio syncs correctly with video in both recording modes. Verify system and microphone audio can be captured simultaneously. Test audio quality at different bitrate settings."
+            "testStrategy": "Test audio syncs correctly with video in both recording modes. Verify system and microphone audio can be captured simultaneously. Test audio quality at different bitrate settings.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Build Picture-in-Picture recording system",
         "description": "Implement simultaneous screen and webcam recording with overlay configuration",
         "details": "Create backend commands for simultaneous screen + webcam capture. Implement PiP configuration system with position options (4 corners) and size options (small/medium/large). Record screen and webcam as separate files with metadata linking. Create PiP configuration UI with visual position selector and live preview. Store both file paths with overlay configuration for later compositing during export.",
         "testStrategy": "Test simultaneous recording of screen and webcam. Verify PiP position and size configuration saves correctly. Test live preview shows accurate overlay positioning. Validate separate file recording maintains sync.",
         "priority": "medium",
         "dependencies": [
-          3,
-          5
+          "3",
+          "5"
         ],
         "status": "done",
         "subtasks": [
@@ -455,7 +487,8 @@
             "dependencies": [],
             "details": "Extend the existing recording infrastructure to support multiple concurrent MediaRecorder instances. Create new Tauri commands for starting/stopping dual recording sessions. Implement synchronization mechanisms to ensure both streams start and stop at the same time. Handle resource management for two simultaneous recording streams and ensure proper error handling when one stream fails.",
             "status": "done",
-            "testStrategy": "Test that both screen and webcam streams can be initiated simultaneously. Verify synchronization by checking timestamps. Test error handling when one stream fails while the other continues."
+            "testStrategy": "Test that both screen and webcam streams can be initiated simultaneously. Verify synchronization by checking timestamps. Test error handling when one stream fails while the other continues.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -464,7 +497,8 @@
             "dependencies": [],
             "details": "Define TypeScript interfaces for PiP configuration including position enum (topLeft, topRight, bottomLeft, bottomRight) and size enum (small, medium, large). Create configuration storage in React state and persist settings to local storage. Implement conversion functions to translate position/size enums to actual pixel coordinates based on screen dimensions.",
             "status": "done",
-            "testStrategy": "Verify configuration objects serialize/deserialize correctly. Test position and size enum conversions produce correct pixel values. Validate settings persist across application restarts."
+            "testStrategy": "Verify configuration objects serialize/deserialize correctly. Test position and size enum conversions produce correct pixel values. Validate settings persist across application restarts.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -475,7 +509,8 @@
             ],
             "details": "Build a visual position selector showing four corner options as clickable buttons or a drag-and-drop interface. Implement size selector with three options (small: 15%, medium: 25%, large: 35% of screen). Create interactive preview area showing the selected position and size. Style components to match existing ClipForge UI patterns and ensure responsive design.",
             "status": "done",
-            "testStrategy": "Test all four corner positions can be selected and visually update. Verify size changes are reflected in the preview. Test UI responsiveness on different screen sizes."
+            "testStrategy": "Test all four corner positions can be selected and visually update. Verify size changes are reflected in the preview. Test UI responsiveness on different screen sizes.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -487,7 +522,8 @@
             ],
             "details": "Use HTML5 video elements to display both screen preview and webcam preview. Implement CSS-based overlay positioning to show webcam on top of screen preview according to selected configuration. Update preview in real-time when user changes position or size settings. Handle aspect ratio preservation and ensure smooth preview rendering without performance issues.",
             "status": "done",
-            "testStrategy": "Verify live preview updates immediately when settings change. Test preview maintains correct aspect ratios. Validate preview performance with high-resolution streams."
+            "testStrategy": "Verify live preview updates immediately when settings change. Test preview maintains correct aspect ratios. Validate preview performance with high-resolution streams.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -498,7 +534,8 @@
             ],
             "details": "Record screen capture and webcam to separate MP4 files in the recordings directory. Generate unique but linked filenames (e.g., recording_001_screen.mp4 and recording_001_webcam.mp4). Create metadata JSON file containing timestamps, duration, PiP configuration, and file paths. Ensure both recordings start with synchronized timestamps for accurate compositing during export.",
             "status": "done",
-            "testStrategy": "Verify two separate video files are created with linked names. Test metadata file contains all required synchronization data. Validate timestamps allow for accurate alignment during playback."
+            "testStrategy": "Verify two separate video files are created with linked names. Test metadata file contains all required synchronization data. Validate timestamps allow for accurate alignment during playback.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -510,21 +547,22 @@
             ],
             "details": "Store PiP configuration (position, size) alongside recording metadata in a structured format. Create data structure linking screen recording, webcam recording, and overlay settings. Integrate with existing media library to make recordings available for timeline editing. Ensure configuration is accessible during export phase for proper video compositing with ffmpeg.",
             "status": "done",
-            "testStrategy": "Test configuration saves correctly with all recording metadata. Verify recordings appear in media library with proper references. Validate export process can access and use the saved configuration."
+            "testStrategy": "Test configuration saves correctly with all recording metadata. Verify recordings appear in media library with proper references. Validate export process can access and use the saved configuration.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Integrate recordings with media library",
         "description": "Auto-import completed recordings and generate thumbnails",
         "details": "Implement automatic import of completed recordings to the media library. Generate thumbnails for recorded video files using existing thumbnail generation system. Update media library UI to display new recordings immediately. Handle file metadata extraction (duration, resolution, file size). Ensure recorded files integrate seamlessly with existing timeline and editing features.",
         "testStrategy": "Test recordings automatically appear in media library after completion. Verify thumbnails generate correctly for all recording types. Test recorded files can be added to timeline and edited normally.",
         "priority": "medium",
         "dependencies": [
-          4,
-          6,
-          7
+          "4",
+          "6",
+          "7"
         ],
         "status": "done",
         "subtasks": [
@@ -535,7 +573,8 @@
             "dependencies": [],
             "details": "Implement recording completion detection in both RecordingInterface.jsx and any webcam recording components. Create a unified completion handler that emits events or calls callbacks when recordings finish. Set up event listeners in MediaLibraryPanel.jsx to respond to recording completion events. Pass the recorded file path and metadata through the event system for immediate processing.",
             "status": "done",
-            "testStrategy": "Test that completion events fire correctly for both screen and webcam recordings. Verify event data includes file path and basic metadata. Test that MediaLibraryPanel receives and processes events properly."
+            "testStrategy": "Test that completion events fire correctly for both screen and webcam recordings. Verify event data includes file path and basic metadata. Test that MediaLibraryPanel receives and processes events properly.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -546,7 +585,8 @@
             ],
             "details": "Locate and understand the existing thumbnail generation system used for imported media files. Create a function that takes a recorded video file path and generates a thumbnail using the same mechanism. Ensure thumbnails are saved in the correct location with proper naming conventions. Handle different video formats and resolutions appropriately. Add thumbnail generation to the recording completion flow.",
             "status": "done",
-            "testStrategy": "Verify thumbnails generate correctly for different recording formats (MP4, WebM). Test thumbnail quality and aspect ratio preservation. Validate thumbnail file paths and naming conventions match existing patterns."
+            "testStrategy": "Verify thumbnails generate correctly for different recording formats (MP4, WebM). Test thumbnail quality and aspect ratio preservation. Validate thumbnail file paths and naming conventions match existing patterns.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -558,7 +598,8 @@
             ],
             "details": "Add state management in MediaLibraryPanel to track newly recorded files. Implement real-time UI updates when recording completion events are received. Ensure new recordings appear at the top of the media list or in a dedicated 'Recent Recordings' section. Display recording metadata including duration, resolution, and file size. Add visual indicators to distinguish recordings from imported media if needed.",
             "status": "done",
-            "testStrategy": "Test that new recordings appear immediately in the media library UI. Verify sorting and display order of recordings. Test UI responsiveness during multiple rapid recordings. Validate that all metadata displays correctly."
+            "testStrategy": "Test that new recordings appear immediately in the media library UI. Verify sorting and display order of recordings. Test UI responsiveness during multiple rapid recordings. Validate that all metadata displays correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -569,20 +610,21 @@
             ],
             "details": "Create backend Tauri commands to extract video metadata using system tools or libraries. Extract key metadata: duration, resolution, frame rate, codec, bitrate, and file size. Format metadata for user-friendly display (e.g., '1920x1080', '5:32', '125 MB'). Store metadata alongside file references for quick access. Ensure metadata extraction works for both screen and webcam recordings. Handle metadata extraction failures gracefully.",
             "status": "done",
-            "testStrategy": "Test metadata extraction for various recording formats and resolutions. Verify accurate duration and file size calculations. Test display formatting for different value ranges. Validate error handling for corrupted or incomplete files."
+            "testStrategy": "Test metadata extraction for various recording formats and resolutions. Verify accurate duration and file size calculations. Test display formatting for different value ranges. Validate error handling for corrupted or incomplete files.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "Implement PiP export compositing",
         "description": "Add FFmpeg-based video compositing for Picture-in-Picture export",
         "details": "Extend the existing export system to handle PiP compositing using FFmpeg overlay filter. Calculate overlay position based on PiP configuration (corner position, size, margins). Implement video compositing during export process, combining screen recording with webcam overlay. Handle audio from screen recording only. Add progress indication for composite rendering.",
         "testStrategy": "Test PiP export produces correctly positioned overlay. Verify audio only comes from screen recording. Test all position and size combinations. Validate export progress indication works correctly.",
         "priority": "medium",
         "dependencies": [
-          7,
-          8
+          "7",
+          "8"
         ],
         "status": "done",
         "subtasks": [
@@ -593,7 +635,8 @@
             "dependencies": [],
             "details": "Add PiP detection logic to the export handler by checking if both screen recording and webcam clips are present and PiP mode is enabled. Create a conditional branch in the export flow that routes to composite export when PiP is detected. Set up the basic structure for passing PiP configuration (position, size, margins) to the compositing pipeline.",
             "status": "done",
-            "testStrategy": "Test that export system correctly identifies PiP mode vs standard export. Verify routing logic works for all export scenarios."
+            "testStrategy": "Test that export system correctly identifies PiP mode vs standard export. Verify routing logic works for all export scenarios.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -604,7 +647,8 @@
             ],
             "details": "Create functions to calculate overlay X/Y coordinates based on corner position (top-left, top-right, bottom-left, bottom-right), size percentage, and margin values. Convert percentage-based sizing to pixel dimensions based on main video resolution. Generate FFmpeg overlay filter string with calculated parameters including position and scaling.",
             "status": "done",
-            "testStrategy": "Unit test coordinate calculations for all corner positions. Verify margin calculations work correctly. Test scaling calculations maintain aspect ratio."
+            "testStrategy": "Unit test coordinate calculations for all corner positions. Verify margin calculations work correctly. Test scaling calculations maintain aspect ratio.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -615,7 +659,8 @@
             ],
             "details": "Implement FFmpeg command builder that takes two input videos and applies overlay filter with calculated parameters. Handle video scaling for PiP overlay to maintain quality. Set up proper codec parameters for output video (H.264/AAC). Implement error handling for FFmpeg process failures and validate input video compatibility.",
             "status": "done",
-            "testStrategy": "Test compositing with various video resolutions and formats. Verify overlay positioning is accurate. Test error handling for invalid inputs."
+            "testStrategy": "Test compositing with various video resolutions and formats. Verify overlay positioning is accurate. Test error handling for invalid inputs.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -626,7 +671,8 @@
             ],
             "details": "Configure FFmpeg to extract and use audio track only from the screen recording input. Suppress or remove audio track from webcam recording during compositing. Handle cases where screen recording may not have audio. Ensure audio sync is maintained throughout the composite video.",
             "status": "done",
-            "testStrategy": "Test audio is only from screen recording source. Verify audio sync with video. Test handling of silent screen recordings."
+            "testStrategy": "Test audio is only from screen recording source. Verify audio sync with video. Test handling of silent screen recordings.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -638,20 +684,21 @@
             ],
             "details": "Parse FFmpeg progress output to extract completion percentage and estimated time remaining. Create progress event emitter to send updates to frontend. Implement progress bar UI component that displays during composite export. Add cancellation support for long-running composite operations.",
             "status": "done",
-            "testStrategy": "Test progress updates are accurate and smooth. Verify cancellation stops FFmpeg process cleanly. Test progress UI updates correctly."
+            "testStrategy": "Test progress updates are accurate and smooth. Verify cancellation stops FFmpeg process cleanly. Test progress UI updates correctly.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Add comprehensive error handling and edge cases",
         "description": "Implement robust error handling for all recording scenarios",
         "details": "Add comprehensive error handling for permission denied scenarios, device unavailability, disk space errors, and encoding failures. Implement user-friendly error messages for common issues. Add fallback options when devices are unavailable. Handle edge cases like long recordings (>30 min), no camera/microphone scenarios, and recording cancellation. Implement memory management and cleanup for interrupted recordings.",
         "testStrategy": "Test all error scenarios: permission denied, no devices, disk full, recording cancellation. Verify user-friendly error messages display correctly. Test cleanup of temporary files on errors. Validate memory usage during long recordings.",
         "priority": "high",
         "dependencies": [
-          8,
-          9
+          "8",
+          "9"
         ],
         "status": "done",
         "subtasks": [
@@ -662,7 +709,8 @@
             "dependencies": [],
             "details": "Implement permission denied detection for screen capture, camera, and microphone access. Create user-friendly error dialogs with step-by-step instructions for granting permissions on different operating systems. Add retry mechanisms after permission grant. Include fallback options when permissions cannot be obtained. Log permission states for debugging.",
             "status": "done",
-            "testStrategy": "Test permission denial scenarios for each recording type. Verify error messages provide clear resolution steps. Test retry mechanisms after permission grant."
+            "testStrategy": "Test permission denial scenarios for each recording type. Verify error messages provide clear resolution steps. Test retry mechanisms after permission grant.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -671,7 +719,8 @@
             "dependencies": [],
             "details": "Detect device unavailability for cameras, microphones, and displays. Implement device enumeration with error handling. Create fallback recording modes when specific devices are unavailable. Add real-time device disconnection detection during recording. Provide options to continue recording without unavailable devices or switch to alternative devices.",
             "status": "done",
-            "testStrategy": "Test device disconnection during recording. Verify fallback modes activate correctly. Test switching between devices mid-recording."
+            "testStrategy": "Test device disconnection during recording. Verify fallback modes activate correctly. Test switching between devices mid-recording.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -680,7 +729,8 @@
             "dependencies": [],
             "details": "Check available disk space before starting recording based on estimated file size. Monitor disk space during recording with configurable thresholds. Implement graceful recording stop when disk space is low. Add warnings at different disk space levels (e.g., <1GB, <500MB). Create auto-save mechanism when approaching disk limits. Display estimated recording time based on available space.",
             "status": "done",
-            "testStrategy": "Test recording behavior with limited disk space. Verify warnings appear at correct thresholds. Test auto-save mechanism triggers properly."
+            "testStrategy": "Test recording behavior with limited disk space. Verify warnings appear at correct thresholds. Test auto-save mechanism triggers properly.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -689,7 +739,8 @@
             "dependencies": [],
             "details": "Implement chunked recording for long sessions to prevent memory overflow. Create automatic file segmentation for recordings exceeding time or size thresholds. Add memory usage monitoring during recording with automatic optimization. Implement buffer management to prevent memory leaks. Create background file processing to reduce memory footprint. Add configuration for maximum recording duration limits.",
             "status": "done",
-            "testStrategy": "Test recordings exceeding 30 minutes for memory stability. Verify file segmentation works correctly. Monitor memory usage patterns during extended sessions."
+            "testStrategy": "Test recordings exceeding 30 minutes for memory stability. Verify file segmentation works correctly. Monitor memory usage patterns during extended sessions.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -703,28 +754,29 @@
             ],
             "details": "Create cleanup registry to track all temporary files and resources. Implement cleanup for recording cancellation, encoding failures, and unexpected crashes. Add recovery mechanism for partial recordings after failures. Ensure all file handles, streams, and resources are properly released. Implement cleanup verification to confirm all temporary files are removed. Add cleanup retry mechanism for locked files.",
             "status": "done",
-            "testStrategy": "Test cleanup after various failure scenarios. Verify no temporary files remain after errors. Test recovery of partial recordings. Validate resource cleanup with system monitoring."
+            "testStrategy": "Test cleanup after various failure scenarios. Verify no temporary files remain after errors. Test recovery of partial recordings. Validate resource cleanup with system monitoring.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Implement Split Clips functionality",
         "description": "Add the ability to split clips at the playhead position with keyboard shortcuts and visual feedback",
         "details": "**Backend:** Add `split_clip` function in timeline state to create two new clips from split point and adjust trim values for both halves. **Frontend:** Add Split button to timeline toolbar (or right-click menu), split at current playhead position with keyboard shortcut (Cmd/Ctrl + Shift + S), and provide visual feedback (scissor cursor at playhead).",
         "testStrategy": "",
         "status": "done",
         "dependencies": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
         ],
         "priority": "high",
         "subtasks": [
@@ -735,7 +787,8 @@
             "details": "Create a split_clip function that takes a clip ID and split timestamp as parameters. Calculate the split point relative to the clip's trimmed duration. Generate two new clips from the original: first clip keeps original start to split point, second clip from split point to original end. Adjust trim values appropriately for both clips. Update timeline state to replace original clip with two new clips. Handle edge cases like splitting at clip boundaries.",
             "status": "done",
             "dependencies": [],
-            "parentTaskId": 11
+            "parentTaskId": 11,
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -746,7 +799,8 @@
             "dependencies": [
               "11.1"
             ],
-            "parentTaskId": 11
+            "parentTaskId": 11,
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -758,7 +812,8 @@
               "11.1",
               "11.2"
             ],
-            "parentTaskId": 11
+            "parentTaskId": 11,
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -770,7 +825,8 @@
               "11.2",
               "11.3"
             ],
-            "parentTaskId": 11
+            "parentTaskId": 11,
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -784,28 +840,29 @@
               "11.3",
               "11.4"
             ],
-            "parentTaskId": 11
+            "parentTaskId": 11,
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Implement Multiple Tracks functionality",
         "description": "Extend the timeline to support multiple video tracks with visual layering and drag-and-drop between tracks",
         "details": "**Backend:** Extend clip data structure to include track property, update overlap detection for multi-track, and modify export logic to composite multiple tracks. **Frontend:** Expand Timeline.jsx to render multiple track lanes with track headers and labels (Video 1, Video 2, Overlay), enable dragging clips between tracks, implement visual layering (top track renders over bottom), and add track height adjustment.",
         "testStrategy": "",
         "status": "pending",
         "dependencies": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
         ],
         "priority": "high",
         "subtasks": [
@@ -816,7 +873,8 @@
             "details": "Add 'track' property to clip data structure (integer representing track index 0, 1, 2, etc.). Update clip creation functions to accept track parameter with default value of 0. Modify clip serialization/deserialization to include track information. Update timeline state management to handle clips on different tracks. Ensure backward compatibility with existing single-track projects.",
             "status": "pending",
             "dependencies": [],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -827,7 +885,8 @@
             "dependencies": [
               "12.1"
             ],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -839,7 +898,8 @@
               "12.1",
               "12.2"
             ],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -850,7 +910,8 @@
             "dependencies": [
               "12.1"
             ],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -862,7 +923,8 @@
               "12.2",
               "12.4"
             ],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -873,15 +935,913 @@
             "dependencies": [
               "12.4"
             ],
-            "parentTaskId": 12
+            "parentTaskId": 12,
+            "parentId": "undefined"
           }
         ]
+      },
+      {
+        "id": "13",
+        "title": "Create Swift ScreenCaptureKit bridge module",
+        "description": "Build Swift module to wrap ScreenCaptureKit APIs for frame capture with proper SCStream configuration and delegate implementation",
+        "details": "Create a new Swift file src-tauri/src/swift/ScreenCaptureKit.swift that imports ScreenCaptureKit framework. Implement SCStreamDelegate and SCStreamOutput protocols for handling frame callbacks. Configure SCStreamConfiguration for video capture settings (resolution, frame rate, pixel format). Set up SCContentFilter for display/window filtering. Implement start/stop/pause methods with proper error handling. Use @objc annotations to expose Swift functions to C/Objective-C. Handle CMSampleBuffer processing and extract CVPixelBuffer for frame data. Implement memory management with proper retain/release cycles. Add logging for debugging frame capture pipeline.",
+        "testStrategy": "Test Swift compilation with cargo build. Verify SCStream initialization with different display configurations. Test frame callback invocation with logging. Validate memory management with instruments for leaks. Test error handling for invalid configurations.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Swift file and import ScreenCaptureKit framework",
+            "description": "Set up the basic Swift file structure and import necessary ScreenCaptureKit components for frame capture functionality",
+            "dependencies": [],
+            "details": "Create src-tauri/src/swift/ScreenCaptureKit.swift file. Import ScreenCaptureKit, AVFoundation, and CoreMedia frameworks. Set up basic module structure with necessary Swift language features for interop. Ensure proper Swift version compatibility and framework availability checks.\n<info added on 2025-10-30T16:05:17.306Z>\nI'll analyze the codebase to understand the current Swift implementation and build system before generating the subtask update.Successfully completed initial Swift module setup:\n- Swift file created at src/swift/ScreenCaptureKit.swift with all framework imports\n- Build system extended in build.rs to compile Swift code into dynamic library (libScreenCaptureKitBridge.dylib)\n- Dynamic library successfully built (62KB) with proper framework linking\n- All 6 C FFI functions exported and verified with nm:\n  * screen_capture_bridge_create/destroy for lifecycle management\n  * screen_capture_bridge_start/stop/pause for capture control\n  * screen_capture_is_available for compatibility checking\n- ScreenCaptureKitBridge class implemented with @available(macOS 12.3, *) guard\n- Unmanaged references used for proper memory management across FFI boundary\n- Placeholder methods ready for SCStreamDelegate implementation in next subtask\n</info added on 2025-10-30T16:05:17.306Z>",
+            "status": "done",
+            "testStrategy": "Verify Swift file compiles without errors using swift compiler. Test framework imports are accessible and available on target macOS versions.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:05:28.483Z"
+          },
+          {
+            "id": 2,
+            "title": "Implement SCStreamDelegate protocol",
+            "description": "Create delegate implementation to handle stream lifecycle events and errors from ScreenCaptureKit streaming",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement SCStreamDelegate protocol methods including stream:didStopWithError:, stream:didOutputSampleBuffer:ofType:. Handle stream lifecycle events, error reporting, and delegate callback management. Implement proper error handling and logging for debugging stream issues.",
+            "status": "done",
+            "testStrategy": "Test delegate methods are called during stream lifecycle. Verify error handling works with invalid stream configurations. Test logging output for debugging.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:06:56.088Z"
+          },
+          {
+            "id": 3,
+            "title": "Implement SCStreamOutput protocol",
+            "description": "Create output handler to receive and process video frame data from ScreenCaptureKit capture sessions",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement SCStreamOutput protocol with stream:didOutputSampleBuffer:ofType: method. Handle CMSampleBuffer processing for video frames. Implement frame rate control and buffer management. Set up proper threading for frame processing callbacks.",
+            "status": "done",
+            "testStrategy": "Test frame callbacks are received during active capture. Verify frame data integrity and timing. Test buffer overflow handling with high frame rates.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:08:04.886Z"
+          },
+          {
+            "id": 4,
+            "title": "Configure SCStreamConfiguration for video capture settings",
+            "description": "Set up stream configuration with proper video settings including resolution, frame rate, and pixel format options",
+            "dependencies": [
+              1
+            ],
+            "details": "Create SCStreamConfiguration with video capture parameters. Configure resolution (width/height), frame rate (30/60 fps options), pixel format (kCVPixelFormatType_32BGRA). Set up quality settings, color space, and capture scale factor. Implement configuration validation and fallback options.",
+            "status": "done",
+            "testStrategy": "Test different resolution and frame rate combinations. Verify pixel format compatibility. Test configuration validation with invalid parameters.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:08:48.934Z"
+          },
+          {
+            "id": 5,
+            "title": "Implement SCContentFilter for display and window filtering",
+            "description": "Create content filtering system to select specific displays or windows for capture using ScreenCaptureKit APIs",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement SCContentFilter creation for display and window filtering. Use SCShareableContent to enumerate available displays and windows. Create filters for desktop capture, specific window capture, and application-based filtering. Handle multiple display scenarios and window exclusion options.",
+            "status": "done",
+            "testStrategy": "Test content enumeration returns valid displays and windows. Verify filters work with different content types. Test multi-display filtering scenarios.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:08:49.682Z"
+          },
+          {
+            "id": 6,
+            "title": "Implement start, stop, and pause methods with error handling",
+            "description": "Create control methods for managing capture session lifecycle with comprehensive error handling and state management",
+            "dependencies": [
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Implement startCapture(), stopCapture(), and pauseCapture() methods. Create SCStream instance management with proper initialization and cleanup. Handle capture session errors, permission failures, and hardware unavailability. Implement state tracking and prevent invalid state transitions.",
+            "status": "done",
+            "testStrategy": "Test start/stop/pause functionality works correctly. Verify error handling for permission denied and hardware issues. Test state management prevents invalid operations.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:09:27.903Z"
+          },
+          {
+            "id": 7,
+            "title": "Add @objc annotations for C/Objective-C bridge exposure",
+            "description": "Set up Objective-C bridge annotations to expose Swift functions for Rust FFI integration",
+            "dependencies": [
+              6
+            ],
+            "details": "Add @objc annotations to all public Swift methods for C/Objective-C exposure. Create C-compatible function signatures with proper parameter types. Implement bridging header generation and export declarations. Set up Swift-to-C type conversions for basic data types and pointers.",
+            "status": "done",
+            "testStrategy": "Verify @objc methods are accessible from C code. Test function signatures match expected FFI declarations. Test basic parameter passing between Swift and C.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:09:28.661Z"
+          },
+          {
+            "id": 8,
+            "title": "Process CMSampleBuffer and extract CVPixelBuffer with memory management",
+            "description": "Implement frame data processing pipeline with proper memory management for extracting pixel data from ScreenCaptureKit buffers",
+            "dependencies": [
+              3,
+              7
+            ],
+            "details": "Extract CVPixelBuffer from CMSampleBuffer in frame callbacks. Implement CVPixelBufferLockBaseAddress/Unlock for safe pixel data access. Copy pixel data to contiguous memory buffer for FFI transfer. Implement proper memory management with retain/release cycles. Handle different pixel formats and buffer stride calculations.",
+            "status": "done",
+            "testStrategy": "Test pixel buffer extraction and memory copying. Verify memory management with no leaks using instruments. Test pixel data integrity and format consistency.",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-30T16:09:41.612Z"
+          }
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 8,
+        "expansionPrompt": "Break down into: 1) Swift file creation and basic ScreenCaptureKit imports, 2) SCStreamDelegate protocol implementation, 3) SCStreamOutput protocol implementation, 4) SCStreamConfiguration setup with video settings, 5) SCContentFilter implementation for display/window filtering, 6) Start/stop/pause method implementation with error handling, 7) @objc annotation setup for C/Objective-C exposure, 8) CMSampleBuffer processing and CVPixelBuffer extraction with memory management.",
+        "updatedAt": "2025-10-30T16:09:41.612Z"
+      },
+      {
+        "id": "14",
+        "title": "Build Rust FFI bridge for Swift interop",
+        "description": "Create Rust module that interfaces with Swift ScreenCaptureKit code using FFI and manages frame data flow between Swift and Rust",
+        "details": "Create src-tauri/src/capture/ffi.rs module for Swift-Rust bridge. Use objc and block crates to handle Objective-C runtime and blocks. Define extern 'C' functions matching Swift @objc exports. Implement frame callback handler that receives CVPixelBuffer data from Swift. Create thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>> for buffering. Convert CVPixelBuffer to Rust-friendly format (Vec<u8> with metadata). Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr. Implement error translation between Swift NSError and Rust Result types. Add build.rs configuration to compile and link Swift code. Create safe Rust API wrapping unsafe FFI calls.",
+        "testStrategy": "Unit test FFI function signatures match Swift exports. Test frame data transfer from Swift to Rust. Verify thread safety with concurrent frame processing. Test memory safety with Miri or sanitizers. Validate error propagation across FFI boundary.",
+        "priority": "high",
+        "dependencies": [
+          "13"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create src-tauri/src/capture/ffi.rs module structure",
+            "description": "Create the basic module structure for Swift-Rust FFI bridge with proper imports and module organization",
+            "dependencies": [],
+            "details": "Create src-tauri/src/capture/ffi.rs file with module structure. Add necessary use statements for objc, block, std::sync::{Arc, Mutex}, std::collections::VecDeque. Define basic module structure with proper error handling types and frame data structures. Set up conditional compilation for macOS platform.",
+            "status": "pending",
+            "testStrategy": "Verify module compiles without errors and imports are resolved correctly",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement extern 'C' functions matching Swift @objc exports",
+            "description": "Define C-compatible function signatures that match Swift @objc exported functions for FFI communication",
+            "dependencies": [
+              1
+            ],
+            "details": "Define extern 'C' functions with C-compatible signatures that match Swift @objc exports. Include functions for initializing capture session, starting/stopping recording, and receiving frame callbacks. Use proper C types (c_void, c_char, etc.) and ensure function signatures are ABI-compatible between Swift and Rust.",
+            "status": "pending",
+            "testStrategy": "Unit test FFI function signatures match Swift exports using symbol verification",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Set up objc and block crates for Objective-C runtime handling",
+            "description": "Configure objc and block crates to handle Objective-C runtime interactions and block-based callbacks",
+            "dependencies": [
+              1
+            ],
+            "details": "Add objc and block crate dependencies to Cargo.toml. Implement Objective-C runtime helpers for calling Swift methods and handling blocks. Set up proper block conversion utilities to handle Swift completion handlers and callbacks from Rust side.",
+            "status": "pending",
+            "testStrategy": "Test Objective-C runtime calls work correctly and blocks can be created and invoked",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>>",
+            "description": "Create a thread-safe frame buffer queue for managing video frames between Swift and Rust threads",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement Frame struct with metadata (timestamp, width, height, format). Create thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>> for buffering frames from Swift callback thread. Add methods for pushing frames from Swift side and popping frames from Rust processing side with proper synchronization.",
+            "status": "pending",
+            "testStrategy": "Verify thread safety with concurrent frame processing and test queue overflow handling",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Create CVPixelBuffer to Rust Vec<u8> conversion",
+            "description": "Implement conversion from Swift CVPixelBuffer format to Rust-friendly Vec<u8> with frame metadata",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Implement unsafe conversion from CVPixelBuffer pointer to Rust Vec<u8>. Handle different pixel formats (BGRA, YUV420, etc.) and extract frame metadata (width, height, stride, timestamp). Ensure proper memory copying and format conversion while maintaining data integrity.",
+            "status": "pending",
+            "testStrategy": "Test frame data transfer from Swift to Rust and validate pixel data integrity across conversion",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr",
+            "description": "Implement proper Swift object memory management using StrongPtr for retain/release cycles",
+            "dependencies": [
+              3
+            ],
+            "details": "Use objc::rc::StrongPtr to handle Swift object lifecycle management. Implement proper retain/release for Swift objects passed to Rust. Handle autoreleased objects and ensure no memory leaks or premature deallocation. Create RAII wrappers for Swift objects used in Rust.",
+            "status": "pending",
+            "testStrategy": "Test memory safety with Miri or sanitizers and verify no memory leaks in object lifecycle",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add build.rs configuration to compile and link Swift code",
+            "description": "Configure build system to compile Swift code and link it with Rust FFI module",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create build.rs script to compile Swift source files using swiftc. Configure linking of Swift runtime and Foundation frameworks. Set up proper library search paths and framework linking for macOS. Ensure Swift code is compiled with proper ABI compatibility for Rust FFI.",
+            "status": "pending",
+            "testStrategy": "Validate error propagation across FFI boundary and test build process produces working executable",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Break down into: 1) Create src-tauri/src/capture/ffi.rs module structure, 2) Implement extern 'C' functions matching Swift @objc exports, 3) Set up objc and block crates for Objective-C runtime handling, 4) Implement thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>>, 5) Create CVPixelBuffer to Rust Vec<u8> conversion, 6) Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr, 7) Add build.rs configuration to compile and link Swift code."
+      },
+      {
+        "id": "15",
+        "title": "Replace screen enumeration with SCShareableContent",
+        "description": "Migrate from NSScreen/CGWindow APIs to ScreenCaptureKit's SCShareableContent for unified display and window enumeration",
+        "details": "Replace current implementation in screen_sources/macos.rs with SCShareableContent API calls. Use SCShareableContent.getShareableContent() to fetch displays and windows asynchronously. Map SCDisplay objects to existing ScreenSource structure maintaining ID compatibility. Extract window metadata from SCWindow including title, owning application, and bounds. Generate thumbnails using SCScreenshotManager for preview images. Handle async nature of SCShareableContent with tokio::task::spawn_blocking. Maintain backward compatibility with existing source_id format for minimal frontend changes. Cache shareable content results with TTL for performance.",
+        "testStrategy": "Test enumeration matches current NSScreen implementation. Verify window filtering excludes desktop elements. Test thumbnail generation performance with many windows. Validate multi-display detection and ordering. Test with various window states (minimized, fullscreen, hidden).",
+        "priority": "medium",
+        "dependencies": [
+          "14"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Replace NSScreen API calls with SCShareableContent.getShareableContent()",
+            "description": "Remove existing NSScreen enumeration code and replace with SCShareableContent.getShareableContent() async calls",
+            "dependencies": [],
+            "details": "Modify screen_sources/macos.rs to import ScreenCaptureKit framework. Replace NSScreen.screens() calls with SCShareableContent.getShareableContent() async method. Remove CGWindow API calls for window enumeration. Update function signatures to handle async/await pattern. Ensure proper error handling for SCShareableContent failures.",
+            "status": "pending",
+            "testStrategy": "Test that SCShareableContent.getShareableContent() returns expected display and window data. Verify async calls complete successfully without blocking.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Map SCDisplay objects to existing ScreenSource structure",
+            "description": "Create mapping logic to convert SCDisplay objects to the existing ScreenSource data structure while maintaining compatibility",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement conversion functions to map SCDisplay properties (displayID, width, height, localizedName) to ScreenSource fields. Maintain existing ID format for backward compatibility with frontend. Preserve resolution, name, and type information. Handle coordinate system differences between SCDisplay and existing implementation.",
+            "status": "pending",
+            "testStrategy": "Test that mapped ScreenSource objects contain identical data to previous NSScreen implementation. Verify ID compatibility with existing frontend code.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Extract window metadata from SCWindow objects",
+            "description": "Implement window metadata extraction from SCWindow objects including title, application, and bounds information",
+            "dependencies": [
+              1
+            ],
+            "details": "Extract window properties from SCWindow objects including windowID, title, owningApplication.bundleIdentifier, and frame bounds. Filter out desktop elements and system windows. Map window type and state information. Handle windows with missing or empty titles gracefully. Maintain existing window source format for compatibility.",
+            "status": "pending",
+            "testStrategy": "Test window metadata extraction includes all required fields. Verify filtering excludes desktop and system windows. Test with various application windows and states.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement thumbnail generation using SCScreenshotManager",
+            "description": "Add thumbnail preview generation for screens and windows using SCScreenshotManager API",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Use SCScreenshotManager.captureImage() to generate thumbnail previews for displays and windows. Configure appropriate thumbnail dimensions and compression settings. Handle async screenshot capture with proper error handling. Integrate thumbnail data into ScreenSource structure. Optimize thumbnail generation for performance with many windows.",
+            "status": "pending",
+            "testStrategy": "Test thumbnail generation produces valid image data for screens and windows. Verify performance with large numbers of windows. Test error handling for inaccessible windows.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Handle async nature with tokio::task::spawn_blocking",
+            "description": "Wrap SCShareableContent async calls with tokio::task::spawn_blocking for Rust async compatibility",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Implement tokio::task::spawn_blocking wrapper around SCShareableContent calls to bridge Swift async with Rust async runtime. Handle futures properly and convert Swift completion handlers to Rust Future patterns. Manage thread safety between Rust and Swift contexts. Implement proper error propagation from Swift to Rust.",
+            "status": "pending",
+            "testStrategy": "Test async operations complete without blocking Tauri event loop. Verify error propagation works correctly between Swift and Rust contexts. Test concurrent screen enumeration requests.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement content caching with TTL for performance optimization",
+            "description": "Add caching mechanism for SCShareableContent results with time-to-live expiration for improved performance",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Implement in-memory cache for shareable content results with configurable TTL (default 5 seconds). Cache both display and window enumeration results separately. Implement cache invalidation and refresh logic. Add cache hit/miss metrics for monitoring. Ensure cache is thread-safe and handles concurrent access properly.",
+            "status": "pending",
+            "testStrategy": "Test cache returns fresh data within TTL window and refreshes after expiration. Verify cache improves enumeration performance. Test thread safety with concurrent cache access.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Replace NSScreen API calls with SCShareableContent.getShareableContent(), 2) Map SCDisplay objects to existing ScreenSource structure, 3) Extract window metadata from SCWindow objects, 4) Implement thumbnail generation using SCScreenshotManager, 5) Handle async nature with tokio::task::spawn_blocking, 6) Implement content caching with TTL for performance optimization."
+      },
+      {
+        "id": "16",
+        "title": "Implement frame processing and preview pipeline",
+        "description": "Create pipeline to process captured frames from ScreenCaptureKit for both preview display and FFmpeg encoding",
+        "details": "Extract pixel data from CMSampleBuffer using CVPixelBufferGetBaseAddress in Swift. Implement pixel format conversion from native format (likely 420v or BGRA) to RGB using Accelerate framework or manual conversion. Create frame throttling mechanism to reduce preview frame rate from capture rate (60fps to 15fps) using frame counter modulo. Implement JPEG compression using image crate with configurable quality (30-80%). Add frame queue with size limit (e.g., 5 frames) dropping oldest on overflow. Include timestamp metadata using CMSampleBufferGetPresentationTimeStamp. Create FrameProcessor trait with implementations for preview and encoding paths. Implement zero-copy optimization where possible using memory mapping.",
+        "testStrategy": "Test pixel format conversion maintains color accuracy. Verify frame throttling achieves target preview FPS. Test JPEG compression quality vs size tradeoffs. Validate frame queue prevents memory bloat under load. Test timestamp accuracy for A/V sync.",
+        "priority": "high",
+        "dependencies": [
+          "14"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extract pixel data from CMSampleBuffer using CVPixelBufferGetBaseAddress",
+            "description": "Implement Swift code to extract raw pixel data from CMSampleBuffer objects received from ScreenCaptureKit",
+            "dependencies": [],
+            "details": "Use CVPixelBufferGetBaseAddress to access the raw pixel data from CMSampleBuffer. Handle CVPixelBufferLockBaseAddress for thread-safe access. Extract width, height, and bytes per row information. Implement proper error handling for invalid buffers. Ensure memory is properly locked/unlocked during access.",
+            "status": "pending",
+            "testStrategy": "Test with various screen capture formats. Verify pixel data extraction doesn't corrupt memory. Test error handling with invalid buffers.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement pixel format conversion from 420v/BGRA to RGB using Accelerate framework",
+            "description": "Create efficient pixel format conversion pipeline using Apple's Accelerate framework for optimal performance",
+            "dependencies": [
+              1
+            ],
+            "details": "Use vImageConvert functions from Accelerate framework to convert from native formats (420v/BGRA) to RGB. Implement fallback manual conversion for unsupported formats. Handle different bit depths and color spaces. Optimize for real-time performance using SIMD instructions where possible. Create reusable conversion context to avoid repeated setup costs.",
+            "status": "pending",
+            "testStrategy": "Test color accuracy with reference images. Benchmark performance against manual conversion. Verify all supported pixel formats convert correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create frame throttling mechanism (60fps to 15fps) using modulo counters",
+            "description": "Implement frame rate reduction system to throttle high-frequency capture for preview display",
+            "dependencies": [
+              2
+            ],
+            "details": "Use modulo arithmetic to drop frames (e.g., keep every 4th frame for 60fps to 15fps). Implement configurable throttling ratios. Track frame counters per stream. Ensure first frame is always processed. Add frame timing validation to maintain consistent intervals. Handle variable input frame rates gracefully.",
+            "status": "pending",
+            "testStrategy": "Verify target frame rate is achieved consistently. Test with variable input frame rates. Validate frame timing accuracy.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement JPEG compression using image crate with configurable quality",
+            "description": "Add JPEG compression pipeline for preview frames with adjustable quality settings",
+            "dependencies": [
+              3
+            ],
+            "details": "Use Rust image crate to encode RGB frames as JPEG with quality range 30-80%. Implement quality presets (low/medium/high). Add dynamic quality adjustment based on performance metrics. Handle different image dimensions efficiently. Optimize encoder settings for real-time compression. Include error handling for compression failures.",
+            "status": "pending",
+            "testStrategy": "Test quality vs compression ratio tradeoffs. Benchmark compression performance at different quality levels. Verify output JPEG format compliance.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add frame queue with size limits and overflow handling",
+            "description": "Create bounded frame buffer system with automatic overflow management to prevent memory bloat",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement circular buffer with configurable size limit (default 5 frames). Drop oldest frames when queue is full. Use thread-safe queue operations for producer-consumer pattern. Track queue utilization metrics. Implement backpressure signals when queue approaches capacity. Add frame metadata preservation during queuing.",
+            "status": "pending",
+            "testStrategy": "Test queue behavior under high frame rates. Verify oldest frames are dropped correctly. Test thread safety with concurrent access.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Include timestamp metadata using CMSampleBufferGetPresentationTimeStamp",
+            "description": "Extract and preserve accurate timing information from captured frames for synchronization",
+            "dependencies": [
+              1
+            ],
+            "details": "Use CMSampleBufferGetPresentationTimeStamp to extract frame timestamps. Convert Core Media timestamps to consistent format. Preserve timestamp accuracy for A/V sync. Handle timestamp discontinuities during pause/resume. Implement timestamp validation and correction. Store timestamps with frame data throughout pipeline.",
+            "status": "pending",
+            "testStrategy": "Test timestamp accuracy and consistency. Verify A/V sync is maintained. Test timestamp handling during pause/resume cycles.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Create FrameProcessor trait with preview and encoding implementations",
+            "description": "Design and implement abstraction layer for different frame processing paths",
+            "dependencies": [
+              2,
+              4,
+              5,
+              6
+            ],
+            "details": "Define FrameProcessor trait with methods for different processing needs. Implement PreviewProcessor for JPEG-compressed preview frames. Create EncodingProcessor for FFmpeg pipeline integration. Support zero-copy optimization using memory mapping where possible. Include processor-specific configuration options. Implement processor switching based on recording state.",
+            "status": "pending",
+            "testStrategy": "Test both processor implementations work correctly. Verify zero-copy optimizations provide performance benefits. Test processor switching doesn't drop frames.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Break down into: 1) Extract pixel data from CMSampleBuffer using CVPixelBufferGetBaseAddress, 2) Implement pixel format conversion from 420v/BGRA to RGB using Accelerate framework, 3) Create frame throttling mechanism (60fps to 15fps) using modulo counters, 4) Implement JPEG compression using image crate with configurable quality, 5) Add frame queue with size limits and overflow handling, 6) Include timestamp metadata using CMSampleBufferGetPresentationTimeStamp, 7) Create FrameProcessor trait with preview and encoding implementations."
+      },
+      {
+        "id": "17",
+        "title": "Integrate Tauri event system for preview frames",
+        "description": "Connect frame processing pipeline to Tauri's event system to stream preview frames to the frontend UI",
+        "details": "Define PreviewFrame event payload struct with base64 image data, timestamp, and frame dimensions. Implement event emission using app_handle.emit('preview-frame', payload). Add preview control commands (start_preview, stop_preview) exposed to frontend. Implement backpressure detection by checking event queue size. Add frame dropping strategy when frontend cannot keep up (skip frames, not queue). Include performance metrics in events (dropped frames, current FPS). Create preview quality settings command for dynamic JPEG quality adjustment. Implement preview-only mode that doesn't start FFmpeg for testing UI. Add debouncing to prevent event flooding using tokio::time::interval.",
+        "testStrategy": "Test event delivery to frontend with mock listener. Verify base64 encoding correctness of JPEG data. Test backpressure handling with slow frontend consumer. Validate frame dropping maintains smooth preview. Test quality adjustment affects frame size.",
+        "priority": "medium",
+        "dependencies": [
+          "16"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define PreviewFrame event payload struct with base64 image data and metadata",
+            "description": "Create the data structure for preview frame events including base64 encoded image data, timestamp, and frame dimensions",
+            "dependencies": [],
+            "details": "Define PreviewFrame struct in Rust with fields for base64_image (String), timestamp (u64), width (u32), height (u32), and frame_number (u64). Implement Serialize trait for Tauri event compatibility. Add validation for base64 data format and reasonable dimension limits. Include helper methods for encoding JPEG data to base64 format.",
+            "status": "pending",
+            "testStrategy": "Test struct serialization to JSON. Verify base64 encoding produces valid data. Test with various image dimensions and formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement event emission using app_handle.emit()",
+            "description": "Set up Tauri event emission system to send preview frames to frontend using app_handle.emit",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement preview frame emission using app_handle.emit('preview-frame', payload). Create async function to handle frame emission with error handling for disconnected frontend. Add event emission rate limiting to prevent overwhelming the event system. Implement proper error handling for serialization failures and event queue issues.",
+            "status": "pending",
+            "testStrategy": "Test event emission with mock frontend listener. Verify events are properly formatted and delivered. Test error handling when frontend is disconnected.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add preview control commands (start_preview, stop_preview)",
+            "description": "Create Tauri commands to control preview streaming from frontend",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement start_preview and stop_preview Tauri commands exposed to frontend. Add preview state management using atomic flags or channels. Include preview settings parameter for quality and frame rate control. Implement proper cleanup when stopping preview to prevent resource leaks. Add command validation and error responses.",
+            "status": "pending",
+            "testStrategy": "Test preview start/stop commands from frontend. Verify state transitions work correctly. Test multiple start/stop cycles don't cause issues. Validate proper resource cleanup.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement backpressure detection and frame dropping strategy",
+            "description": "Add system to detect when frontend cannot keep up and implement frame dropping to maintain performance",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement backpressure detection by monitoring event queue size using Tauri's event system metrics. Create frame dropping strategy that skips frames instead of queuing when backpressure detected. Add configurable thresholds for when to start dropping frames. Implement priority-based dropping (keep keyframes, drop intermediate frames). Add metrics tracking for dropped frame count.",
+            "status": "pending",
+            "testStrategy": "Test backpressure detection with slow frontend consumer. Verify frame dropping maintains smooth preview without queue buildup. Test with various frontend processing speeds.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add performance metrics and debouncing using tokio::time::interval",
+            "description": "Implement performance monitoring and event debouncing to optimize preview streaming",
+            "dependencies": [
+              4
+            ],
+            "details": "Add performance metrics including current FPS, dropped frame count, and average processing time. Implement debouncing using tokio::time::interval to prevent event flooding. Create metrics emission as separate events or include in frame payloads. Add configurable debounce interval and FPS limiting. Implement performance degradation detection and automatic quality adjustment.",
+            "status": "pending",
+            "testStrategy": "Test FPS calculation accuracy. Verify debouncing prevents event flooding. Test performance metrics update correctly. Validate automatic quality adjustment under load.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Define PreviewFrame event payload struct with base64 image data and metadata, 2) Implement event emission using app_handle.emit(), 3) Add preview control commands (start_preview, stop_preview), 4) Implement backpressure detection and frame dropping strategy, 5) Add performance metrics and debouncing using tokio::time::interval."
+      },
+      {
+        "id": "18",
+        "title": "Build React preview component for real-time display",
+        "description": "Create frontend React component that receives and displays preview frames from the Tauri event stream",
+        "details": "Create PreviewWindow.tsx component with event listener using Tauri's listen() API. Implement base64 to image conversion and display using Canvas API or img element. Add double buffering using two canvas elements for smooth frame transitions. Style preview as floating overlay with drag handle and resize corners. Implement show/hide toggle with smooth CSS transitions. Add FPS counter calculating actual display frame rate. Include recording indicator overlay when recording active. Implement auto-hide after inactivity with mouse hover to show. Add picture-in-picture mode for minimal preview. Create performance optimizations using React.memo and useCallback.",
+        "testStrategy": "Test frame rendering at various rates (5-30 FPS). Verify no memory leaks with long preview sessions. Test drag and resize functionality across screen. Validate smooth transitions without flicker. Test performance with 4K resolution previews.",
+        "priority": "medium",
+        "dependencies": [
+          "17"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create PreviewWindow.tsx component with Tauri event listener",
+            "description": "Create the base React component structure with Tauri event handling to receive preview frames from the backend recording stream",
+            "dependencies": [],
+            "details": "Create PreviewWindow.tsx in src/components directory. Set up React component with useState and useEffect hooks. Import Tauri's listen API and create event listener for 'preview-frame' events. Handle component mounting/unmounting and cleanup event listeners properly. Define TypeScript interfaces for preview frame data structure.",
+            "status": "pending",
+            "testStrategy": "Test event listener registration and cleanup. Verify component mounts without errors and receives mock preview events.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement base64 to image conversion and Canvas API display",
+            "description": "Convert base64 encoded frame data to displayable images and render them using HTML5 Canvas API for optimal performance",
+            "dependencies": [
+              1
+            ],
+            "details": "Create utility function to convert base64 data to Image objects. Set up HTML5 Canvas element with proper sizing and context. Implement drawImage() calls to render frames to canvas. Handle image loading asynchronously with proper error handling. Add canvas scaling to maintain aspect ratio.",
+            "status": "pending",
+            "testStrategy": "Test base64 conversion with various image formats. Verify canvas renders images correctly and maintains aspect ratio.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add double buffering using two canvas elements",
+            "description": "Implement smooth frame transitions by alternating between two canvas elements to eliminate flicker during real-time rendering",
+            "dependencies": [
+              2
+            ],
+            "details": "Create two canvas elements in the component. Implement alternating buffer logic to draw new frames on hidden canvas while displaying current frame. Add smooth transition by swapping canvas visibility. Include frame synchronization to prevent partial frame display.",
+            "status": "pending",
+            "testStrategy": "Test frame transitions for smoothness without flicker. Verify double buffering works at various frame rates (5-30 FPS).",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Style as floating overlay with drag handle and resize corners",
+            "description": "Create floating overlay UI with interactive drag and resize functionality for user positioning and sizing control",
+            "dependencies": [
+              3
+            ],
+            "details": "Add CSS positioning for floating overlay behavior. Implement drag handle using mouse events and pointer tracking. Add resize corners with mouse cursor changes and resize logic. Include boundary constraints to keep preview within screen bounds. Style with semi-transparent border and rounded corners.",
+            "status": "pending",
+            "testStrategy": "Test drag functionality across entire screen area. Verify resize corners work correctly and maintain aspect ratio. Test boundary constraints.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement show/hide toggle with CSS transitions",
+            "description": "Add smooth show/hide functionality with CSS transitions and auto-hide behavior based on user inactivity",
+            "dependencies": [
+              4
+            ],
+            "details": "Create toggle state management for show/hide functionality. Implement CSS transitions for opacity and scale animations. Add auto-hide timer that triggers after 3 seconds of inactivity. Include mouse hover detection to show preview when hidden. Add keyboard shortcut support for toggle.",
+            "status": "pending",
+            "testStrategy": "Test smooth transitions for show/hide animations. Verify auto-hide timer works correctly and hover detection shows preview.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Add FPS counter and recording indicator overlay with performance optimizations",
+            "description": "Implement performance monitoring with FPS counter, recording status indicator, and React performance optimizations",
+            "dependencies": [
+              5
+            ],
+            "details": "Create FPS calculation logic tracking actual display frame rate. Add recording indicator red dot overlay when recording is active. Implement React.memo for component optimization and useCallback for event handlers. Add performance monitoring to detect frame drops. Include memory usage tracking for preview frames.",
+            "status": "pending",
+            "testStrategy": "Verify FPS counter displays accurate frame rates. Test recording indicator shows/hides correctly. Monitor memory usage during long preview sessions.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Create PreviewWindow.tsx component with Tauri event listener, 2) Implement base64 to image conversion and Canvas API display, 3) Add double buffering using two canvas elements, 4) Style as floating overlay with drag handle and resize corners, 5) Implement show/hide toggle with CSS transitions, 6) Add FPS counter and recording indicator overlay with performance optimizations."
+      },
+      {
+        "id": "19",
+        "title": "Configure FFmpeg stdin pipeline for raw frames",
+        "description": "Modify FFmpeg command builder to accept raw video frames via stdin instead of using AVFoundation capture",
+        "details": "Modify screen_capture.rs to build FFmpeg command with -f rawvideo -pix_fmt rgb24 or yuv420p input. Set input parameters: -video_size WIDTHxHEIGHT -framerate FPS -i pipe:0 for stdin. Configure output encoding parameters maintaining current quality presets. Implement frame writer that pipes raw frames to FFmpeg process stdin. Handle stdin write errors and EPIPE for FFmpeg termination. Add buffer size configuration to prevent blocking on slow encoding. Implement frame timing to maintain consistent frame rate using tokio::time::interval. Support variable frame rate mode for performance optimization. Add real-time encoding flag (-re) when appropriate.",
+        "testStrategy": "Test FFmpeg accepts raw frames without corruption. Verify encoded video maintains target frame rate. Test with various resolutions and pixel formats. Validate graceful handling of FFmpeg crashes. Compare quality with current AVFoundation capture.",
+        "priority": "high",
+        "dependencies": [
+          "16"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Modify FFmpeg command builder for raw video input",
+            "description": "Update screen_capture.rs to build FFmpeg command with -f rawvideo input format and proper pixel format specification",
+            "dependencies": [],
+            "details": "Modify the FFmpeg command construction in screen_capture.rs to use -f rawvideo input format. Add pixel format specification using -pix_fmt rgb24 or yuv420p depending on source format. Remove existing AVFoundation-specific input parameters and replace with raw video input configuration.",
+            "status": "pending",
+            "testStrategy": "Test FFmpeg command generation produces correct raw video input parameters. Verify pixel format selection logic works for different source formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Set input parameters for stdin pipeline",
+            "description": "Configure FFmpeg input parameters including video size, frame rate, and stdin pipe specification",
+            "dependencies": [
+              1
+            ],
+            "details": "Add input parameter configuration: -video_size WIDTHxHEIGHT using actual capture dimensions, -framerate FPS based on target frame rate, and -i pipe:0 to specify stdin as input source. Ensure parameters are properly formatted and validated before command execution.",
+            "status": "pending",
+            "testStrategy": "Test parameter generation with various resolutions and frame rates. Verify stdin pipe specification is correctly formatted for FFmpeg.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement frame writer for FFmpeg stdin",
+            "description": "Create frame writer component that pipes raw video frames to FFmpeg process stdin",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement frame writer that takes raw frame data and writes to FFmpeg stdin pipe. Handle frame format conversion if needed. Implement proper buffer management to write frames efficiently. Add error handling for write operations and ensure frames are written in correct sequence.",
+            "status": "pending",
+            "testStrategy": "Test frame writer can successfully pipe frames to FFmpeg without data corruption. Verify frame ordering and timing consistency.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Handle stdin write errors and EPIPE",
+            "description": "Implement error handling for stdin write operations and FFmpeg process termination",
+            "dependencies": [
+              3
+            ],
+            "details": "Add comprehensive error handling for stdin write failures. Handle EPIPE errors when FFmpeg process terminates unexpectedly. Implement graceful shutdown when write errors occur. Add logging for debugging write failures and process termination scenarios.",
+            "status": "pending",
+            "testStrategy": "Test error handling when FFmpeg process crashes mid-recording. Verify EPIPE errors are handled gracefully without panic. Test recovery scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add frame timing with tokio interval",
+            "description": "Implement consistent frame rate timing using tokio::time::interval for frame delivery",
+            "dependencies": [
+              4
+            ],
+            "details": "Use tokio::time::interval to maintain consistent frame rate timing. Calculate interval duration based on target FPS. Implement frame timing logic that accounts for processing delays. Add frame drop detection when encoding falls behind real-time requirements.",
+            "status": "pending",
+            "testStrategy": "Test frame timing maintains target frame rate under various system loads. Verify frame drops are detected and handled appropriately.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Support variable frame rate and real-time encoding",
+            "description": "Add variable frame rate mode and real-time encoding flag configuration",
+            "dependencies": [
+              5
+            ],
+            "details": "Implement variable frame rate mode for performance optimization when consistent timing isn't critical. Add real-time encoding flag (-re) configuration when appropriate for live streaming scenarios. Create configuration options to toggle between constant and variable frame rate modes.",
+            "status": "pending",
+            "testStrategy": "Test variable frame rate mode reduces system load during heavy processing. Verify real-time encoding flag improves streaming performance when enabled.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Modify screen_capture.rs to build FFmpeg command with -f rawvideo input parameters, 2) Set input parameters (-video_size, -framerate, -i pipe:0), 3) Implement frame writer that pipes raw frames to FFmpeg stdin, 4) Handle stdin write errors and EPIPE for FFmpeg termination, 5) Add frame timing using tokio::time::interval for consistent frame rate, 6) Support variable frame rate mode and real-time encoding flag."
+      },
+      {
+        "id": "20",
+        "title": "Implement audio capture via ScreenCaptureKit",
+        "description": "Add audio capture support using ScreenCaptureKit's audio capabilities for system and microphone audio",
+        "details": "Configure SCStreamConfiguration with capturesAudio = true for system audio. Add microphone capture using addStreamOutput with audio type. Extract audio samples from CMSampleBuffer in audio callback. Convert audio format from Core Audio to raw PCM for FFmpeg. Implement audio-video synchronization using presentation timestamps. Create separate pipe for audio data to FFmpeg using -f s16le -ar 48000 -ac 2. Handle audio-only recording mode when no video selected. Implement audio level monitoring for UI feedback. Add audio device selection for microphone input. Support mixing system and microphone audio streams.",
+        "testStrategy": "Test audio capture from various sources (system, mic, both). Verify audio-video sync within 40ms tolerance. Test audio quality at different sample rates. Validate handling of audio device changes mid-recording. Test audio-only recording mode.",
+        "priority": "medium",
+        "dependencies": [
+          "19"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure SCStreamConfiguration with capturesAudio = true",
+            "description": "Configure ScreenCaptureKit stream to enable system audio capture by setting capturesAudio property to true in the stream configuration",
+            "dependencies": [],
+            "details": "Modify the existing SCStreamConfiguration setup to include audio capture. Set the capturesAudio property to true to enable system audio recording. Update the stream configuration to specify audio format preferences including sample rate (48kHz) and channel count (stereo). Ensure the configuration is applied before starting the capture stream.",
+            "status": "pending",
+            "testStrategy": "Test that system audio is captured when configuration is enabled. Verify audio capture works with different audio sources playing. Test configuration persists across stream restarts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add microphone capture using addStreamOutput with audio type",
+            "description": "Implement microphone audio capture by adding an audio stream output to the ScreenCaptureKit stream configuration",
+            "dependencies": [
+              1
+            ],
+            "details": "Use SCStream's addStreamOutput method to add an audio output handler. Configure the output for audio data type to receive microphone input. Set up audio device enumeration to allow microphone selection. Implement audio session configuration to handle microphone permissions and device access. Create audio format specifications for microphone input matching the system audio format.",
+            "status": "pending",
+            "testStrategy": "Test microphone audio is captured separately from system audio. Verify microphone device selection works correctly. Test microphone permission handling and fallback when denied.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Extract audio samples from CMSampleBuffer in audio callback",
+            "description": "Implement audio callback handler to extract raw audio data from Core Media sample buffers received from ScreenCaptureKit",
+            "dependencies": [
+              2
+            ],
+            "details": "Create audio callback function that receives CMSampleBuffer objects from ScreenCaptureKit. Extract audio data using CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer. Handle both system audio and microphone audio buffers. Implement buffer management to prevent memory leaks. Add error handling for malformed or corrupted audio buffers. Extract timing information from presentation timestamps.",
+            "status": "pending",
+            "testStrategy": "Test audio data extraction from sample buffers is complete and uncorrupted. Verify callback handles high-frequency audio data without dropping samples. Test memory management prevents leaks during long recordings.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Convert audio format from Core Audio to raw PCM for FFmpeg",
+            "description": "Implement audio format conversion from Core Audio format to raw PCM format suitable for FFmpeg processing",
+            "dependencies": [
+              3
+            ],
+            "details": "Convert extracted audio data from Core Audio's AudioBufferList format to raw PCM data. Handle format conversion including sample rate conversion, channel mapping, and bit depth conversion. Implement interleaved PCM output format (s16le) at 48kHz sample rate with 2 channels. Add audio format validation and error handling for unsupported input formats. Optimize conversion performance for real-time processing.",
+            "status": "pending",
+            "testStrategy": "Test audio format conversion maintains quality and timing accuracy. Verify converted PCM data is compatible with FFmpeg input requirements. Test conversion handles various input audio formats correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement audio-video synchronization using presentation timestamps",
+            "description": "Create synchronization mechanism to align audio and video streams using presentation timestamps from ScreenCaptureKit",
+            "dependencies": [
+              4
+            ],
+            "details": "Extract presentation timestamps from both audio and video CMSampleBuffers. Implement timestamp alignment algorithm to synchronize audio and video streams. Handle timestamp drift and correction to maintain sync over long recordings. Create buffering mechanism to handle timing differences between audio and video callbacks. Implement sync tolerance checking with target accuracy of 40ms or better.",
+            "status": "pending",
+            "testStrategy": "Test audio-video sync remains within 40ms tolerance throughout recording. Verify sync correction handles timestamp drift properly. Test sync accuracy with various recording durations and system loads.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create separate audio pipe to FFmpeg and support audio device selection",
+            "description": "Implement separate audio data pipeline to FFmpeg with audio device selection UI and mixing capabilities",
+            "dependencies": [
+              5
+            ],
+            "details": "Create separate named pipe or data stream for audio data to FFmpeg using -f s16le -ar 48000 -ac 2 format. Implement audio device enumeration and selection interface for microphone input. Add audio mixing capability to combine system and microphone audio streams. Implement audio level monitoring for UI feedback showing input levels. Support audio-only recording mode when no video source is selected. Add audio device change detection and handling during recording.",
+            "status": "pending",
+            "testStrategy": "Test separate audio pipeline delivers data correctly to FFmpeg. Verify audio device selection and switching works seamlessly. Test audio mixing produces balanced output from multiple sources. Validate audio-only recording mode functions properly.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Configure SCStreamConfiguration with capturesAudio = true, 2) Add microphone capture using addStreamOutput with audio type, 3) Extract audio samples from CMSampleBuffer in audio callback, 4) Convert audio format from Core Audio to raw PCM for FFmpeg, 5) Implement audio-video synchronization using presentation timestamps, 6) Create separate audio pipe to FFmpeg and support audio device selection."
+      },
+      {
+        "id": "21",
+        "title": "Implement recording controls and state management",
+        "description": "Add pause, resume, and proper state management for the new ScreenCaptureKit architecture",
+        "details": "Implement pause using SCStream.stopCapture() maintaining stream configuration. Add resume with SCStream.startCapture() continuing from paused state. Update RecordingState to track paused duration for accurate timestamps. Modify FFmpeg pipeline to handle discontinuous timestamps during pause. Implement recording timer that excludes paused time. Add state validation to prevent invalid transitions (e.g., pause while not recording). Update frontend controls to reflect available actions per state. Implement maximum recording duration with auto-stop. Add pre-recording buffer for instant start capability. Handle system sleep/wake events appropriately.",
+        "testStrategy": "Test pause/resume maintains video continuity. Verify duration calculation excludes paused time. Test state transitions are atomic and consistent. Validate handling of rapid pause/resume cycles. Test system sleep during recording.",
+        "priority": "medium",
+        "dependencies": [
+          "20"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement pause using SCStream.stopCapture() while maintaining configuration",
+            "description": "Add pause functionality to the ScreenCaptureKit recording system by implementing SCStream.stopCapture() while preserving the stream configuration for seamless resume",
+            "dependencies": [],
+            "details": "Implement a pause method in the recording module that calls SCStream.stopCapture() without destroying the stream configuration. Store the current stream state and configuration in memory to enable quick resume. Update the recording state to reflect paused status and ensure the stream configuration remains intact for subsequent resume operations.",
+            "status": "pending",
+            "testStrategy": "Test that pause stops capture while maintaining stream configuration. Verify stream can be resumed without reconfiguration. Test rapid pause operations don't corrupt state.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add resume with SCStream.startCapture() from paused state",
+            "description": "Implement resume functionality that uses SCStream.startCapture() to continue recording from a paused state without losing configuration or requiring re-initialization",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a resume method that uses the preserved stream configuration from the pause operation to call SCStream.startCapture() and continue recording. Ensure the resume operation maintains video continuity and doesn't require stream re-initialization. Handle potential errors during resume and provide fallback mechanisms.",
+            "status": "pending",
+            "testStrategy": "Test resume continues recording seamlessly from pause point. Verify no stream re-initialization occurs. Test resume after various pause durations.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Update RecordingState to track paused duration for accurate timestamps",
+            "description": "Modify the RecordingState structure to track paused time intervals and calculate accurate recording duration that excludes paused periods",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Extend RecordingState to include pause start/end timestamps and cumulative paused duration. Implement duration calculation logic that subtracts paused time from total elapsed time. Add methods to track pause intervals and provide accurate recording duration for UI display and file metadata.",
+            "status": "pending",
+            "testStrategy": "Test duration calculation excludes paused time accurately. Verify multiple pause/resume cycles calculate correctly. Test edge cases like pause at recording start/end.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Modify FFmpeg pipeline to handle discontinuous timestamps during pause",
+            "description": "Update the FFmpeg processing pipeline to properly handle timestamp discontinuities that occur when recording is paused and resumed",
+            "dependencies": [
+              2
+            ],
+            "details": "Modify the FFmpeg pipeline to detect and handle timestamp gaps caused by pause/resume operations. Implement timestamp adjustment logic to ensure smooth video playback despite recording interruptions. Add filters or processing steps to maintain temporal continuity in the final output video file.",
+            "status": "pending",
+            "testStrategy": "Test final video plays smoothly without timestamp artifacts. Verify no frame drops or duplicates at pause/resume points. Test with various pause durations and frequencies.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add state validation to prevent invalid transitions and handle system sleep/wake events",
+            "description": "Implement comprehensive state validation to prevent invalid recording state transitions and properly handle system sleep/wake events during recording",
+            "dependencies": [
+              3
+            ],
+            "details": "Create state validation logic that prevents invalid transitions like pausing while not recording or resuming while already recording. Implement system event handlers for sleep/wake events that appropriately pause/resume recording or handle interruptions. Add error handling for edge cases and state corruption prevention mechanisms.",
+            "status": "pending",
+            "testStrategy": "Test invalid state transitions are properly rejected. Verify system sleep/wake events are handled gracefully. Test recovery from unexpected state corruption scenarios.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Implement pause using SCStream.stopCapture() while maintaining configuration, 2) Add resume with SCStream.startCapture() from paused state, 3) Update RecordingState to track paused duration for accurate timestamps, 4) Modify FFmpeg pipeline to handle discontinuous timestamps during pause, 5) Add state validation to prevent invalid transitions and handle system sleep/wake events."
+      },
+      {
+        "id": "22",
+        "title": "Add comprehensive testing and performance validation",
+        "description": "Create test suite and performance benchmarks for the hybrid ScreenCaptureKit and FFmpeg architecture",
+        "details": "Create integration tests using XCTest for Swift components and Rust tests for FFI layer. Implement performance benchmarks comparing with current FFmpeg-only approach. Test memory usage over long recording sessions (1+ hours) checking for leaks. Validate CPU usage stays within 5% of current implementation. Create stress tests with maximum resolution (4K/5K) and frame rate (60fps). Test all codec combinations with quality presets. Implement automated test for permission flows on fresh macOS install. Add tests for error scenarios (disk full, permissions revoked, display disconnected). Create CI pipeline tests for macOS 12.3+ compatibility. Document performance characteristics and resource usage patterns.",
+        "testStrategy": "Run test suite on various macOS versions (12.3, 13, 14, 15). Execute memory leak detection with Instruments. Perform load testing with multiple concurrent recordings. Validate against real-world usage patterns. Compare metrics with current implementation baseline.",
+        "priority": "low",
+        "dependencies": [
+          "21"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create XCTest integration tests for Swift components and Rust FFI layer tests",
+            "description": "Set up comprehensive test suites for both Swift ScreenCaptureKit components using XCTest framework and Rust FFI layer using standard Rust testing patterns",
+            "dependencies": [],
+            "details": "Create XCTest target in Xcode project for Swift ScreenCaptureKit bridge module testing. Write tests for SCStream initialization, delegate callbacks, and configuration validation. Set up Rust test module for FFI bridge testing including frame data transfer, thread safety, and error propagation. Configure build system to run both Swift and Rust tests together. Test Swift-Rust interop boundary with mock data.",
+            "status": "pending",
+            "testStrategy": "Run XCTest suite via xcodebuild and Rust tests via cargo test. Verify test coverage for all public APIs. Test on multiple macOS versions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement performance benchmarks comparing hybrid vs FFmpeg-only approach",
+            "description": "Create comprehensive performance benchmarking suite to measure and compare the hybrid ScreenCaptureKit+FFmpeg implementation against the current FFmpeg-only approach",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop benchmarking harness using Rust criterion crate for performance measurements. Create baseline measurements for current FFmpeg implementation. Implement benchmarks for frame capture latency, CPU usage, memory consumption, and encoding throughput. Test various recording configurations (resolutions, frame rates, codecs). Generate performance reports comparing both approaches with statistical analysis. Set up automated benchmark runs.",
+            "status": "pending",
+            "testStrategy": "Run benchmarks on consistent hardware configurations. Validate CPU usage stays within 5% of current implementation. Compare memory usage patterns over extended periods.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create stress tests for memory usage and high resolution recording",
+            "description": "Develop comprehensive stress testing suite for long recording sessions and maximum resolution scenarios to validate system stability and resource management",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement stress tests for 1+ hour recording sessions checking for memory leaks using macOS Instruments integration. Create high-resolution stress tests (4K/5K at 60fps) validating frame processing pipeline stability. Test all codec combinations with different quality presets under stress conditions. Implement automated memory leak detection and reporting. Create tests for error scenarios like disk full, permissions revoked, and display disconnected during long recordings.",
+            "status": "pending",
+            "testStrategy": "Use Instruments for memory leak detection. Monitor system resources during extended test runs. Validate cleanup procedures for interrupted recordings.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create CI pipeline tests for macOS compatibility and automated permission flows",
+            "description": "Set up continuous integration testing pipeline with macOS compatibility validation and automated permission flow testing across different macOS versions",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Configure GitHub Actions or similar CI system for macOS 12.3+ compatibility testing. Implement automated tests for fresh macOS install permission flows using AppleScript or similar automation. Create test matrix for different macOS versions (12.3, 13, 14, 15). Set up automated test reporting and performance regression detection. Implement CI checks that run on every PR with performance threshold validation.",
+            "status": "pending",
+            "testStrategy": "Run CI tests on multiple macOS versions in parallel. Validate permission flow automation works reliably. Set up performance regression alerts for CI pipeline.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down into: 1) Create integration tests using XCTest for Swift components and Rust tests for FFI layer, 2) Implement performance benchmarks comparing with current FFmpeg-only approach, 3) Create stress tests for memory usage over long sessions and high resolution recording, 4) Create CI pipeline tests for macOS compatibility and automated permission flow testing."
       }
     ],
     "metadata": {
-      "created": "2025-10-28T21:32:21.200Z",
-      "updated": "2025-10-30T02:41:59.806Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2025-10-30T16:09:41.613Z",
+      "taskCount": 22,
+      "completedCount": 12,
+      "tags": [
+        "master"
+      ]
     }
   }
 }

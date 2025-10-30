@@ -62,6 +62,7 @@ jobs:
           npm install
 
       - name: Build the app
+        id: tauri-build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,4 +92,26 @@ jobs:
             See the [README](https://github.com/BiscuitNick/clipforge-tauri/blob/main/README.md) for full build instructions.
           releaseDraft: true
           prerelease: false
+          includeRelease: true
+          includeDebug: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+      - name: List built artifacts (debug)
+        run: |
+          echo "=== Checking bundle directory ==="
+          ls -la clipforge-tauri/src-tauri/target/release/bundle/ || echo "Bundle directory not found"
+          if [ "${{ matrix.platform }}" == "macos-latest" ]; then
+            echo "=== macOS bundles ==="
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/dmg/ || echo "DMG not found"
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/macos/ || echo "App bundle not found"
+          elif [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            echo "=== Windows bundles ==="
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/msi/ || echo "MSI not found"
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/nsis/ || echo "NSIS not found"
+          else
+            echo "=== Linux bundles ==="
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/deb/ || echo "DEB not found"
+            ls -la clipforge-tauri/src-tauri/target/release/bundle/appimage/ || echo "AppImage not found"
+          fi
+        shell: bash
