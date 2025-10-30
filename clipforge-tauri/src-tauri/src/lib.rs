@@ -11,6 +11,9 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize recording module and perform startup cleanup
+    commands::recording::initialize_recording_module();
+
     // Initialize recording manager state
     let recording_manager = Arc::new(Mutex::new(commands::recording::RecordingManager::new()));
 

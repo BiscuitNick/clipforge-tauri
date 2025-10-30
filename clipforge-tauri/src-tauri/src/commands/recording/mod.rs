@@ -1215,6 +1215,66 @@ pub async fn validate_long_recording_config(
 }
 
 // ============================================================================
+// Startup Cleanup Functions
+// ============================================================================
+
+/// Clean up any stuck FFmpeg processes from previous sessions
+#[cfg(target_os = "macos")]
+pub fn cleanup_stuck_ffmpeg_processes() {
+    use std::process::Command;
+
+    println!("[StartupCleanup] Checking for stuck FFmpeg processes from previous sessions");
+
+    // Kill any FFmpeg processes that might be recording for ClipForge
+    let result = Command::new("pkill")
+        .arg("-9")
+        .arg("-f")
+        .arg("ffmpeg.*avfoundation")  // Match FFmpeg with AVFoundation (macOS screen capture)
+        .output();
+
+    match result {
+        Ok(output) => {
+            if output.status.success() {
+                println!("[StartupCleanup] Successfully cleaned up stuck FFmpeg processes");
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if stderr.contains("No matching processes") {
+                    println!("[StartupCleanup] No stuck FFmpeg processes found");
+                } else {
+                    println!("[StartupCleanup] pkill output: {}", stderr);
+                }
+            }
+        }
+        Err(e) => {
+            println!("[StartupCleanup] Failed to run pkill: {}", e);
+        }
+    }
+
+    // Also clean up temporary files older than 1 hour
+    if let Ok(count) = TempFileManager::cleanup_orphaned_files() {
+        if count > 0 {
+            println!("[StartupCleanup] Cleaned up {} orphaned temporary files", count);
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn cleanup_stuck_ffmpeg_processes() {
+    // Implement for other platforms as needed
+    println!("[StartupCleanup] Process cleanup not implemented for this platform");
+}
+
+/// Initialize the recording module and perform startup cleanup
+pub fn initialize_recording_module() {
+    println!("[RecordingModule] Initializing recording module");
+
+    // Clean up any stuck processes from previous sessions
+    cleanup_stuck_ffmpeg_processes();
+
+    println!("[RecordingModule] Recording module initialized");
+}
+
+// ============================================================================
 // Tauri Commands (Placeholders)
 // ============================================================================
 

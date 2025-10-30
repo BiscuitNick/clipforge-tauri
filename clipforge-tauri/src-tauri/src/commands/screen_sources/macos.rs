@@ -12,6 +12,7 @@ use objc::{class, msg_send, sel, sel_impl};
 use objc::runtime::Object;
 use std::ptr;
 use std::ops::Deref;
+use std::process::{Command, Stdio};
 use image::{ImageBuffer, RgbaImage};
 use base64::{Engine as _, engine::general_purpose};
 
@@ -19,6 +20,70 @@ use base64::{Engine as _, engine::general_purpose};
 pub struct PlatformEnumerator;
 
 impl PlatformEnumerator {
+    /// Dynamically detect the number of camera devices using FFmpeg
+    fn get_camera_device_count() -> usize {
+        // Try to find FFmpeg
+        if let Some(ffmpeg_path) = super::super::ffmpeg_utils::find_ffmpeg() {
+            // Run ffmpeg to list AVFoundation devices
+            if let Ok(output) = Command::new(&ffmpeg_path)
+                .arg("-f")
+                .arg("avfoundation")
+                .arg("-list_devices")
+                .arg("true")
+                .arg("-i")
+                .arg("")
+                .stderr(Stdio::piped())
+                .output()
+            {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let mut camera_count = 0;
+                let mut in_video_section = false;
+
+                println!("[CameraDetection] Analyzing FFmpeg device list output");
+
+                // Parse FFmpeg output to count video devices
+                for line in stderr.lines() {
+                    if line.contains("AVFoundation video devices:") {
+                        in_video_section = true;
+                        println!("[CameraDetection] Found video devices section");
+                        continue;
+                    } else if line.contains("AVFoundation audio devices:") {
+                        // We've reached the audio section, stop counting
+                        println!("[CameraDetection] Reached audio section, stopping count");
+                        break;
+                    } else if in_video_section {
+                        // Look for device entries like "[AVFoundation indev @ 0x...] [0] FaceTime HD Camera"
+                        if line.contains("[AVFoundation") && line.contains("] [") {
+                            // Extract device name to check if it's a screen
+                            let lower_line = line.to_lowercase();
+                            if lower_line.contains("capture screen") || lower_line.contains("screen") && lower_line.contains("capture") {
+                                // This is a screen capture device, stop counting cameras
+                                println!("[CameraDetection] Found first screen device, camera count: {}", camera_count);
+                                break;
+                            } else {
+                                // This is a camera device
+                                camera_count += 1;
+                                println!("[CameraDetection] Found camera device #{}: {}", camera_count, line);
+                            }
+                        }
+                    }
+                }
+
+                println!("[CameraDetection] Total camera devices detected: {}", camera_count);
+                return camera_count;
+            } else {
+                println!("[CameraDetection] Failed to run FFmpeg for device detection");
+            }
+        } else {
+            println!("[CameraDetection] FFmpeg not found for device detection");
+        }
+
+        // Fallback: return 0 if detection fails
+        // This means screens will start at device index 0
+        println!("[CameraDetection] Using fallback camera count: 0");
+        0
+    }
+
     /// Get window information dictionary
     fn get_window_info() -> Result<Vec<CFDictionary>, String> {
         unsafe {
@@ -256,13 +321,13 @@ impl SourceEnumerator for PlatformEnumerator {
                 let display_id_value: id = msg_send![device_desc, objectForKey: display_id_key];
                 let display_id: u32 = msg_send![display_id_value, unsignedIntValue];
 
-                // IMPORTANT: For AVFoundation, we need to count all video input devices
-                // (cameras) before screens. Use ffmpeg -f avfoundation -list_devices true -i ""
-                // to see the device list. Screens come after all cameras.
-                // We'll need to detect this dynamically, but for now use a common offset.
-                // TODO: Dynamically detect number of camera devices
-                let camera_count = 4; // Common setup: built-in camera + continuity cameras
+                // Dynamically detect the number of camera devices before screens
+                // AVFoundation lists all camera devices first, then screen devices
+                let camera_count = Self::get_camera_device_count();
                 let avf_device_index = i + camera_count;
+
+                println!("[ScreenEnumeration] Camera count: {}, Screen index: {}, AVF device: {}",
+                    camera_count, i, avf_device_index);
 
                 // Generate thumbnail using AVFoundation device index
                 let thumbnail = Self::capture_screen_thumbnail(avf_device_index);
