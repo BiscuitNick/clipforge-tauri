@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf ffmpeg
+
+      - name: Install FFmpeg (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: brew install ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          choco install ffmpeg -y
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './clipforge-tauri/src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: |
+          cd clipforge-tauri
+          npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./clipforge-tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: 'ClipForge v__VERSION__'
+          releaseBody: |
+            ## What's New in ClipForge v__VERSION__
+
+            ### Features
+            - Timeline-based video editing with drag-and-drop
+            - Real-time preview and playback
+            - Professional export with FFmpeg
+
+            ### Installation
+            - **macOS**: Download the `.dmg` file
+            - **Windows**: Download the `.msi` installer
+            - **Linux**: Download the `.AppImage` or `.deb` package
+
+            ### Requirements
+            - FFmpeg must be installed on your system
+              - macOS: `brew install ffmpeg`
+              - Windows: Download from https://ffmpeg.org/download.html
+              - Linux: `sudo apt install ffmpeg` or `sudo dnf install ffmpeg`
+
+            See the [README](https://github.com/BiscuitNick/clipforge-tauri/blob/main/README.md) for full build instructions.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
