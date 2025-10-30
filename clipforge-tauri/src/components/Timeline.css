@@ -50,6 +50,58 @@
   gap: 0.5rem;
 }
 
+/* Timeline video controls */
+.timeline-controls .timeline-video-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 1rem;
+  border-right: 1px solid #444;
+}
+
+.timeline-controls .timeline-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeline-controls .timeline-control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.timeline-controls .timeline-control-btn.stop-btn {
+  background-color: #666;
+}
+
+.timeline-controls .timeline-control-btn.stop-btn:hover:not(:disabled) {
+  background-color: #777;
+}
+
+.timeline-controls .timeline-control-btn.play-pause-btn {
+  background-color: #28a745;
+}
+
+.timeline-controls .timeline-control-btn.play-pause-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.timeline-controls .timeline-control-btn.play-pause-btn.playing {
+  background-color: #ffc107;
+}
+
+.timeline-controls .timeline-control-btn.play-pause-btn.playing:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
 .timeline-controls button {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -79,26 +131,6 @@
 
 .timeline-controls button:disabled:hover {
   background-color: #333;
-}
-
-.timeline-controls .play-pause-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  background-color: #28a745;
-}
-
-.timeline-controls .play-pause-btn:hover {
-  background-color: #218838;
-}
-
-.timeline-controls .play-pause-btn.playing {
-  background-color: #ffc107;
-}
-
-.timeline-controls .play-pause-btn.playing:hover {
-  background-color: #e0a800;
 }
 
 .zoom-level {

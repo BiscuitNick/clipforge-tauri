@@ -32,6 +32,7 @@ function Timeline({
   onCopyClip,
   onPasteClip,
   onDeleteClip,
+  onSplitClip,
   hasClipboard,
   onExport,
   isExporting = false
@@ -43,6 +44,7 @@ function Timeline({
   const [lastMouseX, setLastMouseX] = useState(0);
   const [draggingTrimHandle, setDraggingTrimHandle] = useState(null); // { clipId, handle: 'start' | 'end' }
   const [draggingClip, setDraggingClip] = useState(null); // { clipId, originalPosition, currentPosition, clickOffset }
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, clipId, splitTime }
 
   // Make timeline a drop zone for media items
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -597,6 +599,18 @@ function Timeline({
     }
   };
 
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -606,14 +620,31 @@ function Timeline({
       }
 
       // Copy: Cmd/Ctrl+C
-      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !e.shiftKey) {
         e.preventDefault();
         onCopyClip?.();
       }
       // Paste: Cmd/Ctrl+V
-      else if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+      else if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !e.shiftKey) {
         e.preventDefault();
         onPasteClip?.();
+      }
+      // Split: Cmd/Ctrl+Shift+S
+      else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 's') {
+        e.preventDefault();
+        // Find the clip under the playhead
+        const clipUnderPlayhead = clips?.find(clip => {
+          const clipStart = clip.startTime;
+          const trimStart = clip.trimStart || 0;
+          const trimEnd = clip.trimEnd || clip.duration;
+          const clipDuration = trimEnd - trimStart;
+          const clipEnd = clipStart + clipDuration;
+          return playheadPosition >= clipStart && playheadPosition < clipEnd;
+        });
+
+        if (clipUnderPlayhead) {
+          onSplitClip?.(clipUnderPlayhead.id, playheadPosition);
+        }
       }
       // Delete: Delete or Backspace
       else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -693,7 +724,7 @@ function Timeline({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedClipId, clips, playheadPosition, onCopyClip, onPasteClip, onDeleteClip, onTogglePlayback, onPlayheadMove, onClipSelect, getTotalDuration]);
+  }, [selectedClipId, clips, playheadPosition, onCopyClip, onPasteClip, onDeleteClip, onSplitClip, onTogglePlayback, onPlayheadMove, onClipSelect, getTotalDuration]);
 
   return (
     <div className="timeline-container" ref={containerRef}>
@@ -703,6 +734,41 @@ function Timeline({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: isOver ? 10 : -1 }}
       />
       <div className="timeline-controls">
+        {/* Video Playback Controls */}
+        <div className="timeline-video-controls">
+          <button
+            className="timeline-control-btn stop-btn"
+            onClick={() => {
+              if (isPlaying) {
+                onTogglePlayback?.(); // Pause if currently playing
+              }
+              onPlayheadMove?.(0); // Always reset to beginning
+            }}
+            disabled={clips.length === 0}
+            title="Stop (Reset to beginning)"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M6 6h12v12H6z" />
+            </svg>
+          </button>
+          <button
+            className={`timeline-control-btn play-pause-btn ${isPlaying ? 'playing' : ''}`}
+            onClick={onTogglePlayback}
+            disabled={clips.length === 0}
+            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          >
+            {isPlaying ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
         <div className="toolbar-section">
           <button onClick={() => onZoom?.(0.5)} title="Zoom In">Zoom In</button>
           <button onClick={() => onZoom?.(-0.5)} title="Zoom Out">Zoom Out</button>
@@ -750,6 +816,34 @@ function Timeline({
             Paste
           </button>
           <button
+            onClick={() => {
+              // Find the clip under the playhead
+              const clipUnderPlayhead = clips?.find(clip => {
+                const clipStart = clip.startTime;
+                const trimStart = clip.trimStart || 0;
+                const trimEnd = clip.trimEnd || clip.duration;
+                const clipDuration = trimEnd - trimStart;
+                const clipEnd = clipStart + clipDuration;
+                return playheadPosition >= clipStart && playheadPosition < clipEnd;
+              });
+
+              if (clipUnderPlayhead) {
+                onSplitClip?.(clipUnderPlayhead.id, playheadPosition);
+              }
+            }}
+            disabled={!clips || clips.length === 0 || !clips.some(clip => {
+              const clipStart = clip.startTime;
+              const trimStart = clip.trimStart || 0;
+              const trimEnd = clip.trimEnd || clip.duration;
+              const clipDuration = trimEnd - trimStart;
+              const clipEnd = clipStart + clipDuration;
+              return playheadPosition > clipStart && playheadPosition < clipEnd;
+            })}
+            title="Split clip at playhead (Cmd/Ctrl+Shift+S)"
+          >
+            ✂️ Split
+          </button>
+          <button
             onClick={() => selectedClipId && onDeleteClip?.(selectedClipId)}
             disabled={!selectedClipId}
             title="Delete clip (Delete/Backspace)"
@@ -766,7 +860,101 @@ function Timeline({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
+        onContextMenu={(e) => {
+          e.preventDefault();
+
+          // Get the click position in timeline coordinates
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const clickTime = pixelToTime(x);
+
+          // Find the clip under the click position
+          const clipUnderMouse = clips?.find(clip => {
+            const clipStart = clip.startTime;
+            const trimStart = clip.trimStart || 0;
+            const trimEnd = clip.trimEnd || clip.duration;
+            const clipDuration = trimEnd - trimStart;
+            const clipEnd = clipStart + clipDuration;
+            return clickTime >= clipStart && clickTime < clipEnd;
+          });
+
+          if (clipUnderMouse) {
+            // Show context menu for this clip
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              clipId: clipUnderMouse.id,
+              splitTime: clickTime
+            });
+          } else {
+            setContextMenu(null);
+          }
+        }}
       />
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="timeline-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            background: '#2a2a2a',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            padding: '4px 0',
+            zIndex: 1000,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+          }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <button
+            className="context-menu-item"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '8px 16px',
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#3a3a3a'}
+            onMouseLeave={(e) => e.target.style.background = 'none'}
+            onClick={() => {
+              onSplitClip?.(contextMenu.clipId, contextMenu.splitTime);
+              setContextMenu(null);
+            }}
+          >
+            ✂️ Split at Cursor
+          </button>
+          <button
+            className="context-menu-item"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '8px 16px',
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#3a3a3a'}
+            onMouseLeave={(e) => e.target.style.background = 'none'}
+            onClick={() => {
+              onDeleteClip?.(contextMenu.clipId);
+              setContextMenu(null);
+            }}
+          >
+            🗑️ Delete Clip
+          </button>
+        </div>
+      )}
     </div>
   );
 }

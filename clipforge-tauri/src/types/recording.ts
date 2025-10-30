@@ -51,3 +51,184 @@ export interface RecordingOptions {
   config?: RecordingConfig;
   include_audio: boolean;
 }
+
+// ============================================================================
+// Picture-in-Picture (PiP) Configuration Types
+// ============================================================================
+
+/**
+ * Position of the webcam overlay on the screen
+ */
+export type PiPPosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
+
+/**
+ * Size of the webcam overlay relative to screen dimensions
+ */
+export type PiPSize = 'small' | 'medium' | 'large';
+
+/**
+ * Size percentages for each PiP size option
+ * These are percentages of the screen width/height
+ */
+export const PiPSizeValues: Record<PiPSize, number> = {
+  small: 0.15,   // 15% of screen dimensions
+  medium: 0.25,  // 25% of screen dimensions
+  large: 0.35,   // 35% of screen dimensions
+};
+
+/**
+ * Padding from screen edges in pixels
+ */
+export const PiP_EDGE_PADDING = 20;
+
+/**
+ * Configuration for Picture-in-Picture webcam overlay
+ */
+export interface PiPConfiguration {
+  /** Position of the overlay on screen */
+  position: PiPPosition;
+  /** Size of the overlay */
+  size: PiPSize;
+  /** Selected camera device ID */
+  cameraId?: string;
+  /** Include audio from webcam */
+  includeAudio: boolean;
+  /** Selected audio device ID for webcam */
+  audioDeviceId?: string;
+}
+
+/**
+ * Calculated pixel coordinates for PiP overlay
+ */
+export interface PiPCoordinates {
+  /** X position in pixels */
+  x: number;
+  /** Y position in pixels */
+  y: number;
+  /** Width in pixels */
+  width: number;
+  /** Height in pixels */
+  height: number;
+}
+
+/**
+ * Metadata for a PiP recording session
+ * Links screen and webcam recordings with synchronization info
+ */
+export interface PiPRecordingMetadata {
+  /** Unique ID for this recording session */
+  id: string;
+  /** Timestamp when recording started (milliseconds since epoch) */
+  startTime: number;
+  /** Duration of the recording in seconds */
+  duration: number;
+  /** Path to the screen recording file */
+  screenFilePath: string;
+  /** Path to the webcam recording file */
+  webcamFilePath: string;
+  /** PiP configuration used for this recording */
+  pipConfig: PiPConfiguration;
+  /** Screen dimensions at time of recording */
+  screenDimensions: {
+    width: number;
+    height: number;
+  };
+  /** Webcam dimensions at time of recording */
+  webcamDimensions: {
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Default PiP configuration
+ */
+export const DefaultPiPConfiguration: PiPConfiguration = {
+  position: 'bottomRight',
+  size: 'medium',
+  includeAudio: true,
+};
+
+/**
+ * Calculate pixel coordinates for PiP overlay based on configuration
+ * @param config PiP configuration
+ * @param screenWidth Width of the screen in pixels
+ * @param screenHeight Height of the screen in pixels
+ * @param webcamAspectRatio Aspect ratio of the webcam (width/height)
+ * @returns Pixel coordinates for the overlay
+ */
+export function calculatePiPCoordinates(
+  config: PiPConfiguration,
+  screenWidth: number,
+  screenHeight: number,
+  webcamAspectRatio: number = 16 / 9
+): PiPCoordinates {
+  // Calculate overlay dimensions based on size setting
+  const sizePercent = PiPSizeValues[config.size];
+
+  // Use the smaller dimension to maintain aspect ratio
+  const overlayWidth = Math.floor(screenWidth * sizePercent);
+  const overlayHeight = Math.floor(overlayWidth / webcamAspectRatio);
+
+  // Calculate position based on selected corner
+  let x: number;
+  let y: number;
+
+  switch (config.position) {
+    case 'topLeft':
+      x = PiP_EDGE_PADDING;
+      y = PiP_EDGE_PADDING;
+      break;
+    case 'topRight':
+      x = screenWidth - overlayWidth - PiP_EDGE_PADDING;
+      y = PiP_EDGE_PADDING;
+      break;
+    case 'bottomLeft':
+      x = PiP_EDGE_PADDING;
+      y = screenHeight - overlayHeight - PiP_EDGE_PADDING;
+      break;
+    case 'bottomRight':
+      x = screenWidth - overlayWidth - PiP_EDGE_PADDING;
+      y = screenHeight - overlayHeight - PiP_EDGE_PADDING;
+      break;
+  }
+
+  return {
+    x,
+    y,
+    width: overlayWidth,
+    height: overlayHeight,
+  };
+}
+
+/**
+ * Get CSS styles for positioning PiP overlay
+ * @param coordinates Calculated PiP coordinates
+ * @returns CSS style object for positioning
+ */
+export function getPiPOverlayStyles(coordinates: PiPCoordinates): React.CSSProperties {
+  return {
+    position: 'absolute',
+    left: `${coordinates.x}px`,
+    top: `${coordinates.y}px`,
+    width: `${coordinates.width}px`,
+    height: `${coordinates.height}px`,
+  };
+}
+
+/**
+ * Validate PiP configuration
+ * @param config Configuration to validate
+ * @returns Error message if invalid, null if valid
+ */
+export function validatePiPConfiguration(config: PiPConfiguration): string | null {
+  if (!['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].includes(config.position)) {
+    return `Invalid PiP position: ${config.position}`;
+  }
+
+  if (!['small', 'medium', 'large'].includes(config.size)) {
+    return `Invalid PiP size: ${config.size}`;
+  }
+
+  return null;
+}

@@ -16,13 +16,15 @@ function formatTime(seconds) {
  * Video Preview Panel - Central playback area
  * Loads selected media and provides playback controls
  * Videos remain paused on load until user clicks play
- * Supports three modes:
+ * Supports multiple modes:
  * - library: Preview a single media item from the library
  * - timeline: Play back the timeline with clips and gaps
  * - recording: Show live recording preview and controls
+ * - webcam-recording: Show live webcam stream during recording
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null }) {
   const videoRef = useRef(null);
+  const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -48,6 +50,50 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   useEffect(() => {
     console.log("[VideoPreview] videoSrc changed to:", videoSrc);
   }, [videoSrc]);
+
+  // Handle webcam stream changes
+  useEffect(() => {
+    if (mode !== "webcam-recording") {
+      // Clear webcam stream when not in webcam recording mode
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = null;
+      }
+      return;
+    }
+
+    const video = webcamVideoRef.current;
+    if (!video) return;
+
+    if (webcamStream) {
+      console.log("[VideoPreview] Setting webcam stream");
+      video.srcObject = webcamStream;
+      video.play().catch(err => console.error("[VideoPreview] Webcam play failed:", err));
+    } else {
+      console.log("[VideoPreview] Clearing webcam stream");
+      video.srcObject = null;
+    }
+  }, [webcamStream, mode]);
+
+  // Handle library playback commands (from Media Library controls)
+  useEffect(() => {
+    if (!libraryPlaybackCommand || mode !== "library") return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (libraryPlaybackCommand === 'play') {
+      console.log("[VideoPreview] Library command: Play");
+      video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+    } else if (libraryPlaybackCommand === 'pause') {
+      console.log("[VideoPreview] Library command: Pause");
+      video.pause();
+    } else if (libraryPlaybackCommand === 'stop') {
+      console.log("[VideoPreview] Library command: Stop");
+      video.pause();
+      video.currentTime = 0;
+      setCurrentTime(0);
+    }
+  }, [libraryPlaybackCommand, mode]);
 
   // Handle timeline playback mode
   useEffect(() => {
@@ -343,6 +389,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const getModeText = () => {
     if (mode === "recording") return "Recording";
     if (mode === "recording-preview") return "Ready to Record";
+    if (mode === "webcam-recording") return "Webcam Recording";
     if (mode === "timeline") return "Timeline";
     return "Library";
   };
@@ -350,61 +397,64 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   return (
     <div className="video-preview-panel">
       <div className="panel-header">
-        <h2>Video Preview</h2>
-        <span className="preview-mode-indicator">{getModeText()}</span>
+        <h2>{panelLabel}</h2>
+        {onCollapse && (
+          <button
+            className="collapse-button"
+            onClick={onCollapse}
+            aria-label="Hide panel"
+            title="Hide panel"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div className="panel-content">
         <div className="video-player">
           <div className="video-container">
-            {mode === "recording-preview" && recordingState ? (
+            {mode === "webcam-recording" ? (
+              <>
+                <video
+                  ref={webcamVideoRef}
+                  className="video-element webcam-preview"
+                  autoPlay
+                  playsInline
+                  muted
+                >
+                  Your browser does not support the video tag.
+                </video>
+                {webcamStream && webcamRecordingDuration > 0 && (
+                  <>
+                    <div className="recording-indicator-bottom-left">
+                      <div className={isWebcamPaused ? "recording-dot-paused" : "recording-dot-pulse"}></div>
+                    </div>
+                    <div className="recording-timer-bottom-right">
+                      {formatTime(webcamRecordingDuration)}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : mode === "recording-preview" && recordingState ? (
               <div className="recording-preview preview-mode">
-                <div className="recording-preview-content">
-                  <div className="preview-indicator">
-                    <svg
-                      className="preview-icon"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span className="preview-text">Ready to Record</span>
-                  </div>
-
-                  {/* Show thumbnail preview if available */}
-                  {recordingState.source?.thumbnail && (
-                    <div className="preview-thumbnail-container">
-                      <img
-                        src={`data:image/png;base64,${recordingState.source.thumbnail}`}
-                        alt="Preview"
-                        className="preview-thumbnail-image"
-                      />
-                      <div className="preview-thumbnail-overlay">
-                        <div className="preview-play-icon">
-                          <svg fill="currentColor" viewBox="0 0 20 20" width="48" height="48">
-                            <circle cx="10" cy="10" r="8" fill="rgba(231, 76, 60, 0.9)" />
-                            <circle cx="10" cy="10" r="3" fill="white" />
-                          </svg>
-                        </div>
+                {/* Show thumbnail preview if available */}
+                {recordingState.source?.thumbnail && (
+                  <div className="preview-thumbnail-container">
+                    <img
+                      src={`data:image/png;base64,${recordingState.source.thumbnail}`}
+                      alt="Preview"
+                      className="preview-thumbnail-image"
+                    />
+                    <div className="preview-thumbnail-overlay">
+                      <div className="preview-play-icon">
+                        <svg fill="currentColor" viewBox="0 0 20 20" width="48" height="48">
+                          <circle cx="10" cy="10" r="8" fill="rgba(231, 76, 60, 0.9)" />
+                          <circle cx="10" cy="10" r="3" fill="white" />
+                        </svg>
                       </div>
                     </div>
-                  )}
-
-                  <div className="preview-source-info">
-                    <p className="preview-source-name">{recordingState.source?.name}</p>
-                    <p className="preview-source-resolution">
-                      {recordingState.config?.width} × {recordingState.config?.height}
-                    </p>
                   </div>
-                  <p className="preview-hint">Click "Start Recording" in the Media Library to begin</p>
-                </div>
+                )}
               </div>
             ) : mode === "recording" && recordingState ? (
               <div className="recording-preview">
@@ -418,34 +468,15 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                     />
                   </div>
                 )}
-                <div className="recording-preview-overlay">
-                  <div className="recording-preview-content">
-                    <div className="recording-indicator-large">
-                      <div className="recording-dot-large"></div>
-                      <span className="recording-text">Recording in Progress</span>
-                    </div>
-                    <div className="recording-timer-large">
-                      {formatTime(recordingState.duration)}
-                    </div>
-                    {recordingState.source?.name && (
-                      <p className="recording-info">{recordingState.source.name}</p>
-                    )}
-                    <button
-                      className="stop-recording-btn"
-                      onClick={onStopRecording}
-                    >
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                        <path d="M6 6h12v12H6z" />
-                      </svg>
-                      Stop Recording
-                    </button>
-                  </div>
+                <div className="recording-indicator-bottom-left">
+                  <div className="recording-dot-pulse"></div>
+                </div>
+                <div className="recording-timer-bottom-right">
+                  {formatTime(recordingState.duration)}
                 </div>
               </div>
             ) : showBlackScreen ? (
-              <div className="black-screen">
-                <div className="black-screen-message">Gap in Timeline</div>
-              </div>
+              <div className="black-screen"></div>
             ) : videoSrc ? (
               <video
                 ref={videoRef}
@@ -458,79 +489,35 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                 Your browser does not support the video tag.
               </video>
             ) : (
-              <div className="preview-placeholder">
-                <svg
-                  className="placeholder-icon"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-                <p className="placeholder-text">Select media to preview</p>
-                <p className="placeholder-hint">Click a media item in the library</p>
-              </div>
+              <div className="preview-placeholder"></div>
             )}
           </div>
 
-          <div className="timeline-scrubber">
-            <input
-              type="range"
-              className="scrubber"
-              min="0"
-              max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
-              step="0.1"
-              value={mode === "timeline" && timelineState ? timelineState.playheadPosition : currentTime}
-              onChange={handleScrubberChange}
-              onMouseDown={handleScrubberMouseDown}
-              onMouseUp={handleScrubberMouseUp}
-              onTouchStart={handleScrubberMouseDown}
-              onTouchEnd={handleScrubberMouseUp}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-            />
-          </div>
-
-          <div className="video-controls">
-            <button
-              className="play-pause-btn"
-              onClick={handleStop}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-              title="Stop"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M6 6h12v12H6z" />
-              </svg>
-            </button>
-
-            <button
-              className={`play-pause-btn ${isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? 'playing' : ''}`}
-              onClick={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? handlePause : handlePlay}
-              disabled={mode === "timeline" ? !timelineState : !videoSrc}
-              title={(mode === "timeline" && timelineState?.isPlaying) || isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying || (mode === "timeline" && timelineState?.isPlaying) ? (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
-
-            <div className="time-display">
-              {mode === "timeline" && timelineState
-                ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`
-              }
+          {/* Hide scrubber in recording modes */}
+          {mode !== "recording" && mode !== "webcam-recording" && mode !== "recording-preview" && (
+            <div className="video-scrubber-container">
+              <input
+                type="range"
+                className="video-scrubber minimalistic"
+                min="0"
+                max={mode === "timeline" && timelineState ? timelineState.getTotalDuration() : (duration || 0)}
+                step="0.1"
+                value={mode === "timeline" && timelineState ? timelineState.playheadPosition : currentTime}
+                onChange={handleScrubberChange}
+                onMouseDown={handleScrubberMouseDown}
+                onMouseUp={handleScrubberMouseUp}
+                onTouchStart={handleScrubberMouseDown}
+                onTouchEnd={handleScrubberMouseUp}
+                disabled={mode === "timeline" ? !timelineState : !videoSrc}
+              />
+              <div className="video-time-display">
+                {mode === "timeline" && timelineState
+                  ? `${formatTime(timelineState.playheadPosition)} / ${formatTime(timelineState.getTotalDuration())}`
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`
+                }
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

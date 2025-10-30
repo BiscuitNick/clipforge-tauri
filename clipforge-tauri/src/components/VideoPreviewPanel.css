@@ -22,12 +22,26 @@
   color: #f6f6f6;
 }
 
-.video-preview-panel .preview-mode-indicator {
-  font-size: 0.85rem;
+.video-preview-panel .collapse-button {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
   color: #888;
-  background-color: #2a2a2a;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.375rem 0.5rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  line-height: 1;
+}
+
+.video-preview-panel .collapse-button:hover {
+  background: #d64545;
+  border-color: #d64545;
+  color: white;
 }
 
 .video-preview-panel .panel-content {
@@ -58,6 +72,7 @@
   border-radius: 4px;
   overflow: hidden;
   min-height: 0; /* Important for flex child */
+  position: relative; /* Enable absolute positioning relative to this container */
 }
 
 .video-preview-panel .video-element {
@@ -79,67 +94,90 @@
   font-weight: 500;
 }
 
-/* Timeline scrubber - full width */
-.video-preview-panel .timeline-scrubber {
+/* Minimalistic video scrubber */
+.video-preview-panel .video-scrubber-container {
   width: 100%;
-  padding: 0.75rem;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #333;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(26, 26, 26, 0.8);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber {
-  width: 100%;
-  height: 8px;
+.video-preview-panel .video-scrubber.minimalistic {
+  flex: 1;
+  height: 3px;
   -webkit-appearance: none;
   appearance: none;
-  background: #333;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
   outline: none;
   cursor: pointer;
+  transition: height 0.2s ease;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-webkit-slider-thumb {
+.video-preview-panel .video-scrubber.minimalistic:hover {
+  height: 4px;
+}
+
+.video-preview-panel .video-scrubber.minimalistic::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #007bff;
+  width: 10px;
+  height: 10px;
+  background: #fff;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  opacity: 0.8;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-webkit-slider-thumb:hover {
-  background: #0056b3;
+.video-preview-panel .video-scrubber.minimalistic:hover::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  opacity: 1;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #007bff;
+.video-preview-panel .video-scrubber.minimalistic::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: #fff;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  opacity: 0.8;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber::-moz-range-thumb:hover {
-  background: #0056b3;
+.video-preview-panel .video-scrubber.minimalistic:hover::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  opacity: 1;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled {
-  opacity: 0.5;
+.video-preview-panel .video-scrubber.minimalistic:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled::-webkit-slider-thumb {
+.video-preview-panel .video-scrubber.minimalistic:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  background: #666;
+}
+
+.video-preview-panel .video-scrubber.minimalistic:disabled::-moz-range-thumb {
   cursor: not-allowed;
   background: #666;
 }
 
-.video-preview-panel .timeline-scrubber .scrubber:disabled::-moz-range-thumb {
-  cursor: not-allowed;
-  background: #666;
+.video-preview-panel .video-time-display {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+  min-width: 85px;
+  text-align: right;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
 /* Video controls styles */
@@ -235,24 +273,20 @@
     padding: 0.5rem;
   }
 
-  .video-preview-panel .video-controls {
-    padding: 0.5rem;
+  .video-preview-panel .video-time-display {
+    min-width: 80px;
+    font-size: 0.7rem;
   }
 
-  .video-preview-panel .time-display {
-    min-width: 80px;
-    font-size: 0.8rem;
+  .video-preview-panel .video-scrubber-container {
+    padding: 0.4rem 0.5rem;
   }
 }
 
 @media (max-width: 479px) {
-  .video-preview-panel .placeholder-text {
-    font-size: 1rem;
-  }
-
-  .video-preview-panel .placeholder-icon {
-    width: 48px;
-    height: 48px;
+  .video-preview-panel .video-time-display {
+    font-size: 0.65rem;
+    min-width: 70px;
   }
 }
 
@@ -473,4 +507,62 @@
     opacity: 1;
     transform: scale(1.1);
   }
+}
+
+/* Bottom-positioned recording indicators */
+.video-preview-panel .recording-indicator-bottom-left {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-preview-panel .recording-dot-pulse {
+  width: 16px;
+  height: 16px;
+  background-color: #e74c3c;
+  border-radius: 50%;
+  animation: pulse-recording 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.video-preview-panel .recording-dot-paused {
+  width: 16px;
+  height: 16px;
+  background-color: #f39c12;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+}
+
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.3);
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.8);
+  }
+}
+
+.video-preview-panel .recording-timer-bottom-right {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }

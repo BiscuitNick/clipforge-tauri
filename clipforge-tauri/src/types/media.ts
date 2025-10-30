@@ -29,6 +29,12 @@ export interface MediaItem {
 
   /** Optional: Frame rate */
   frameRate?: number;
+
+  /** Optional: Type of media - 'standard' or 'pip' */
+  mediaType?: 'standard' | 'pip';
+
+  /** Optional: Path to PiP metadata file (for PiP recordings) */
+  pipMetadataPath?: string;
 }
 
 /**
@@ -66,6 +72,12 @@ export interface TimelineClip {
 
   /** Optional: Frame rate */
   frameRate?: number;
+
+  /** Optional: Type of media - 'standard' or 'pip' */
+  mediaType?: 'standard' | 'pip';
+
+  /** Optional: Path to PiP metadata file (for PiP recordings) */
+  pipMetadataPath?: string;
 }
 
 /**
@@ -84,3 +96,6 @@ export interface LegacyClip {
   trimStart: number;
   trimEnd: number;
 }
+
+// Re-export PiP types from recording module for convenience
+export type { PiPRecordingMetadata, PiPConfiguration } from './recording';

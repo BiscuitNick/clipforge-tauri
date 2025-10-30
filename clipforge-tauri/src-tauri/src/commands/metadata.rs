@@ -10,6 +10,8 @@ pub struct VideoMetadata {
     pub width: u32,
     pub height: u32,
     pub frame_rate: f64,
+    pub thumbnail_path: Option<String>,
+    pub file_size: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,6 +111,11 @@ pub async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String
         .unwrap_or("unknown")
         .to_string();
 
+    // Get file size
+    let file_size = std::fs::metadata(&file_path)
+        .ok()
+        .map(|m| m.len());
+
     Ok(VideoMetadata {
         path: file_path,
         filename,
@@ -116,5 +123,7 @@ pub async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String
         width,
         height,
         frame_rate,
+        thumbnail_path: None, // Will be populated by import_video
+        file_size,
     })
 }

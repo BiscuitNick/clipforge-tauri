@@ -83,6 +83,22 @@ src-tauri/src/
 
 ## Getting Started
 
+### Download Pre-built Release (Recommended)
+
+For most users, downloading a pre-built release is the easiest option:
+
+1. Go to the [Releases page](https://github.com/BiscuitNick/clipforge-tauri/releases)
+2. Download the appropriate file for your platform:
+   - **macOS**: `ClipForge_<version>_universal.dmg`
+   - **Windows**: `ClipForge_<version>_x64.msi` or `.exe`
+   - **Linux**: `ClipForge_<version>_amd64.deb` or `.AppImage`
+3. Install FFmpeg on your system (required for video processing)
+4. Install and run ClipForge
+
+### Building from Source
+
+If you want to build the app yourself or contribute to development:
+
 ### Installation
 
 1. **Clone the repository**
@@ -123,16 +139,145 @@ This will:
 
 **Create an optimized production build:**
 ```bash
-npm run tauri:build
+cd clipforge-tauri
+npm run tauri build
 ```
 
-This generates:
-- **macOS**: `.dmg` installer in `src-tauri/target/release/bundle/dmg/`
-- Optimized binary in `src-tauri/target/release/`
+This generates platform-specific installers:
 
-**Build artifacts:**
-- Application bundle: `ClipForge Video Editor.app`
-- Installer: `ClipForge Video Editor_<version>_<arch>.dmg`
+#### macOS
+- **Location**: `src-tauri/target/release/bundle/`
+- **Formats**:
+  - `.dmg` - Disk image installer (in `dmg/` subdirectory)
+  - `.app` - Application bundle (in `macos/` subdirectory)
+- **Universal Binary**: Builds for both Intel and Apple Silicon by default
+
+#### Windows
+- **Location**: `src-tauri/target/release/bundle/`
+- **Formats**:
+  - `.msi` - Windows Installer (in `msi/` subdirectory)
+  - `.exe` - Executable (in `nsis/` subdirectory, if NSIS is installed)
+
+#### Linux
+- **Location**: `src-tauri/target/release/bundle/`
+- **Formats**:
+  - `.deb` - Debian package (in `deb/` subdirectory)
+  - `.AppImage` - Portable application (in `appimage/` subdirectory)
+  - `.rpm` - RPM package (in `rpm/` subdirectory, on RPM-based systems)
+
+**Build artifacts naming:**
+- Application: `ClipForge_<version>_<arch>.<extension>`
+- Example: `ClipForge_0.1.0_x64.dmg`
+
+### Cross-Platform Build Instructions
+
+#### Building on macOS
+```bash
+# Install prerequisites
+brew install ffmpeg
+
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone and build
+git clone https://github.com/BiscuitNick/clipforge-tauri.git
+cd clipforge-tauri/clipforge-tauri
+npm install
+npm run tauri build
+```
+
+**For Universal Binary (Intel + Apple Silicon):**
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npm run tauri build -- --target universal-apple-darwin
+```
+
+#### Building on Windows
+```bash
+# Install Rust from https://rustup.rs/
+# Install FFmpeg from https://ffmpeg.org/download.html (add to PATH)
+
+# Install Node.js from https://nodejs.org/
+
+# Clone and build
+git clone https://github.com/BiscuitNick/clipforge-tauri.git
+cd clipforge-tauri\clipforge-tauri
+npm install
+npm run tauri build
+```
+
+**Note**: On Windows, you may need to install Visual Studio Build Tools with C++ support.
+
+#### Building on Linux (Ubuntu/Debian)
+```bash
+# Install prerequisites
+sudo apt update
+sudo apt install -y \
+    libwebkit2gtk-4.1-dev \
+    build-essential \
+    curl \
+    wget \
+    file \
+    libxdo-dev \
+    libssl-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    ffmpeg
+
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install Node.js (if not already installed)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Clone and build
+git clone https://github.com/BiscuitNick/clipforge-tauri.git
+cd clipforge-tauri/clipforge-tauri
+npm install
+npm run tauri build
+```
+
+#### Building on Linux (Fedora/RHEL)
+```bash
+# Install prerequisites
+sudo dnf install -y \
+    webkit2gtk4.1-devel \
+    openssl-devel \
+    curl \
+    wget \
+    file \
+    libappindicator-gtk3-devel \
+    librsvg2-devel \
+    ffmpeg
+
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install Node.js
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo dnf install -y nodejs
+
+# Clone and build
+git clone https://github.com/BiscuitNick/clipforge-tauri.git
+cd clipforge-tauri/clipforge-tauri
+npm install
+npm run tauri build
+```
+
+### Verifying Your Build
+
+After building, verify the application works:
+
+```bash
+# Run the built application directly
+./src-tauri/target/release/clipforge-tauri
+
+# Or install and test the package:
+# macOS: Open the .dmg and drag to Applications
+# Windows: Run the .msi installer
+# Linux: Install the .deb with: sudo dpkg -i *.deb
+```
 
 ## Usage
 
@@ -262,6 +407,18 @@ ffprobe -version
 - 8GB RAM
 - SSD storage for better performance
 - FFmpeg 5.0 or higher
+
+## Distribution & Releases
+
+### For Users
+- Download pre-built releases from the [Releases page](https://github.com/BiscuitNick/clipforge-tauri/releases)
+- Available for macOS, Windows, and Linux
+
+### For Developers & Maintainers
+- **[RELEASE_GUIDE.md](RELEASE_GUIDE.md)** - Complete guide for creating and publishing releases
+- **[AUTO_UPDATE_GUIDE.md](AUTO_UPDATE_GUIDE.md)** - Optional guide for setting up automatic updates
+
+The project uses GitHub Actions for automated multi-platform builds. See `.github/workflows/release.yml` for the CI/CD configuration.
 
 ## License
 

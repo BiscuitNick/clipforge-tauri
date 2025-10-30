@@ -621,6 +621,74 @@ export function useTimeline() {
     return newClip;
   }, [clipboardClip, clips, saveHistory]);
 
+  // Split clip at specified time
+  const splitClip = useCallback((clipId, splitTime) => {
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip) {
+      console.warn("Clip not found:", clipId);
+      return null;
+    }
+
+    // Calculate the clip's effective duration
+    const trimStart = clip.trimStart || 0;
+    const trimEnd = clip.trimEnd || clip.duration;
+    const clipDuration = trimEnd - trimStart;
+    const clipEnd = clip.startTime + clipDuration;
+
+    // Validate split position
+    if (splitTime <= clip.startTime || splitTime >= clipEnd) {
+      console.warn("Split position must be within clip boundaries");
+      return null;
+    }
+
+    // Prevent splits that would create clips shorter than 1 frame
+    const MIN_CLIP_DURATION = 1 / (clip.frameRate || 30); // At least 1 frame
+    const leftDuration = splitTime - clip.startTime;
+    const rightDuration = clipEnd - splitTime;
+
+    if (leftDuration < MIN_CLIP_DURATION || rightDuration < MIN_CLIP_DURATION) {
+      console.warn("Split would create clips shorter than minimum duration");
+      return null;
+    }
+
+    // Calculate split point in source media time
+    const splitOffsetInClip = splitTime - clip.startTime;
+    const splitPointInSource = trimStart + splitOffsetInClip;
+
+    // Create two new clips from the original
+    const leftClip = {
+      ...clip,
+      id: `clip-${Date.now()}-left-${Math.random().toString(36).substr(2, 9)}`,
+      trimEnd: splitPointInSource,
+      // startTime stays the same
+    };
+
+    const rightClip = {
+      ...clip,
+      id: `clip-${Date.now()}-right-${Math.random().toString(36).substr(2, 9)}`,
+      startTime: splitTime,
+      trimStart: splitPointInSource,
+      // trimEnd stays the same
+    };
+
+    // Save history before mutation
+    saveHistory();
+
+    // Replace the original clip with the two new clips
+    setClips(prev => {
+      const otherClips = prev.filter(c => c.id !== clipId);
+      return [...otherClips, leftClip, rightClip].sort((a, b) => a.startTime - b.startTime);
+    });
+
+    // If the split clip was selected, select the left part
+    if (selectedClipId === clipId) {
+      setSelectedClipId(leftClip.id);
+    }
+
+    console.log(`Split clip at ${splitTime}s`, { leftClip, rightClip });
+    return { leftClip, rightClip };
+  }, [clips, selectedClipId, saveHistory]);
+
   return {
     // State
     clips,
@@ -653,6 +721,9 @@ export function useTimeline() {
     // Clipboard
     copyClip,
     pasteClip,
+
+    // Split
+    splitClip,
 
     // Undo/Redo
     undo,

@@ -11,6 +11,9 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize recording module and perform startup cleanup
+    commands::recording::initialize_recording_module();
+
     // Initialize recording manager state
     let recording_manager = Arc::new(Mutex::new(commands::recording::RecordingManager::new()));
 
@@ -38,10 +41,20 @@ pub fn run() {
             commands::recording::cleanup_orphaned_files,
             commands::recording::cleanup_temp_files,
             commands::recording::check_disk_space,
+            commands::recording::get_disk_space_info,
             commands::recording::get_error_details,
+            commands::recording::validate_device_availability,
+            commands::recording::get_long_recording_config,
+            commands::recording::validate_long_recording_config,
+            commands::recording::save_webcam_recording,
+            commands::recording::save_pip_metadata,
+            commands::thumbnail::generate_thumbnail,
+            commands::thumbnail::cleanup_old_thumbnails,
             commands::screen_sources::enumerate_sources,
             commands::screen_sources::enumerate_screens,
-            commands::screen_sources::enumerate_windows
+            commands::screen_sources::enumerate_windows,
+            commands::camera_sources::enumerate_cameras,
+            commands::camera_sources::get_default_camera
         ])
         .setup(|app| {
             // Create the menu

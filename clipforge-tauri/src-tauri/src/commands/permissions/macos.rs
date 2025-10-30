@@ -131,10 +131,7 @@ impl PermissionHandler for PlatformPermissions {
             PermissionType::Screen => Self::check_screen_permission(),
         };
 
-        PermissionResult {
-            permission_type: permission_type.clone(),
-            status,
-        }
+        PermissionResult::new(permission_type.clone(), status)
     }
 
     fn request_permission(permission_type: &PermissionType) -> PermissionResult {
@@ -144,9 +141,6 @@ impl PermissionHandler for PlatformPermissions {
             PermissionType::Screen => Self::request_screen_permission(),
         };
 
-        PermissionResult {
-            permission_type: permission_type.clone(),
-            status,
-        }
+        PermissionResult::new(permission_type.clone(), status)
     }
 }

@@ -57,21 +57,100 @@
   border-radius: 4px;
 }
 
-.media-library-panel .panel-content {
+.media-library-panel .panel-content-scrollable {
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 1rem;
   overflow-y: auto;
+  min-height: 0;
+}
+
+/* Media Library Controls - Context-based video controls */
+.media-library-panel .media-library-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #1a1a1a;
+  border-top: 1px solid #333;
+}
+
+.media-library-panel .media-library-controls-playback {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.media-library-panel .control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-library-panel .control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.media-library-panel .add-media-btn {
+  background-color: #007bff;
+}
+
+.media-library-panel .add-media-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.media-library-panel .stop-btn {
+  background-color: #666;
+}
+
+.media-library-panel .stop-btn:hover:not(:disabled) {
+  background-color: #777;
+}
+
+.media-library-panel .play-btn {
+  background-color: #28a745;
+}
+
+.media-library-panel .play-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.media-library-panel .pause-btn {
+  background-color: #ffc107;
+}
+
+.media-library-panel .pause-btn:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
+.media-library-panel .record-btn {
+  background-color: #e74c3c;
+}
+
+.media-library-panel .record-btn:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+.media-library-panel .controls-separator {
+  width: 1px;
+  height: 32px;
+  background-color: #444;
+  margin: 0 0.25rem;
 }
 
 /* Drop zone styles */
-/* Media actions toolbar */
-.media-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 1rem;
-}
 
 /* Record button */
 .record-button {
@@ -262,6 +341,13 @@
   height: 32px;
 }
 
+.media-library-panel .thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .media-library-panel .media-info {
   flex: 1;
   display: flex;
@@ -351,108 +437,124 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 1rem;
 }
 
-.media-library-panel .recording-mode-content {
+.media-library-panel .recording-mode-centered {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
-  max-width: 400px;
-}
-
-.media-library-panel .recording-mode-icon {
-  width: 80px;
-  height: 80px;
-  color: #555;
-  margin-bottom: 1.5rem;
-}
-
-.media-library-panel .recording-mode-content h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #f6f6f6;
-}
-
-.media-library-panel .recording-mode-content p {
-  margin: 0 0 2rem 0;
-  font-size: 0.95rem;
-  color: #999;
-}
-
-.media-library-panel .record-button.large {
-  padding: 1rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 8px;
-}
-
-.media-library-panel .record-button.large:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
-}
-
-.media-library-panel .record-button.large.primary {
-  background-color: #e74c3c;
-}
-
-.media-library-panel .record-button.large.primary:hover:not(:disabled) {
-  background-color: #c0392b;
-}
-
-/* Selected source info */
-.media-library-panel .selected-source-info {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background-color: #252525;
-  border-radius: 8px;
-  border: 1px solid #333;
-}
-
-.media-library-panel .source-name-display {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #f6f6f6;
-}
-
-.media-library-panel .source-resolution-display {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #999;
-}
-
-/* Recording actions */
-.media-library-panel .recording-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  justify-content: center;
   width: 100%;
-  max-width: 300px;
 }
 
-.media-library-panel .change-source-button {
+/* Select Source Button - Minimalistic style matching Change Source */
+.media-library-panel .select-source-button {
   background-color: #333;
   color: #f6f6f6;
   border: 1px solid #444;
-  padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.media-library-panel .change-source-button:hover:not(:disabled) {
+.media-library-panel .select-source-button:hover:not(:disabled) {
   background-color: #3a3a3a;
   border-color: #555;
 }
 
-.media-library-panel .change-source-button:disabled {
+.media-library-panel .select-source-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Selected source compact display */
+.media-library-panel .selected-source-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.media-library-panel .source-details {
+  font-size: 0.9rem;
+  color: #f6f6f6;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.media-library-panel .change-source-button-compact {
+  background-color: #333;
+  color: #f6f6f6;
+  border: 1px solid #444;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-library-panel .change-source-button-compact:hover:not(:disabled) {
+  background-color: #3a3a3a;
+  border-color: #555;
+}
+
+.media-library-panel .change-source-button-compact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Recording status display */
+.media-library-panel .recording-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.media-library-panel .recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f6f6f6;
+  font-size: 0.9rem;
+}
+
+.media-library-panel .recording-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #e74c3c;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.media-library-panel .recording-timer {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f6f6f6;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Disabled mode selector */
@@ -461,17 +563,216 @@
   cursor: not-allowed;
 }
 
+/* Inline Webcam Configuration */
+.webcam-config-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: #222;
+  border-radius: 6px;
+  margin: 1rem;
+}
+
+.webcam-config-inline .config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.webcam-config-inline .config-label {
+  font-size: 0.9rem;
+  color: #f6f6f6;
+  font-weight: 500;
+  min-width: 85px;
+}
+
+.webcam-config-inline .config-select {
+  flex: 1;
+  background-color: #2a2a2a;
+  color: #f6f6f6;
+  border: 1px solid #444;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.webcam-config-inline .config-select:hover:not(:disabled) {
+  background-color: #333;
+  border-color: #555;
+}
+
+.webcam-config-inline .config-select:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.webcam-config-inline .config-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.webcam-config-inline .config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.webcam-config-inline .config-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.webcam-config-inline .config-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.webcam-config-inline .config-checkbox span {
+  font-size: 0.9rem;
+  color: #f6f6f6;
+}
+
+.webcam-config-inline .audio-meter-row {
+  padding: 0.5rem;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.webcam-config-inline .mute-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: all 0.2s ease;
+  min-width: 30px;
+}
+
+.webcam-config-inline .mute-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.webcam-config-inline .mute-btn.muted {
+  opacity: 0.5;
+}
+
+.webcam-config-inline .mute-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.webcam-config-inline .vu-meter {
+  flex: 1;
+  height: 24px;
+  background-color: #0a0a0a;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.webcam-config-inline .vu-meter-fill {
+  height: 100%;
+  transition: width 0.1s ease-out;
+  border-radius: 3px;
+}
+
+.webcam-config-inline .audio-level-text {
+  color: #f6f6f6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
   .media-library-panel {
     min-height: 200px;
   }
 
-  .media-library-panel .panel-content {
+  .media-library-panel .panel-content-scrollable {
     padding: 0.75rem;
   }
 
   .media-library-panel .drop-zone {
     padding: 1.5rem 1rem;
+  }
+
+  .media-library-panel .media-library-controls {
+    padding: 0.5rem;
+  }
+
+  .media-library-panel .control-btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .media-library-panel .controls-separator {
+    height: 28px;
+  }
+
+  .media-library-panel .select-source-button {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .media-library-panel .source-details {
+    font-size: 0.85rem;
+  }
+}
+
+/* Countdown Overlay */
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.countdown-content {
+  text-align: center;
+  animation: countdown-pulse 1s ease-in-out infinite;
+}
+
+.countdown-number {
+  font-size: 8rem;
+  font-weight: bold;
+  color: #e74c3c;
+  text-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.countdown-text {
+  font-size: 1.2rem;
+  color: #f6f6f6;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+
+@keyframes countdown-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
   }
 }

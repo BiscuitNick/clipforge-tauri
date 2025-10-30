@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -14,6 +14,17 @@ function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Format file size in bytes to human-readable format
+ */
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 /**
@@ -60,19 +71,27 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
         onClick={handleClick}
       >
         <div className="media-thumbnail" {...listeners}>
-          <svg
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          {item.thumbnailPath ? (
+            <img
+              src={`asset://localhost/${item.thumbnailPath}`}
+              alt={item.filename}
+              className="thumbnail-image"
             />
-          </svg>
+          ) : (
+            <svg
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          )}
         </div>
         <div className="media-info">
           <div className="media-title-row">
@@ -94,6 +113,11 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
                 {item.width}×{item.height}
               </span>
             )}
+            {item.fileSize && (
+              <span className="media-filesize">
+                {formatFileSize(item.fileSize)}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -105,7 +129,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -113,6 +137,41 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
   const [mode, setMode] = useState("media"); // "media", "record-screen", "record-video"
   const [selectedRecordingSource, setSelectedRecordingSource] = useState(null); // Stores selected screen/window and config
+  const [isPaused, setIsPaused] = useState(false); // Track recording pause state
+  const [countdown, setCountdown] = useState(null); // Countdown timer before recording starts
+
+  // Webcam recording state
+  const [isWebcamRecording, setIsWebcamRecording] = useState(false);
+  const [isWebcamPaused, setIsWebcamPaused] = useState(false);
+  const [webcamStream, setWebcamStream] = useState(null);
+  const [webcamRecordingDuration, setWebcamRecordingDuration] = useState(0);
+  const webcamMediaRecorderRef = useRef(null);
+  const webcamRecordedChunksRef = useRef([]);
+  const webcamRecordingStartTimeRef = useRef(null);
+  const webcamRecordingTimerRef = useRef(null);
+  const webcamFinalDurationRef = useRef(0); // Capture final duration at stop time
+
+  // Webcam device state (inline controls instead of modal)
+  const [cameraDevices, setCameraDevices] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState(null);
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedAudioId, setSelectedAudioId] = useState(null);
+  const [includeAudio, setIncludeAudio] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const audioAnimationRef = useRef(null);
+
+  // Cleanup webcam recording timer on unmount or mode change
+  useEffect(() => {
+    return () => {
+      if (webcamRecordingTimerRef.current) {
+        clearInterval(webcamRecordingTimerRef.current);
+        webcamRecordingTimerRef.current = null;
+      }
+    };
+  }, [mode]);
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -267,7 +326,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       return;
     }
 
+    // Start countdown
     setIsLoading(true);
+    for (let i = 3; i > 0; i--) {
+      setCountdown(i);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    setCountdown(null);
+
     setMessage("Starting recording...");
     setMessageType("loading");
 
@@ -281,9 +347,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
       console.log('[MediaLibraryPanel] Recording started:', result);
 
-      // Notify parent about recording start
+      // Notify parent about recording start with source information
       if (onRecordingStateChange) {
-        onRecordingStateChange({ ...result, isRecording: true });
+        onRecordingStateChange({
+          ...result,
+          isRecording: true,
+          source: selectedRecordingSource.source,
+          config: selectedRecordingSource.config
+        });
       }
 
       setMessage("");
@@ -292,6 +363,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       console.error('[MediaLibraryPanel] Failed to start recording:', err);
       setMessage(`Failed to start recording: ${err}`);
       setMessageType("error");
+      setCountdown(null); // Clear countdown on error
       setTimeout(() => {
         setMessage("");
         setMessageType("");
@@ -306,8 +378,521 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     setIsRecordingModalOpen(true);
   };
 
+  // Handle pause/resume recording
+  const handlePauseResumeRecording = async () => {
+    if (!isRecording) return;
+
+    try {
+      if (isPaused) {
+        // Resume recording
+        setIsLoading(true);
+        setMessage("Resuming recording...");
+        setMessageType("loading");
+
+        const result = await invoke('resume_recording');
+        console.log('[MediaLibraryPanel] Recording resumed:', result);
+        setIsPaused(false);
+        setMessage("");
+        setMessageType("");
+      } else {
+        // Pause recording
+        setIsLoading(true);
+        setMessage("Pausing recording...");
+        setMessageType("loading");
+
+        const result = await invoke('pause_recording');
+        console.log('[MediaLibraryPanel] Recording paused:', result);
+        setIsPaused(true);
+        setMessage("");
+        setMessageType("");
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to pause/resume recording:', err);
+      setMessage(`Failed to ${isPaused ? 'resume' : 'pause'} recording: ${err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle stop recording
+  const handleStopRecording = async () => {
+    if (!isRecording) return;
+
+    try {
+      setIsLoading(true);
+      setMessage("Stopping recording and processing video...");
+      setMessageType("loading");
+
+      const result = await invoke('stop_recording');
+      console.log('[MediaLibraryPanel] Recording stopped:', result);
+
+      // Reset state
+      setIsPaused(false);
+      setSelectedRecordingSource(null);
+
+      // Notify parent
+      if (onRecordingStateChange) {
+        onRecordingStateChange(result);
+      }
+
+      // Switch to media files view
+      setMode("media");
+      setMessage("Recording saved successfully!");
+      setMessageType("success");
+
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 3000);
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to stop recording:', err);
+      setMessage(`Failed to stop recording: ${err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load available cameras
+  const loadCameras = async () => {
+    try {
+      // Request camera access to trigger permission prompt
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      // Enumerate devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to camera format
+      const cameras = videoDevices.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Camera ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setCameraDevices(cameras);
+
+      // Auto-select default
+      if (cameras.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(cameras[0].id);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to enumerate cameras:', err);
+      setMessage(`Failed to load cameras: ${err.message || err}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    }
+  };
+
+  // Load available audio devices
+  const loadAudioDevices = async () => {
+    try {
+      // Request audio access
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Enumerate audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+      // Stop temp stream
+      tempStream.getTracks().forEach(track => track.stop());
+
+      // Convert to audio format
+      const audioDevs = audioInputs.map((device, index) => ({
+        id: device.deviceId,
+        name: device.label || `Microphone ${index + 1}`,
+        is_default: index === 0
+      }));
+
+      setAudioDevices(audioDevs);
+
+      // Auto-select default
+      if (audioDevs.length > 0 && !selectedAudioId) {
+        setSelectedAudioId(audioDevs[0].id);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to enumerate audio devices:', err);
+      // Don't show error - audio is optional
+    }
+  };
+
+  // Start audio level monitoring
+  const startAudioMonitoring = (mediaStream) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateAudioLevel = () => {
+        if (!analyserRef.current) return;
+
+        analyser.getByteFrequencyData(dataArray);
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const average = sum / dataArray.length;
+        const normalizedLevel = Math.min(100, (average / 255) * 100);
+
+        setAudioLevel(isMuted ? 0 : normalizedLevel);
+        audioAnimationRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+
+      updateAudioLevel();
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start audio monitoring:', err);
+    }
+  };
+
+  // Stop audio monitoring
+  const stopAudioMonitoring = () => {
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
+
+  // Load devices when entering record-video mode
+  useEffect(() => {
+    if (mode === 'record-video') {
+      loadCameras();
+      loadAudioDevices();
+    } else {
+      // Cleanup when leaving record-video mode
+      stopAudioMonitoring();
+    }
+
+    return () => {
+      stopAudioMonitoring();
+    };
+  }, [mode]);
+
+  // Start webcam preview when device selections change
+  const startWebcamPreview = async () => {
+    if (!selectedCameraId || isWebcamRecording) return;
+
+    try {
+      // Stop existing stream
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+      }
+      stopAudioMonitoring();
+
+      const constraints = {
+        video: { deviceId: { exact: selectedCameraId } },
+        audio: includeAudio && selectedAudioId ? { deviceId: { exact: selectedAudioId } } : includeAudio
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setWebcamStream(stream);
+
+      // Start audio monitoring if audio is enabled
+      if (includeAudio && stream.getAudioTracks().length > 0) {
+        startAudioMonitoring(stream);
+      }
+
+      // Notify parent to show webcam preview
+      if (onWebcamStreamChange) {
+        onWebcamStreamChange(stream);
+      }
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start webcam stream:', err);
+      setMessage(`Failed to start webcam: ${err.message}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+    }
+  };
+
+  // Start preview when device selections change
+  useEffect(() => {
+    if (mode === 'record-video' && selectedCameraId) {
+      startWebcamPreview();
+    }
+  }, [selectedCameraId, selectedAudioId, includeAudio]);
+
+  // Handle mute toggle
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+    if (webcamStream) {
+      const audioTracks = webcamStream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMuted; // Will be flipped after state updates
+      });
+    }
+  };
+
+  // Handle starting webcam recording
+  const handleStartWebcamRecording = async () => {
+    if (!webcamStream) {
+      setMessage("Please configure camera first");
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 3000);
+      return;
+    }
+
+    try {
+      setIsWebcamRecording(true);
+      setIsWebcamPaused(false);
+
+      // Reset all recording state
+      webcamRecordedChunksRef.current = [];
+      webcamFinalDurationRef.current = 0;
+
+      console.log('[MediaLibraryPanel] Starting webcam recording, stream tracks:', webcamStream.getTracks().length);
+
+      // Create MediaRecorder with the stream
+      const options = {
+        mimeType: 'video/webm;codecs=vp8,opus',
+        videoBitsPerSecond: 2500000
+      };
+
+      const mediaRecorder = new MediaRecorder(webcamStream, options);
+      webcamMediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          console.log('[MediaLibraryPanel] Data chunk received, size:', event.data.size, 'total chunks:', webcamRecordedChunksRef.current.length + 1);
+          webcamRecordedChunksRef.current.push(event.data);
+        } else {
+          console.warn('[MediaLibraryPanel] Received empty data chunk');
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        console.log('[MediaLibraryPanel] Webcam recording stopped, saving...');
+        console.log('[MediaLibraryPanel] Chunks collected:', webcamRecordedChunksRef.current.length);
+
+        // Stop timer
+        if (webcamRecordingTimerRef.current) {
+          clearInterval(webcamRecordingTimerRef.current);
+          webcamRecordingTimerRef.current = null;
+        }
+
+        // Use the captured final duration
+        const finalDuration = webcamFinalDurationRef.current;
+        console.log('[MediaLibraryPanel] Using final duration:', finalDuration);
+
+        // Create blob from recorded chunks
+        const blob = new Blob(webcamRecordedChunksRef.current, {
+          type: 'video/webm'
+        });
+
+        console.log('[MediaLibraryPanel] Blob size:', blob.size, 'bytes');
+
+        if (blob.size === 0) {
+          console.error('[MediaLibraryPanel] Blob is empty! No data recorded.');
+          setMessage("Recording failed: No data captured");
+          setMessageType("error");
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 5000);
+          return;
+        }
+
+        try {
+          // Convert blob to array buffer
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // Convert to array of numbers (required for Tauri serialization)
+          const dataArray = [...uint8Array];
+
+          console.log('[MediaLibraryPanel] Saving webcam recording, size:', dataArray.length, 'bytes, duration:', finalDuration);
+
+          // Save the recording
+          const result = await invoke('save_webcam_recording', {
+            data: dataArray,
+            mimeType: 'video/webm',
+            duration: finalDuration
+          });
+
+          console.log('[MediaLibraryPanel] Webcam recording saved:', result);
+
+          // Import the saved recording by fetching its path
+          // The result is the file path, so we need to import it
+          const importResult = await invoke('import_video', {
+            paths: [result]
+          });
+
+          console.log('[MediaLibraryPanel] Webcam recording imported:', importResult);
+
+          // Add to media library
+          if (onMediaImport && importResult && importResult.length > 0) {
+            onMediaImport(importResult);
+          }
+
+          setMessage("Webcam recording saved successfully!");
+          setMessageType("success");
+
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 3000);
+
+          // Reset and go back to media view
+          setMode("media");
+          setWebcamRecordingDuration(0);
+          if (webcamStream) {
+            webcamStream.getTracks().forEach(track => track.stop());
+            setWebcamStream(null);
+          }
+          // Reset to default camera for next recording
+          if (cameraDevices.length > 0) {
+            setSelectedCameraId(cameraDevices[0].id);
+          }
+        } catch (err) {
+          console.error('[MediaLibraryPanel] Failed to save webcam recording:', err);
+          setMessage(`Failed to save recording: ${err}`);
+          setMessageType("error");
+          setTimeout(() => {
+            setMessage("");
+            setMessageType("");
+          }, 5000);
+        }
+      };
+
+      // Start recording
+      mediaRecorder.start(1000); // Collect data every second
+      console.log('[MediaLibraryPanel] Webcam recording started');
+
+      // Start timer
+      webcamRecordingStartTimeRef.current = Date.now();
+      setWebcamRecordingDuration(0);
+      if (onWebcamRecordingDurationChange) {
+        onWebcamRecordingDurationChange(0);
+      }
+      webcamRecordingTimerRef.current = setInterval(() => {
+        const elapsed = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+        setWebcamRecordingDuration(elapsed);
+        if (onWebcamRecordingDurationChange) {
+          onWebcamRecordingDurationChange(elapsed);
+        }
+      }, 100); // Update every 100ms for smooth display
+
+      setMessage("Recording started");
+      setMessageType("success");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 2000);
+    } catch (err) {
+      console.error('[MediaLibraryPanel] Failed to start webcam recording:', err);
+      setMessage(`Failed to start recording: ${err.message}`);
+      setMessageType("error");
+      setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
+      setIsWebcamRecording(false);
+    }
+  };
+
+  // Handle pausing/resuming webcam recording
+  const handleToggleWebcamPause = () => {
+    const recorder = webcamMediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (isWebcamPaused) {
+      // Resume recording and timer
+      recorder.resume();
+      setIsWebcamPaused(false);
+      if (onWebcamPausedChange) {
+        onWebcamPausedChange(false);
+      }
+      // Restart timer from where we paused
+      webcamRecordingStartTimeRef.current = Date.now() - (webcamRecordingDuration * 1000);
+      webcamRecordingTimerRef.current = setInterval(() => {
+        const elapsed = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+        setWebcamRecordingDuration(elapsed);
+        if (onWebcamRecordingDurationChange) {
+          onWebcamRecordingDurationChange(elapsed);
+        }
+      }, 100);
+      console.log('[MediaLibraryPanel] Webcam recording resumed');
+    } else {
+      // Pause recording and timer
+      recorder.pause();
+      setIsWebcamPaused(true);
+      if (onWebcamPausedChange) {
+        onWebcamPausedChange(true);
+      }
+      if (webcamRecordingTimerRef.current) {
+        clearInterval(webcamRecordingTimerRef.current);
+        webcamRecordingTimerRef.current = null;
+      }
+      console.log('[MediaLibraryPanel] Webcam recording paused');
+    }
+  };
+
+  // Handle stopping webcam recording
+  const handleStopWebcamRecording = () => {
+    const recorder = webcamMediaRecorderRef.current;
+    if (!recorder) return;
+
+    // Capture final duration before stopping
+    if (webcamRecordingStartTimeRef.current) {
+      const finalDuration = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
+      webcamFinalDurationRef.current = finalDuration;
+      console.log('[MediaLibraryPanel] Capturing final duration:', finalDuration);
+    }
+
+    if (recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+
+    setIsWebcamRecording(false);
+    setIsWebcamPaused(false);
+    console.log('[MediaLibraryPanel] Webcam recording stopped');
+  };
+
   return (
     <div className="media-library-panel">
+      {/* Countdown Overlay */}
+      {countdown !== null && (
+        <div className="countdown-overlay">
+          <div className="countdown-content">
+            <div className="countdown-number">{countdown}</div>
+            <div className="countdown-text">Recording starts in...</div>
+          </div>
+        </div>
+      )}
+
       <div className="panel-header">
         <h2>Media Library</h2>
         <div className="header-controls">
@@ -327,7 +912,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         </div>
       </div>
 
-      <div className="panel-content">
+      <div className="panel-content-scrollable">
         {mode === "media" && (
           <>
             {mediaItems.length === 0 ? (
@@ -362,15 +947,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             ) : (
               // Show media list when items exist
               <div className="media-list">
-                <div className="media-actions">
-                  <button
-                    className="import-button compact"
-                    onClick={handleImportClick}
-                    disabled={isLoading}
-                  >
-                    + Add Media
-                  </button>
-                </div>
                 <div className="media-items">
                   {mediaItems.map((item) => (
                     <DraggableMediaItem
@@ -388,92 +964,114 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
         {mode === "record-screen" && (
           <div className="recording-mode-view">
-            <div className="recording-mode-content">
-              <svg
-                className="recording-mode-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-              <h3>Screen Recording</h3>
-
-              {!selectedRecordingSource ? (
-                <>
-                  <p>Select a screen or window to record</p>
+            {!selectedRecordingSource ? (
+              <div className="recording-mode-centered">
+                <button
+                  className="select-source-button"
+                  onClick={() => setIsRecordingModalOpen(true)}
+                  disabled={isLoading || isRecording}
+                >
+                  Select Screen/Window
+                </button>
+              </div>
+            ) : (
+              <div className="recording-mode-centered">
+                <div className="selected-source-compact">
+                  <span className="source-details">
+                    {selectedRecordingSource.source.name} • {selectedRecordingSource.config.width} × {selectedRecordingSource.config.height}
+                    {selectedRecordingSource.resolution !== 'native' && ` (${selectedRecordingSource.resolution})`}
+                  </span>
                   <button
-                    className="record-button large"
-                    onClick={() => setIsRecordingModalOpen(true)}
+                    className="change-source-button-compact"
+                    onClick={handleChangeSource}
                     disabled={isLoading || isRecording}
                   >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Select Screen/Window
+                    Change Source
                   </button>
-                </>
-              ) : (
-                <>
-                  <div className="selected-source-info">
-                    <p className="source-name-display">{selectedRecordingSource.source.name}</p>
-                    <p className="source-resolution-display">
-                      {selectedRecordingSource.config.width} × {selectedRecordingSource.config.height}
-                      {selectedRecordingSource.resolution !== 'native' && ` (${selectedRecordingSource.resolution})`}
-                    </p>
-                  </div>
-                  <div className="recording-actions">
-                    <button
-                      className="record-button large primary"
-                      onClick={handleStartRecording}
-                      disabled={isLoading || isRecording}
-                    >
-                      <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                        <circle cx="10" cy="10" r="6" />
-                      </svg>
-                      Start Recording
-                    </button>
-                    <button
-                      className="change-source-button"
-                      onClick={handleChangeSource}
-                      disabled={isLoading || isRecording}
-                    >
-                      Change Source
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {mode === "record-video" && (
-          <div className="recording-mode-view">
-            <div className="recording-mode-content">
-              <svg
-                className="recording-mode-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+          <div className="webcam-config-inline">
+            {/* Camera Selection */}
+            <div className="config-row">
+              <label className="config-label">Camera:</label>
+              <select
+                className="config-select"
+                value={selectedCameraId || ''}
+                onChange={(e) => setSelectedCameraId(e.target.value)}
+                disabled={isWebcamRecording || cameraDevices.length === 0}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-              <h3>Webcam Recording</h3>
-              <p>Coming soon...</p>
+                {cameraDevices.length === 0 ? (
+                  <option>No cameras found</option>
+                ) : (
+                  cameraDevices.map(camera => (
+                    <option key={camera.id} value={camera.id}>
+                      {camera.name}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
+
+            {/* Audio Toggle */}
+            <div className="config-row">
+              <label className="config-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeAudio}
+                  onChange={(e) => setIncludeAudio(e.target.checked)}
+                  disabled={isWebcamRecording}
+                />
+                <span>Include Audio</span>
+              </label>
+            </div>
+
+            {/* Audio Device Selection */}
+            {includeAudio && audioDevices.length > 0 && (
+              <div className="config-row">
+                <label className="config-label">Microphone:</label>
+                <select
+                  className="config-select"
+                  value={selectedAudioId || ''}
+                  onChange={(e) => setSelectedAudioId(e.target.value)}
+                  disabled={isWebcamRecording}
+                >
+                  {audioDevices.map(device => (
+                    <option key={device.id} value={device.id}>
+                      {device.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Audio Level Meter */}
+            {includeAudio && webcamStream && webcamStream.getAudioTracks().length > 0 && (
+              <div className="config-row audio-meter-row">
+                <button
+                  className={`mute-btn ${isMuted ? 'muted' : ''}`}
+                  onClick={handleMuteToggle}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                  disabled={isWebcamRecording}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+                <div className="vu-meter">
+                  <div
+                    className="vu-meter-fill"
+                    style={{
+                      width: `${audioLevel}%`,
+                      backgroundColor: audioLevel < 30 ? '#27ae60' : audioLevel < 70 ? '#f39c12' : '#e74c3c'
+                    }}
+                  />
+                </div>
+                <span className="audio-level-text">{Math.round(audioLevel)}%</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -482,6 +1080,136 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             {message}
           </div>
         )}
+      </div>
+
+      {/* Video Controls - Context-based */}
+      <div className="media-library-controls">
+        {mode === "media" ? (
+          // Media Files controls: Add Media button + Play/Stop for selected media
+          <>
+            {mediaItems.length > 0 && (
+              <>
+                <button
+                  className="control-btn add-media-btn"
+                  onClick={handleImportClick}
+                  disabled={isLoading}
+                  title="Add Media"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                  </svg>
+                </button>
+                <div className="controls-separator" />
+              </>
+            )}
+            <div className="media-library-controls-playback">
+              <button
+                className="control-btn stop-btn"
+                onClick={onStopMedia}
+                disabled={!selectedMediaId}
+                title="Stop"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M6 6h12v12H6z" />
+                </svg>
+              </button>
+              <button
+                className={`control-btn ${isLibraryPlaying ? 'pause-btn' : 'play-btn'}`}
+                onClick={onPlayPauseMedia}
+                disabled={!selectedMediaId}
+                title={isLibraryPlaying ? "Pause" : "Play"}
+              >
+                {isLibraryPlaying ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </>
+        ) : mode === "record-screen" ? (
+          // Record Screen controls: Record/Pause/Stop (centered)
+          <div className="media-library-controls-playback">
+            <button
+              className="control-btn stop-btn"
+              onClick={handleStopRecording}
+              disabled={!isRecording}
+              title="Stop Recording"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 6h12v12H6z" />
+              </svg>
+            </button>
+            <button
+              className="control-btn record-btn"
+              onClick={isRecording ? handlePauseResumeRecording : handleStartRecording}
+              disabled={!selectedRecordingSource && !isRecording}
+              title={isRecording ? (isPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
+            >
+              {isRecording ? (
+                isPaused ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                )
+              ) : (
+                <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                  <circle cx="10" cy="10" r="6" />
+                </svg>
+              )}
+            </button>
+          </div>
+        ) : mode === "record-video" ? (
+          // Record Video (Webcam) controls: Stop/Record/Pause (centered)
+          <div className="media-library-controls-playback">
+            <button
+              className="control-btn stop-btn"
+              onClick={handleStopWebcamRecording}
+              disabled={!isWebcamRecording}
+              title="Stop Recording"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M6 6h12v12H6z" />
+              </svg>
+            </button>
+            <button
+              className="control-btn record-btn"
+              onClick={() => {
+                if (isWebcamRecording) {
+                  handleToggleWebcamPause();
+                } else {
+                  handleStartWebcamRecording();
+                }
+              }}
+              disabled={!webcamStream && !isWebcamRecording}
+              title={isWebcamRecording ? (isWebcamPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
+            >
+              {isWebcamRecording ? (
+                isWebcamPaused ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                )
+              ) : (
+                <svg fill="currentColor" viewBox="0 0 20 20" width="18" height="18">
+                  <circle cx="10" cy="10" r="6" />
+                </svg>
+              )}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <ScreenRecordingModal
