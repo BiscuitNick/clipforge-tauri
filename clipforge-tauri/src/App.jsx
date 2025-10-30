@@ -32,7 +32,7 @@ function App() {
   const [panelVisibility, setPanelVisibility] = React.useState({
     mediaLibrary: true,      // Always visible
     videoPreview1: true,     // Always visible
-    videoPreview2: true,     // Can be hidden
+    videoPreview2: false,    // Can be hidden (starts collapsed)
     timelineClips: true      // Can be hidden
   });
 
