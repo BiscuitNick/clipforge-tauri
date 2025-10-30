@@ -513,6 +513,100 @@
   cursor: not-allowed;
 }
 
+.pip-overlay-settings {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(32, 32, 32, 0.85);
+  border: 1px solid #2f2f2f;
+  border-radius: 6px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pip-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pip-settings-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pip-size-options,
+.pip-position-grid {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pip-size-button,
+.pip-position-button {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #eee;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pip-size-button.active,
+.pip-position-button.active {
+  background: #0ea5e9;
+  border-color: #38bdf8;
+  color: #0b1120;
+  font-weight: 600;
+}
+
+.pip-size-button:disabled,
+.pip-position-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pip-preview-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pip-preview-label {
+  font-size: 0.75rem;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pip-preview-box {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  width: 240px;
+  height: 135px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pip-preview-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pip-preview-placeholder {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+
 /* Recording status display */
 .media-library-panel .recording-status {
   display: flex;

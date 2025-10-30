@@ -4,6 +4,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useDraggable } from "@dnd-kit/core";
 import ScreenRecordingModal from "./ScreenRecordingModal";
+import { usePiPConfig } from "../hooks/usePiPConfig";
+import usePiPRecording from "../hooks/usePiPRecording";
 import "./MediaLibraryPanel.css";
 
 /**
@@ -153,10 +155,31 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
   // Webcam device state (inline controls instead of modal)
   const [cameraDevices, setCameraDevices] = useState([]);
-  const [selectedCameraId, setSelectedCameraId] = useState(null);
   const [audioDevices, setAudioDevices] = useState([]);
-  const [selectedAudioId, setSelectedAudioId] = useState(null);
-  const [includeAudio, setIncludeAudio] = useState(true);
+  const {
+    config: pipConfig,
+    setPosition: setPipPosition,
+    setSize: setPipSize,
+    setCameraId: setPipCameraId,
+    setIncludeAudio: setPipIncludeAudio,
+    setAudioDeviceId: setPipAudioDeviceId,
+  } = usePiPConfig();
+  const {
+    isPaused: pipIsPaused,
+    startRecording: startPiPRecording,
+    stopRecording: stopPiPRecording,
+    pauseRecording: pausePiPRecording,
+    resumeRecording: resumePiPRecording,
+    error: pipError,
+  } = usePiPRecording();
+  const [isPiPEnabled, setIsPiPEnabled] = useState(false);
+  const [isPiPActive, setIsPiPActive] = useState(false);
+  const pipSessionRef = useRef(null);
+  const [selectedCameraId, setSelectedCameraId] = useState(pipConfig.cameraId || null);
+  const [selectedAudioId, setSelectedAudioId] = useState(pipConfig.audioDeviceId || null);
+  const [includeAudio, setIncludeAudio] = useState(
+    pipConfig.includeAudio !== undefined ? pipConfig.includeAudio : true
+  );
   const [isMuted, setIsMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const audioContextRef = useRef(null);
@@ -172,6 +195,60 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       }
     };
   }, [mode]);
+
+  useEffect(() => {
+    if (selectedCameraId) {
+      setPipCameraId(selectedCameraId);
+    }
+  }, [selectedCameraId, setPipCameraId]);
+
+  useEffect(() => {
+    setPipIncludeAudio(includeAudio);
+  }, [includeAudio, setPipIncludeAudio]);
+
+  useEffect(() => {
+    if (selectedAudioId) {
+      setPipAudioDeviceId(selectedAudioId);
+    }
+  }, [selectedAudioId, setPipAudioDeviceId]);
+
+  useEffect(() => {
+    if (pipError) {
+      setMessage(`PiP error: ${pipError}`);
+      setMessageType("error");
+    }
+  }, [pipError]);
+
+  useEffect(() => {
+    if (isPiPEnabled) {
+      if (cameraDevices.length === 0) {
+        loadCameras();
+      }
+      if (includeAudio && audioDevices.length === 0) {
+        loadAudioDevices();
+      }
+      if (!webcamStream) {
+        startWebcamPreview();
+      }
+    } else if (mode !== 'record-video') {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        setWebcamStream(null);
+        if (onWebcamStreamChange) {
+          onWebcamStreamChange(null);
+        }
+      }
+      stopAudioMonitoring();
+    }
+  }, [
+    isPiPEnabled,
+    includeAudio,
+    cameraDevices.length,
+    audioDevices.length,
+    mode,
+    webcamStream,
+    onWebcamStreamChange,
+  ]);
 
   // Set up Tauri file drop event listeners
   useEffect(() => {
@@ -338,6 +415,64 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     setMessageType("loading");
 
     try {
+      if (isPiPEnabled) {
+        if (!selectedCameraId) {
+          throw new Error('Select a camera before starting overlay recording');
+        }
+        const stream = webcamStream || (await startWebcamPreview());
+        if (!stream) {
+          throw new Error('Unable to access webcam for overlay');
+        }
+
+        const videoTrack = stream.getVideoTracks()[0];
+        const settings = videoTrack?.getSettings ? videoTrack.getSettings() : {};
+        const webcamDimensions = {
+          width: settings.width || 1280,
+          height: settings.height || 720,
+        };
+        const currentPiPConfig = {
+          ...pipConfig,
+          cameraId: selectedCameraId || pipConfig.cameraId,
+          includeAudio,
+          audioDeviceId: selectedAudioId || pipConfig.audioDeviceId,
+        };
+
+        const { screenRecording } = await startPiPRecording({
+          screenSource: selectedRecordingSource.source,
+          pipConfig: currentPiPConfig,
+          webcamStream: stream,
+          screenRecordingConfig: selectedRecordingSource.config,
+          includeSystemAudio: selectedRecordingSource.includeAudio,
+        });
+
+        pipSessionRef.current = {
+          pipConfig: currentPiPConfig,
+          screenDimensions: {
+            width:
+              selectedRecordingSource.config?.width || selectedRecordingSource.source.width,
+            height:
+              selectedRecordingSource.config?.height || selectedRecordingSource.source.height,
+          },
+          webcamDimensions,
+        };
+
+        setIsPiPActive(true);
+        setIsPaused(false);
+        setMessage("");
+        setMessageType("");
+
+        if (onRecordingStateChange) {
+          onRecordingStateChange({
+            ...screenRecording,
+            isRecording: true,
+            source: selectedRecordingSource.source,
+            config: selectedRecordingSource.config,
+          });
+        }
+
+        return;
+      }
+
       const result = await invoke('start_recording', {
         recordingType: 'screen',
         sourceId: selectedRecordingSource.source.id,
@@ -381,6 +516,29 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   // Handle pause/resume recording
   const handlePauseResumeRecording = async () => {
     if (!isRecording) return;
+
+    if (isPiPActive) {
+      try {
+        if (pipIsPaused) {
+          resumePiPRecording();
+          setIsPaused(false);
+        } else {
+          pausePiPRecording();
+          setIsPaused(true);
+        }
+        setMessage("");
+        setMessageType("");
+      } catch (err) {
+        console.error('[MediaLibraryPanel] Failed to toggle PiP pause:', err);
+        setMessage(`Failed to toggle overlay recording: ${err}`);
+        setMessageType('error');
+        setTimeout(() => {
+          setMessage('');
+          setMessageType('');
+        }, 5000);
+      }
+      return;
+    }
 
     try {
       if (isPaused) {
@@ -428,6 +586,47 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       setMessage("Stopping recording and processing video...");
       setMessageType("loading");
 
+      if (isPiPActive && pipSessionRef.current) {
+        const session = pipSessionRef.current;
+        const result = await stopPiPRecording({
+          pipConfig: session.pipConfig,
+          screenDimensions: session.screenDimensions,
+          webcamDimensions: session.webcamDimensions,
+        });
+
+        console.log('[MediaLibraryPanel] PiP recording stopped:', result);
+
+        setIsPiPActive(false);
+        pipSessionRef.current = null;
+        setIsPaused(false);
+        setSelectedRecordingSource(null);
+
+        if (onWebcamStreamChange) {
+          onWebcamStreamChange(null);
+        }
+
+        if (onRecordingStateChange) {
+          onRecordingStateChange({
+            file_path: result.compositedFilePath,
+          });
+        }
+
+        setMode("media");
+        if (result.compositeSucceeded) {
+          setMessage("Recording saved with webcam overlay!");
+          setMessageType("success");
+        } else {
+          setMessage("Recording saved (webcam overlay unavailable).");
+          setMessageType("error");
+        }
+
+        setTimeout(() => {
+          setMessage("");
+          setMessageType("");
+        }, 3000);
+        return;
+      }
+
       const result = await invoke('stop_recording');
       console.log('[MediaLibraryPanel] Recording stopped:', result);
 
@@ -451,6 +650,13 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       }, 3000);
     } catch (err) {
       console.error('[MediaLibraryPanel] Failed to stop recording:', err);
+      if (isPiPActive) {
+        setIsPiPActive(false);
+        pipSessionRef.current = null;
+        if (onWebcamStreamChange) {
+          onWebcamStreamChange(null);
+        }
+      }
       setMessage(`Failed to stop recording: ${err}`);
       setMessageType("error");
       setTimeout(() => {
@@ -624,6 +830,8 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       if (onWebcamStreamChange) {
         onWebcamStreamChange(stream);
       }
+
+      return stream;
     } catch (err) {
       console.error('[MediaLibraryPanel] Failed to start webcam stream:', err);
       setMessage(`Failed to start webcam: ${err.message}`);
@@ -632,15 +840,19 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setMessage("");
         setMessageType("");
       }, 5000);
+      if (onWebcamStreamChange) {
+        onWebcamStreamChange(null);
+      }
+      return null;
     }
   };
 
   // Start preview when device selections change
   useEffect(() => {
-    if (mode === 'record-video' && selectedCameraId) {
+    if ((mode === 'record-video' || isPiPEnabled) && selectedCameraId) {
       startWebcamPreview();
     }
-  }, [selectedCameraId, selectedAudioId, includeAudio]);
+  }, [selectedCameraId, selectedAudioId, includeAudio, isPiPEnabled, mode]);
 
   // Handle mute toggle
   const handleMuteToggle = () => {
@@ -984,10 +1196,130 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
                   <button
                     className="change-source-button-compact"
                     onClick={handleChangeSource}
-                    disabled={isLoading || isRecording}
+                    disabled={isLoading || isRecording || isPiPActive}
                   >
                     Change Source
                   </button>
+                </div>
+                <div className="pip-overlay-settings">
+                  <label className="config-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={isPiPEnabled}
+                      onChange={(e) => setIsPiPEnabled(e.target.checked)}
+                      disabled={isRecording || isPiPActive}
+                    />
+                    <span>Include webcam overlay</span>
+                  </label>
+
+                  {isPiPEnabled && (
+                    <div className="pip-settings-panel">
+                      <div className="pip-settings-row">
+                        <label className="config-label">Camera</label>
+                        <select
+                          className="config-select"
+                          value={selectedCameraId || ''}
+                          onChange={(e) => setSelectedCameraId(e.target.value)}
+                          disabled={isRecording || isPiPActive || cameraDevices.length === 0}
+                        >
+                          {cameraDevices.length === 0 ? (
+                            <option>No cameras found</option>
+                          ) : (
+                            cameraDevices.map(camera => (
+                              <option key={camera.id} value={camera.id}>
+                                {camera.name}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="pip-settings-row">
+                        <label className="config-label">Overlay Size</label>
+                        <div className="pip-size-options">
+                          {['small', 'medium', 'large'].map(sizeOption => (
+                            <button
+                              key={sizeOption}
+                              type="button"
+                              className={`pip-size-button ${pipConfig.size === sizeOption ? 'active' : ''}`}
+                              onClick={() => setPipSize(sizeOption)}
+                              disabled={isRecording || isPiPActive}
+                            >
+                              {sizeOption === 'small' ? 'Small' : sizeOption === 'medium' ? 'Medium' : 'Large'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pip-settings-row">
+                        <label className="config-label">Position</label>
+                        <div className="pip-position-grid">
+                          {['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].map(pos => (
+                            <button
+                              key={pos}
+                              type="button"
+                              className={`pip-position-button ${pipConfig.position === pos ? 'active' : ''}`}
+                              onClick={() => setPipPosition(pos)}
+                              disabled={isRecording || isPiPActive}
+                              title={pos.replace(/([A-Z])/g, ' $1')}
+                            >
+                              {pos === 'topLeft' && '↖'}
+                              {pos === 'topRight' && '↗'}
+                              {pos === 'bottomLeft' && '↙'}
+                              {pos === 'bottomRight' && '↘'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pip-settings-row">
+                        <label className="config-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={includeAudio}
+                            onChange={(e) => setIncludeAudio(e.target.checked)}
+                            disabled={isRecording || isPiPActive}
+                          />
+                          <span>Include webcam audio</span>
+                        </label>
+                        {includeAudio && audioDevices.length > 0 && (
+                          <select
+                            className="config-select"
+                            value={selectedAudioId || ''}
+                            onChange={(e) => setSelectedAudioId(e.target.value)}
+                            disabled={isRecording || isPiPActive}
+                          >
+                            {audioDevices.map(device => (
+                              <option key={device.id} value={device.id}>
+                                {device.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div className="pip-preview-row">
+                        <div className="pip-preview-label">Webcam Preview</div>
+                        <div className="pip-preview-box">
+                          {webcamStream ? (
+                            <video
+                              ref={(el) => {
+                                if (el && webcamStream && el.srcObject !== webcamStream) {
+                                  el.srcObject = webcamStream;
+                                  el.play().catch(() => {});
+                                }
+                              }}
+                              autoPlay
+                              muted
+                              playsInline
+                            />
+                          ) : (
+                            <div className="pip-preview-placeholder">Camera inactive</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1147,7 +1479,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             <button
               className="control-btn record-btn"
               onClick={isRecording ? handlePauseResumeRecording : handleStartRecording}
-              disabled={!selectedRecordingSource && !isRecording}
+              disabled={(!selectedRecordingSource && !isRecording) || (isPiPEnabled && !selectedCameraId)}
               title={isRecording ? (isPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
             >
               {isRecording ? (

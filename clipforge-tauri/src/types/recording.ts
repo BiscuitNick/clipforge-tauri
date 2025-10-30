@@ -71,9 +71,9 @@ export type PiPSize = 'small' | 'medium' | 'large';
  * These are percentages of the screen width/height
  */
 export const PiPSizeValues: Record<PiPSize, number> = {
-  small: 0.15,   // 15% of screen dimensions
-  medium: 0.25,  // 25% of screen dimensions
-  large: 0.35,   // 35% of screen dimensions
+  small: 0.12,   // 12% of screen dimensions
+  medium: 0.18,  // 18% of screen dimensions
+  large: 0.24,   // 24% of screen dimensions
 };
 
 /**

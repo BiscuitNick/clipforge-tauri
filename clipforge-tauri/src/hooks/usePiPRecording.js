@@ -87,7 +87,10 @@ export function usePiPRecording() {
 
       setIsRecording(true);
 
-      return recordingId;
+      return {
+        recordingId,
+        screenRecording,
+      };
     } catch (err) {
       console.error('[PiPRecording] Failed to start recording:', err);
       setError(err.message || 'Failed to start recording');
@@ -185,6 +188,31 @@ export function usePiPRecording() {
       // Step 4: Save metadata to file
       await saveMetadata(metadata);
 
+      // Step 5: Composite screen + webcam into final output
+      let compositedFilePath = null;
+      try {
+        compositedFilePath = await invoke('composite_pip_recording', {
+          screenPath: screenFilePathRef.current,
+          webcamPath: webcamFilePathRef.current,
+          position: pipConfig.position,
+          size: pipConfig.size,
+          includeWebcamAudio: pipConfig.includeAudio ?? false,
+          screenWidth: screenDimensions.width,
+          screenHeight: screenDimensions.height,
+          webcamWidth: webcamDimensions.width,
+          webcamHeight: webcamDimensions.height,
+        });
+        metadata.compositedFilePath = compositedFilePath;
+        console.log('[PiPRecording] PiP composite created:', compositedFilePath);
+      } catch (compositeErr) {
+        console.error('[PiPRecording] Failed to composite PiP recording:', compositeErr);
+      }
+
+      const screenPath = screenFilePathRef.current;
+      const webcamPath = webcamFilePathRef.current;
+      const compositeSucceeded = compositedFilePath !== null;
+      const finalCompositePath = compositedFilePath || screenPath;
+
       // Step 5: Cleanup
       cleanup();
 
@@ -193,7 +221,13 @@ export function usePiPRecording() {
 
       console.log('[PiPRecording] Recording completed successfully:', metadata);
 
-      return metadata;
+      return {
+        metadata,
+        screenFilePath: screenPath,
+        webcamFilePath: webcamPath,
+        compositedFilePath: finalCompositePath,
+        compositeSucceeded,
+      };
     } catch (err) {
       console.error('[PiPRecording] Failed to stop recording:', err);
       setError(err.message || 'Failed to stop recording');

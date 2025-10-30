@@ -60,6 +60,7 @@ pub fn run() {
             commands::recording::validate_long_recording_config,
             commands::recording::save_webcam_recording,
             commands::recording::save_pip_metadata,
+            commands::recording::composite_pip_recording,
             commands::thumbnail::generate_thumbnail,
             commands::thumbnail::cleanup_old_thumbnails,
             commands::screen_sources::enumerate_sources,

@@ -2012,6 +2012,164 @@ pub async fn save_pip_metadata(
         .map(|s| s.to_string())
 }
 
+/// Composite screen + webcam recordings into a single PiP video
+#[tauri::command]
+pub async fn composite_pip_recording(
+    screen_path: String,
+    webcam_path: String,
+    position: String,
+    size: String,
+    include_webcam_audio: Option<bool>,
+    screen_width: u32,
+    screen_height: u32,
+    webcam_width: Option<u32>,
+    webcam_height: Option<u32>,
+) -> Result<String, String> {
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    let ffmpeg_path =
+        super::ffmpeg_utils::find_ffmpeg().ok_or_else(|| "FFmpeg not found".to_string())?;
+
+    let size_factor = match size.as_str() {
+        "small" => 0.12,
+        "large" => 0.24,
+        "medium" => 0.18,
+        _ => 0.18,
+    };
+
+    let mut overlay_width =
+        (screen_width as f64 * size_factor).round().clamp(32.0, screen_width as f64) as u32;
+
+    let webcam_aspect = if let (Some(w), Some(h)) = (webcam_width, webcam_height) {
+        if h > 0 {
+            w as f64 / h as f64
+        } else {
+            16.0 / 9.0
+        }
+    } else {
+        16.0 / 9.0
+    };
+
+    let mut overlay_height =
+        (overlay_width as f64 / webcam_aspect).round().clamp(32.0, screen_height as f64) as u32;
+
+    // Ensure even dimensions for H.264 compatibility
+    if overlay_width % 2 != 0 {
+        overlay_width = overlay_width.saturating_sub(1).max(2);
+    }
+    if overlay_height % 2 != 0 {
+        overlay_height = overlay_height.saturating_sub(1).max(2);
+    }
+
+    let edge_padding: u32 = 20;
+    let (overlay_x, overlay_y) = match position.as_str() {
+        "topLeft" => (edge_padding, edge_padding),
+        "topRight" => (
+            screen_width.saturating_sub(overlay_width + edge_padding),
+            edge_padding,
+        ),
+        "bottomLeft" => (
+            edge_padding,
+            screen_height.saturating_sub(overlay_height + edge_padding),
+        ),
+        "bottomRight" | _ => (
+            screen_width.saturating_sub(overlay_width + edge_padding),
+            screen_height.saturating_sub(overlay_height + edge_padding),
+        ),
+    };
+
+    let screen_path_buf = PathBuf::from(&screen_path);
+    let output_path = {
+        let parent = screen_path_buf.parent().unwrap_or(Path::new("."));
+        let stem = screen_path_buf
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("screen_recording");
+        parent.join(format!("{}_pip.mp4", stem))
+    };
+
+    println!(
+        "[PiPComposite] screen={} webcam={} output={}",
+        screen_path,
+        webcam_path,
+        output_path.display()
+    );
+    println!(
+        "[PiPComposite] position={} size={} -> {}x{} at ({}, {})",
+        position, size, overlay_width, overlay_height, overlay_x, overlay_y
+    );
+
+    let mut filter_segments = vec![format!(
+        "[1:v]scale={}:{}[cam]",
+        overlay_width, overlay_height
+    ), format!(
+        "[0:v][cam]overlay={}:{}:format=auto[outv]",
+        overlay_x, overlay_y
+    )];
+
+    let include_audio = include_webcam_audio.unwrap_or(false);
+    if include_audio {
+        filter_segments.push(
+            "[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=2[outa]".to_string(),
+        );
+    }
+
+    let filter_complex = filter_segments.join(";");
+
+    let mut command = Command::new(&ffmpeg_path);
+    command
+        .arg("-i")
+        .arg(&screen_path)
+        .arg("-i")
+        .arg(&webcam_path)
+        .arg("-filter_complex")
+        .arg(&filter_complex)
+        .arg("-map")
+        .arg("[outv]")
+        .arg("-c:v")
+        .arg("libx264")
+        .arg("-preset")
+        .arg("medium")
+        .arg("-crf")
+        .arg("20")
+        .arg("-movflags")
+        .arg("+faststart");
+
+    if include_audio {
+        command
+            .arg("-map")
+            .arg("[outa]")
+            .arg("-c:a")
+            .arg("aac")
+            .arg("-b:a")
+            .arg("192k")
+            .arg("-shortest");
+    } else {
+        command
+            .arg("-map")
+            .arg("0:a?")
+            .arg("-c:a")
+            .arg("copy");
+    }
+
+    command.arg("-y").arg(&output_path);
+
+    let output = command
+        .output()
+        .map_err(|e| format!("Failed to execute FFmpeg for PiP compositing: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("FFmpeg PiP compositing failed: {}", stderr));
+    }
+
+    output_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert output path to string".to_string())
+        .map(|s| s.to_string())
+}
+
 /// Save webcam recording from blob data
 #[tauri::command]
 pub async fn save_webcam_recording(
