@@ -1,8 +1,10 @@
+import Darwin
 import Foundation
 import ScreenCaptureKit
 import AVFoundation
 import CoreMedia
 import Accelerate
+import UniformTypeIdentifiers
 
 // MARK: - ScreenCaptureKit Bridge Module
 // This module provides Swift wrapper for ScreenCaptureKit APIs
@@ -91,6 +93,7 @@ class ContentCache {
 
 /// Availability check for ScreenCaptureKit (requires macOS 12.3+)
 @available(macOS 12.3, *)
+@MainActor
 class ScreenCaptureKitBridge: NSObject {
 
     // MARK: - Properties
@@ -114,8 +117,8 @@ class ScreenCaptureKitBridge: NSObject {
     private var frameCounter: UInt64 = 0
 
     /// Frame throttle divisor (capture_fps / preview_fps)
-    /// Default: 60fps / 15fps = 4 (process every 4th frame)
-    private var frameThrottleDivisor: UInt64 = 4
+    /// Default: 1 (process every frame unless throttling configured)
+    private var frameThrottleDivisor: UInt64 = 1
 
     /// JPEG compression quality (0.0 to 1.0)
     /// Default: 0.5 (50% quality, balance between size and quality)
@@ -142,6 +145,12 @@ class ScreenCaptureKitBridge: NSObject {
     /// Audio sample counter for debugging
     private var audioBufferCounter: UInt64 = 0
 
+    /// Stores the most recent error message for FFI retrieval
+    private var lastErrorMessage: String?
+
+    /// Debug counter for logging attachment dictionaries when pixel buffers are missing
+    private var attachmentDebugCount: Int = 0
+
     // MARK: - Initialization
 
     override init() {
@@ -151,7 +160,15 @@ class ScreenCaptureKitBridge: NSObject {
 
     deinit {
         print("[ScreenCaptureKit] Bridge module deallocated")
-        stopCapture()
+        if let activeStream = stream {
+            Task { @MainActor in
+                do {
+                    try await activeStream.stopCapture()
+                } catch {
+                    print("[ScreenCaptureKit] ⚠️ Error stopping stream during deinit: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     // MARK: - Configuration Methods
@@ -187,6 +204,32 @@ class ScreenCaptureKitBridge: NSObject {
 
         maxFrameQueueSize = clampedSize
         print("[ScreenCaptureKit Config] ✅ Frame queue size configured: \(clampedSize) frames")
+    }
+
+    /// Clears any previously recorded error message
+    private func clearLastError() {
+        lastErrorMessage = nil
+    }
+
+    /// Records an error message for later retrieval
+    /// - Parameters:
+    ///   - message: Human readable error description
+    ///   - error: Optional underlying error
+    private func recordError(_ message: String, error: Error? = nil) {
+        lastErrorMessage = message
+        print("[ScreenCaptureKit Error] \(message)")
+
+        if let error = error {
+            print("[ScreenCaptureKit Error] Underlying error: \(error)")
+        }
+    }
+
+    /// Retrieves and clears the last recorded error message
+    /// - Returns: The last error message, if any
+    func takeLastErrorMessage() -> String? {
+        let message = lastErrorMessage
+        lastErrorMessage = nil
+        return message
     }
 
     // MARK: - Frame Queue Methods
@@ -320,6 +363,7 @@ class ScreenCaptureKitBridge: NSObject {
     ///   - frameRate: Desired frame rate (frames per second)
     ///   - captureAudio: Whether to capture audio
     func configureStream(width: Int, height: Int, frameRate: Int, captureAudio: Bool = false) {
+        clearLastError()
         let config = SCStreamConfiguration()
 
         // Video configuration
@@ -344,12 +388,9 @@ class ScreenCaptureKitBridge: NSObject {
         config.scalesToFit = false
         config.capturesAudio = captureAudio
 
-        // Background color (black with full alpha) - store in variable for strong reference
-        let bgColor = CGColor(red: 0, green: 0, blue: 0, alpha: 1.0)
-        config.backgroundColor = bgColor
-
         // Store configuration
         self.streamConfiguration = config
+        configureFrameThrottling(captureFrameRate: frameRate, previewFrameRate: frameRate)
 
         print("[ScreenCaptureKit Config] ✅ Stream configured: \(width)x\(height) @ \(frameRate)fps, audio: \(captureAudio)")
     }
@@ -358,13 +399,14 @@ class ScreenCaptureKitBridge: NSObject {
     /// - Parameter displayID: The display ID to capture
     /// - Returns: True if successful, false otherwise
     func configureDisplayFilter(displayID: CGDirectDisplayID) async -> Bool {
+        clearLastError()
         do {
             // Get shareable content (cached)
             let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
             // Find the display with matching ID
             guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
-                print("[ScreenCaptureKit Filter] ⚠️ Display not found: \(displayID)")
+                recordError("Display not found for ID \(displayID)")
                 return false
             }
 
@@ -375,7 +417,7 @@ class ScreenCaptureKitBridge: NSObject {
             print("[ScreenCaptureKit Filter] ✅ Display filter configured for display: \(displayID)")
             return true
         } catch {
-            print("[ScreenCaptureKit Filter] ❌ Failed to configure display filter: \(error.localizedDescription)")
+            recordError("Failed to configure display filter: \(error.localizedDescription)", error: error)
             return false
         }
     }
@@ -384,6 +426,7 @@ class ScreenCaptureKitBridge: NSObject {
     /// - Parameter windowID: The window ID to capture
     /// - Returns: True if successful, false otherwise
     func configureWindowFilter(windowID: CGWindowID) async -> Bool {
+        clearLastError()
         do {
             // Get shareable content (cached)
             let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
@@ -394,124 +437,107 @@ class ScreenCaptureKitBridge: NSObject {
                 return false
             }
 
-            // For window capture, we need the display that contains the window
-            // Use the main display or detect which display contains the window
-            guard let display = content.displays.first else {
-                print("[ScreenCaptureKit Filter] ⚠️ No displays available")
+            // For window capture, prefer the display that intersects the window
+            let windowFrame = window.frame
+            let display = content.displays.first(where: { $0.frame.intersects(windowFrame) })
+                ?? content.displays.first
+
+            guard let resolvedDisplay = display else {
+                recordError("No displays available when configuring window filter for window \(windowID)")
                 return false
             }
 
             // Create filter including only this window
-            let filter = SCContentFilter(display: display, including: [window])
+            let filter = SCContentFilter(display: resolvedDisplay, including: [window])
             self.contentFilter = filter
 
             print("[ScreenCaptureKit Filter] ✅ Window filter configured for window: \(windowID)")
             return true
         } catch {
-            print("[ScreenCaptureKit Filter] ❌ Failed to configure window filter: \(error.localizedDescription)")
+            recordError("Failed to configure window filter: \(error.localizedDescription)", error: error)
             return false
         }
     }
 
     // MARK: - Stream Control Methods
 
-    /// Starts the screen capture stream
-    /// - Returns: true if successful, false otherwise
-    @objc func startCapture() -> Bool {
-        print("[ScreenCaptureKit] 🚀 startCapture() called")
+    /// Starts the screen capture stream.
+    /// This must run on the main actor so ScreenCaptureKit APIs execute on the main thread.
+    /// - Returns: true if the stream started successfully, false otherwise
+    func startCaptureSession() async -> Bool {
+        print("[ScreenCaptureKit] 🚀 startCaptureSession() called")
+        clearLastError()
 
-        // Verify configuration exists
         guard let config = streamConfiguration else {
-            print("[ScreenCaptureKit] ❌ Cannot start: stream configuration not set")
+            recordError("Cannot start: stream configuration not set")
             return false
         }
         print("[ScreenCaptureKit] ✅ Configuration verified")
 
         guard let filter = contentFilter else {
-            print("[ScreenCaptureKit] ❌ Cannot start: content filter not set")
+            recordError("Cannot start: content filter not set")
             return false
         }
         print("[ScreenCaptureKit] ✅ Content filter verified")
 
-        // Check if already capturing
         if isCapturing {
             print("[ScreenCaptureKit] ⚠️ Already capturing, stopping existing stream first")
-            stopCapture()
+            await stopCaptureSession(clearQueues: false)
         }
 
-        print("[ScreenCaptureKit] 📍 Entering do-catch block...")
+        // Reset counters and queues
+        frameCounter = 0
+        clearQueue()
+        clearAudioQueue()
+        print("[ScreenCaptureKit] ✅ Frame counter reset")
+
+        // Create output queue for frame callbacks
+        print("[ScreenCaptureKit] 📍 Creating output queue...")
+        outputQueue = DispatchQueue(label: "com.clipforge.screencapture.output", qos: .userInitiated)
+        guard let queue = outputQueue else {
+            recordError("Failed to create output queue")
+            return false
+        }
+        print("[ScreenCaptureKit] ✅ Output queue created")
+
+        // Create the stream
+        print("[ScreenCaptureKit] 📍 Creating SCStream...")
+        print("[ScreenCaptureKit] 📍 Filter: \(filter)")
+        print("[ScreenCaptureKit] 📍 Config width: \(config.width), height: \(config.height), fps: \(config.minimumFrameInterval.seconds)")
+
+        let newStream = SCStream(filter: filter, configuration: config, delegate: self)
+        print("[ScreenCaptureKit] ✅ SCStream created (delegate: self)")
+
         do {
-            // Reset frame counter for clean start
-            frameCounter = 0
-            print("[ScreenCaptureKit] ✅ Frame counter reset")
-
-            // Create output queue for frame callbacks
-            print("[ScreenCaptureKit] 📍 Creating output queue...")
-            outputQueue = DispatchQueue(label: "com.clipforge.screencapture.output", qos: .userInitiated)
-            print("[ScreenCaptureKit] ✅ Output queue created")
-
-            // Create the stream
-            print("[ScreenCaptureKit] 📍 Creating SCStream...")
-            print("[ScreenCaptureKit] 📍 Filter: \(filter)")
-            print("[ScreenCaptureKit] 📍 Config width: \(config.width), height: \(config.height), fps: \(config.minimumFrameInterval.seconds)")
-            print("[ScreenCaptureKit] 📍 Self type: \(type(of: self))")
-
-            // Create stream with nil delegate first to test if delegate is the issue
-            let newStream = SCStream(filter: filter, configuration: config, delegate: nil)
-            print("[ScreenCaptureKit] ✅ SCStream created (without delegate)")
-
-            // Add stream output handler for receiving frames
-            guard let queue = outputQueue else {
-                print("[ScreenCaptureKit] ❌ Failed to create output queue")
-                return false
-            }
-
-            print("[ScreenCaptureKit] 📍 Adding stream output handler...")
+            print("[ScreenCaptureKit] 📍 Adding screen output handler...")
             try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-            print("[ScreenCaptureKit] ✅ Stream output handler added")
+            print("[ScreenCaptureKit] ✅ Screen output handler added")
 
-            // If audio is enabled, add audio output handler
             if config.capturesAudio {
+                print("[ScreenCaptureKit] 📍 Adding audio output handler...")
                 try newStream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
                 print("[ScreenCaptureKit] ✅ Audio output handler added")
             }
-
-            // Store stream reference BEFORE starting async task
-            stream = newStream
-            isCapturing = true
-            print("[ScreenCaptureKit] ✅ Stream reference stored")
-
-            // Start the stream asynchronously
-            // Note: We store the stream reference first to ensure it doesn't get deallocated
-            print("[ScreenCaptureKit] 📍 Starting async stream capture...")
-            Task { [weak self] in
-                guard let self = self else {
-                    print("[ScreenCaptureKit] ⚠️ Bridge deallocated before stream could start")
-                    return
-                }
-
-                guard let stream = self.stream else {
-                    print("[ScreenCaptureKit] ⚠️ Stream reference is nil")
-                    return
-                }
-
-                do {
-                    print("[ScreenCaptureKit] 📍 Calling stream.startCapture()...")
-                    try await stream.startCapture()
-                    print("[ScreenCaptureKit] ✅ Stream started successfully")
-                } catch {
-                    print("[ScreenCaptureKit] ❌ Failed to start stream: \(error.localizedDescription)")
-                    print("[ScreenCaptureKit] Error details: \(error)")
-                    self.isCapturing = false
-                    self.stream = nil
-                }
-            }
-
-            print("[ScreenCaptureKit] ✅ startCapture() completed, stream initializing...")
-            return true
-
         } catch {
-            print("[ScreenCaptureKit] ❌ Failed to start capture: \(error.localizedDescription)")
+            try? newStream.removeStreamOutput(self, type: .screen)
+            if config.capturesAudio {
+                try? newStream.removeStreamOutput(self, type: .audio)
+            }
+            recordError("Failed to add stream output handler: \(error.localizedDescription)", error: error)
+            return false
+        }
+
+        stream = newStream
+        isCapturing = true
+        print("[ScreenCaptureKit] ✅ Stream reference stored")
+
+        do {
+            print("[ScreenCaptureKit] 📍 Calling stream.startCapture() on main actor...")
+            try await newStream.startCapture()
+            print("[ScreenCaptureKit] ✅ Stream started successfully")
+            return true
+        } catch {
+            recordError("Failed to start stream: \(error.localizedDescription)", error: error)
             stream = nil
             isCapturing = false
             return false
@@ -519,62 +545,59 @@ class ScreenCaptureKitBridge: NSObject {
     }
 
     /// Stops the screen capture stream
-    @objc func stopCapture() {
-        print("[ScreenCaptureKit] 🛑 stopCapture() called")
+    func stopCaptureSession(clearQueues: Bool = true) async {
+        print("[ScreenCaptureKit] 🛑 stopCaptureSession() called (clearQueues: \(clearQueues))")
 
-        // Clear the frame queue
-        clearQueue()
+        if clearQueues {
+            clearQueue()
+            clearAudioQueue()
+        }
 
         guard let activeStream = stream else {
             print("[ScreenCaptureKit] ⚠️ No active stream to stop")
             isCapturing = false
+            stream = nil
+            outputQueue = nil
             return
         }
 
-        // Stop capture asynchronously
-        Task {
-            do {
-                try await activeStream.stopCapture()
-                print("[ScreenCaptureKit] ✅ Stream stopped successfully")
-            } catch {
-                print("[ScreenCaptureKit] ⚠️ Error stopping stream: \(error.localizedDescription)")
-            }
+        do {
+            try await activeStream.stopCapture()
+            print("[ScreenCaptureKit] ✅ Stream stopped successfully")
+        } catch {
+            recordError("Error stopping stream: \(error.localizedDescription)", error: error)
         }
 
-        // Clean up references
         stream = nil
+        outputQueue = nil
         isCapturing = false
-        print("[ScreenCaptureKit] ✅ stopCapture() completed")
+        print("[ScreenCaptureKit] ✅ stopCaptureSession() completed")
     }
 
     /// Pauses the screen capture stream
     /// Note: ScreenCaptureKit doesn't have a direct pause API, so we stop the stream
     /// but maintain configuration and filter for seamless resume
-    @objc func pauseCapture() {
-        print("[ScreenCaptureKit] ⏸️ pauseCapture() called")
+    func pauseCaptureSession() async {
+        print("[ScreenCaptureKit] ⏸️ pauseCaptureSession() called")
 
         if !isCapturing {
             print("[ScreenCaptureKit] ⚠️ Cannot pause: not currently capturing")
             return
         }
 
-        // Stop the stream but keep configuration and filter
-        // This allows resume to quickly restart with the same settings
-        stopCapture()
+        await stopCaptureSession(clearQueues: false)
 
         print("[ScreenCaptureKit] ⏸️ Capture paused - configuration maintained")
         print("[ScreenCaptureKit] ⏸️ Frame queue size at pause: \(getQueueSize())")
         print("[ScreenCaptureKit] ⏸️ Audio queue size at pause: \(getAudioQueueSize())")
-
-        // Note: Configuration (streamConfiguration) and filter (contentFilter) are preserved
-        // This enables resume to call startCapture() without reconfiguration
     }
 }
 
 // MARK: - SCStreamDelegate Protocol Implementation
 
 @available(macOS 12.3, *)
-extension ScreenCaptureKitBridge: SCStreamDelegate {
+@MainActor
+extension ScreenCaptureKitBridge: @preconcurrency SCStreamDelegate {
 
     /// Called when the stream encounters an error and stops
     /// - Parameters:
@@ -599,7 +622,8 @@ extension ScreenCaptureKitBridge: SCStreamDelegate {
 // MARK: - SCStreamOutput Protocol Implementation
 
 @available(macOS 12.3, *)
-extension ScreenCaptureKitBridge: SCStreamOutput {
+@MainActor
+extension ScreenCaptureKitBridge: @preconcurrency SCStreamOutput {
 
     /// Called when the stream outputs a sample buffer
     /// This is the primary method for receiving video and audio frames
@@ -617,7 +641,7 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         switch outputType {
         case .screen:
             handleVideoFrame(sampleBuffer)
-        case .audio:
+        case .audio, .microphone:
             handleAudioBuffer(sampleBuffer)
         @unknown default:
             print("[ScreenCaptureKit Output] ⚠️ Unknown output type: \(outputType)")
@@ -665,7 +689,7 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
 
         // Compress to JPEG using ImageIO
         let mutableData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(mutableData, kUTTypeJPEG, 1, nil) else {
+        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
             print("[ScreenCaptureKit Compression] ⚠️ Failed to create image destination")
             return nil
         }
@@ -745,7 +769,23 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         let shouldProcessFrame = (frameCounter % frameThrottleDivisor) == 0
 
         // Extract pixel buffer from sample buffer
+        if let statusValue = getFrameStatus(for: sampleBuffer), statusValue != 0 {
+            if attachmentDebugCount < 10 {
+                print("[ScreenCaptureKit Output] ℹ️ Skipping frame with status value: \(statusValue)")
+                attachmentDebugCount += 1
+            }
+            return
+        }
+
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            if attachmentDebugCount < 10 {
+                if let attachments = getFrameAttachments(for: sampleBuffer) {
+                    print("[ScreenCaptureKit Output] 🔍 Sample attachments (no pixel buffer): \(attachments)")
+                } else {
+                    print("[ScreenCaptureKit Output] 🔍 No attachments available for sample without pixel buffer")
+                }
+                attachmentDebugCount += 1
+            }
             print("[ScreenCaptureKit Output] ⚠️ Failed to get pixel buffer from sample")
             return
         }
@@ -786,12 +826,6 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         // Get bytes per row (stride) - important for proper data alignment
         let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
 
-        // Calculate total buffer size
-        let dataSize = bytesPerRow * height
-
-        // Get the plane count (planar vs packed formats)
-        let planeCount = CVPixelBufferGetPlaneCount(pixelBuffer)
-
         // Convert BGRA to RGB using Accelerate framework
         guard let rgbData = convertBGRAtoRGB(bgraData: baseAddress, width: width, height: height, bytesPerRow: bytesPerRow) else {
             print("[ScreenCaptureKit Output] ⚠️ Failed to convert BGRA to RGB")
@@ -802,6 +836,10 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         guard let jpegData = compressRGBtoJPEG(rgbData: rgbData, width: width, height: height) else {
             print("[ScreenCaptureKit Output] ⚠️ Failed to compress RGB to JPEG")
             return
+        }
+
+        if frameCounter <= 5 || frameCounter % 60 == 0 {
+            print("[ScreenCaptureKit Output] 📦 Frame \(frameCounter) JPEG size: \(jpegData.count) bytes (RGB size: \(rgbData.count))")
         }
 
         // Create processed frame with metadata
@@ -936,7 +974,7 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         // ScreenCaptureKit typically provides Float32 PCM audio
         // We need to convert it to Int16 PCM (s16le) for FFmpeg
 
-        let sourceBytesPerFrame = Int(sourceFormat.mBytesPerFrame)
+        _ = Int(sourceFormat.mBytesPerFrame)
         let sourceChannels = Int(sourceFormat.mChannelsPerFrame)
         let isFloat = sourceFormat.mFormatFlags & kAudioFormatFlagIsFloat != 0
         let isBigEndian = sourceFormat.mFormatFlags & kAudioFormatFlagIsBigEndian != 0
@@ -1000,19 +1038,94 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
         ]
         return String(bytes: bytes, encoding: .ascii) ?? "????"
     }
+
+    /// Retrieves ScreenCaptureKit frame status value from attachments
+    /// - Parameter sampleBuffer: CMSampleBuffer containing frame metadata
+    /// - Returns: Raw status value if available (0 = complete)
+    private func getFrameStatus(for sampleBuffer: CMSampleBuffer) -> Int? {
+        guard let attachments = getFrameAttachments(for: sampleBuffer),
+              let statusValue = attachments[SCStreamFrameInfo.status.rawValue] as? NSNumber else {
+            return nil
+        }
+        return statusValue.intValue
+    }
+
+    /// Retrieves attachment dictionary for a sample buffer
+    /// - Parameter sampleBuffer: The sample buffer to inspect
+    /// - Returns: Dictionary of attachments if available
+    private func getFrameAttachments(for sampleBuffer: CMSampleBuffer) -> [AnyHashable: Any]? {
+        if let attachmentsArray = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [NSDictionary],
+           let attachments = attachmentsArray.first {
+            return attachments as? [AnyHashable: Any]
+        }
+        return nil
+    }
 }
 
 // MARK: - C-Compatible Bridge Functions
 // These functions are exposed to Objective-C/C for FFI with Rust
+
+@available(macOS 12.3, *)
+private func runOnMainActorSync<T>(_ work: @escaping @MainActor () -> T) -> T {
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated {
+            work()
+        }
+    }
+
+    let semaphore = DispatchSemaphore(value: 0)
+    var result: T!
+
+    Task { @MainActor in
+        result = work()
+        semaphore.signal()
+    }
+
+    semaphore.wait()
+    return result
+}
+
+@available(macOS 12.3, *)
+private func runOnMainActorAsync<T>(_ work: @escaping @MainActor () async -> T) -> T {
+    if Thread.isMainThread {
+        var result: T!
+        var isDone = false
+
+        Task { @MainActor in
+            result = await work()
+            isDone = true
+        }
+
+        while !isDone {
+            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
+
+        return result
+    }
+
+    let semaphore = DispatchSemaphore(value: 0)
+    var result: T!
+
+    Task { @MainActor in
+        result = await work()
+        semaphore.signal()
+    }
+
+    semaphore.wait()
+    return result
+}
 
 /// Creates a new ScreenCaptureKit bridge instance
 /// - Returns: Pointer to the bridge instance
 @_cdecl("screen_capture_bridge_create")
 public func screen_capture_bridge_create() -> UnsafeMutableRawPointer? {
     if #available(macOS 12.3, *) {
-        let bridge = ScreenCaptureKitBridge()
-        let pointer = Unmanaged.passRetained(bridge).toOpaque()
-        print("[ScreenCaptureKit FFI] Bridge instance created at \(pointer)")
+        let pointer: UnsafeMutableRawPointer? = runOnMainActorSync {
+            let bridge = ScreenCaptureKitBridge()
+            let ptr = Unmanaged.passRetained(bridge).toOpaque()
+            print("[ScreenCaptureKit FFI] Bridge instance created at \(ptr)")
+            return ptr
+        }
         return pointer
     } else {
         print("[ScreenCaptureKit FFI] ERROR: ScreenCaptureKit requires macOS 12.3 or later")
@@ -1030,9 +1143,11 @@ public func screen_capture_bridge_destroy(_ bridge: UnsafeMutableRawPointer?) {
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge)
-        print("[ScreenCaptureKit FFI] Destroying bridge instance at \(bridge)")
-        bridgeInstance.release()
+        runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge)
+            print("[ScreenCaptureKit FFI] Destroying bridge instance at \(bridge)")
+            bridgeInstance.release()
+        }
     }
 }
 
@@ -1047,8 +1162,10 @@ public func screen_capture_bridge_start(_ bridge: UnsafeMutableRawPointer?) -> I
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        let success = bridgeInstance.startCapture()
+        let success: Bool = runOnMainActorAsync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return await bridgeInstance.startCaptureSession()
+        }
         return success ? 1 : 0
     }
     return 0
@@ -1064,8 +1181,10 @@ public func screen_capture_bridge_stop(_ bridge: UnsafeMutableRawPointer?) {
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        bridgeInstance.stopCapture()
+        runOnMainActorAsync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            await bridgeInstance.stopCaptureSession()
+        }
     }
 }
 
@@ -1079,9 +1198,39 @@ public func screen_capture_bridge_pause(_ bridge: UnsafeMutableRawPointer?) {
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        bridgeInstance.pauseCapture()
+        runOnMainActorAsync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            await bridgeInstance.pauseCaptureSession()
+        }
     }
+}
+
+/// Retrieves and clears the last error message associated with a bridge instance
+/// - Parameter bridge: Pointer to the bridge instance
+/// - Returns: Newly allocated C string containing the error message, or nil if none
+@_cdecl("screen_capture_bridge_take_last_error")
+public func screen_capture_bridge_take_last_error(_ bridge: UnsafeMutableRawPointer?) -> UnsafePointer<CChar>? {
+    guard let bridge = bridge else {
+        return nil
+    }
+
+    if #available(macOS 12.3, *) {
+        let message: String? = runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return bridgeInstance.takeLastErrorMessage()
+        }
+
+        guard let message = message else {
+            return nil
+        }
+
+        return message.withCString { ptr in
+            let duplicated = strdup(ptr)
+            return UnsafePointer<CChar>(duplicated)
+        }
+    }
+
+    return nil
 }
 
 /// Dequeues a processed JPEG frame from the bridge
@@ -1110,11 +1259,17 @@ public func screen_capture_bridge_dequeue_frame(
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+        var extractedFrame: ProcessedFrame?
+        let hasFrame: Bool = runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            if let frame = bridgeInstance.dequeueFrame() {
+                extractedFrame = frame
+                return true
+            }
+            return false
+        }
 
-        // Try to dequeue a frame
-        guard let frame = bridgeInstance.dequeueFrame() else {
-            // Queue is empty
+        guard hasFrame, let frame = extractedFrame else {
             return 0
         }
 
@@ -1127,7 +1282,7 @@ public func screen_capture_bridge_dequeue_frame(
         let buffer = rawBuffer.assumingMemoryBound(to: UInt8.self)
 
         // Copy JPEG data to the buffer
-        frame.jpegData.withUnsafeBytes { jpegBytes in
+        _ = frame.jpegData.withUnsafeBytes { jpegBytes in
             memcpy(buffer, jpegBytes.baseAddress, frame.jpegData.count)
         }
 
@@ -1162,8 +1317,11 @@ public func screen_capture_bridge_get_frame_queue_size(_ bridge: UnsafeMutableRa
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        return Int32(bridgeInstance.getQueueSize())
+        let size: Int32 = runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return Int32(bridgeInstance.getQueueSize())
+        }
+        return size
     } else {
         return -1
     }
@@ -1178,8 +1336,10 @@ public func screen_capture_bridge_clear_frame_queue(_ bridge: UnsafeMutableRawPo
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        bridgeInstance.clearQueue()
+        runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            bridgeInstance.clearQueue()
+        }
     }
 }
 
@@ -1204,13 +1364,15 @@ public func screen_capture_bridge_configure_stream(
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        bridgeInstance.configureStream(
-            width: Int(width),
-            height: Int(height),
-            frameRate: Int(frameRate),
-            captureAudio: captureAudio != 0
-        )
+        runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            bridgeInstance.configureStream(
+                width: Int(width),
+                height: Int(height),
+                frameRate: Int(frameRate),
+                captureAudio: captureAudio != 0
+            )
+        }
     }
 }
 
@@ -1230,18 +1392,10 @@ public func screen_capture_bridge_configure_display(
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-
-        // Use semaphore to make async call synchronous for FFI
-        let semaphore = DispatchSemaphore(value: 0)
-        var success = false
-
-        Task {
-            success = await bridgeInstance.configureDisplayFilter(displayID: displayID)
-            semaphore.signal()
+        let success: Bool = runOnMainActorAsync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return await bridgeInstance.configureDisplayFilter(displayID: displayID)
         }
-
-        semaphore.wait()
         return success ? 1 : 0
     } else {
         print("[ScreenCaptureKit FFI] ERROR: ScreenCaptureKit not available")
@@ -1265,18 +1419,10 @@ public func screen_capture_bridge_configure_window(
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-
-        // Use semaphore to make async call synchronous for FFI
-        let semaphore = DispatchSemaphore(value: 0)
-        var success = false
-
-        Task {
-            success = await bridgeInstance.configureWindowFilter(windowID: windowID)
-            semaphore.signal()
+        let success: Bool = runOnMainActorAsync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return await bridgeInstance.configureWindowFilter(windowID: windowID)
         }
-
-        semaphore.wait()
         return success ? 1 : 0
     } else {
         print("[ScreenCaptureKit FFI] ERROR: ScreenCaptureKit not available")
@@ -1812,10 +1958,17 @@ public func screen_capture_bridge_dequeue_audio(
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+        var extractedBuffer: ProcessedAudioBuffer?
+        let hasBuffer: Bool = runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            if let buffer = bridgeInstance.dequeueAudioBuffer() {
+                extractedBuffer = buffer
+                return true
+            }
+            return false
+        }
 
-        guard let audioBuffer = bridgeInstance.dequeueAudioBuffer() else {
-            // Queue is empty
+        guard hasBuffer, let audioBuffer = extractedBuffer else {
             return 0
         }
 
@@ -1847,8 +2000,11 @@ public func screen_capture_bridge_get_audio_queue_size(_ bridge: UnsafeMutableRa
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        return Int32(bridgeInstance.getAudioQueueSize())
+        let size: Int32 = runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            return Int32(bridgeInstance.getAudioQueueSize())
+        }
+        return size
     }
 
     return -1
@@ -1863,8 +2019,10 @@ public func screen_capture_bridge_clear_audio_queue(_ bridge: UnsafeMutableRawPo
     }
 
     if #available(macOS 12.3, *) {
-        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
-        bridgeInstance.clearAudioQueue()
+        runOnMainActorSync {
+            let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+            bridgeInstance.clearAudioQueue()
+        }
     }
 }
 
@@ -1875,4 +2033,3 @@ public func screen_capture_free_audio_data(_ pcmData: UnsafeMutablePointer<UInt8
     guard let pcmData = pcmData else { return }
     pcmData.deallocate()
 }
-

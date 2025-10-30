@@ -74,8 +74,8 @@ pub struct PreviewSettings {
 impl Default for PreviewSettings {
     fn default() -> Self {
         Self {
-            jpeg_quality: 0.5,  // 50% quality
-            target_fps: 15,     // 15 fps preview
+            jpeg_quality: 0.5, // 50% quality
+            target_fps: 15,    // 15 fps preview
             enable_backpressure: true,
         }
     }
@@ -157,8 +157,7 @@ impl PreviewState {
         if self.metrics.avg_frame_size == 0 {
             self.metrics.avg_frame_size = frame_size;
         } else {
-            self.metrics.avg_frame_size =
-                (self.metrics.avg_frame_size * 9 + frame_size) / 10;
+            self.metrics.avg_frame_size = (self.metrics.avg_frame_size * 9 + frame_size) / 10;
         }
     }
 
@@ -190,10 +189,7 @@ pub type SharedPreviewState = Arc<Mutex<PreviewState>>;
 /// # Returns
 /// - `Ok(())` if emission succeeded
 /// - `Err(String)` if emission failed
-pub fn emit_preview_frame(
-    app_handle: &AppHandle,
-    frame: PreviewFrame,
-) -> Result<(), String> {
+pub fn emit_preview_frame(app_handle: &AppHandle, frame: PreviewFrame) -> Result<(), String> {
     app_handle
         .emit("preview-frame", frame)
         .map_err(|e| format!("Failed to emit preview frame: {}", e))
@@ -208,10 +204,7 @@ pub fn emit_preview_frame(
 /// # Returns
 /// - `Ok(())` if emission succeeded
 /// - `Err(String)` if emission failed
-pub fn emit_preview_metrics(
-    app_handle: &AppHandle,
-    metrics: PreviewMetrics,
-) -> Result<(), String> {
+pub fn emit_preview_metrics(app_handle: &AppHandle, metrics: PreviewMetrics) -> Result<(), String> {
     app_handle
         .emit("preview-metrics", metrics)
         .map_err(|e| format!("Failed to emit preview metrics: {}", e))
@@ -227,7 +220,8 @@ pub async fn start_preview(
     app_handle: AppHandle,
     state: tauri::State<'_, SharedPreviewState>,
 ) -> Result<(), String> {
-    let mut preview_state = state.lock()
+    let mut preview_state = state
+        .lock()
         .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
     if preview_state.is_active {
@@ -247,7 +241,8 @@ pub async fn start_preview(
     println!("[Preview] Started preview streaming");
 
     // Emit initial status
-    app_handle.emit("preview-started", ())
+    app_handle
+        .emit("preview-started", ())
         .map_err(|e| format!("Failed to emit preview-started event: {}", e))?;
 
     Ok(())
@@ -259,7 +254,8 @@ pub async fn stop_preview(
     app_handle: AppHandle,
     state: tauri::State<'_, SharedPreviewState>,
 ) -> Result<(), String> {
-    let mut preview_state = state.lock()
+    let mut preview_state = state
+        .lock()
         .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
     if !preview_state.is_active {
@@ -268,14 +264,15 @@ pub async fn stop_preview(
 
     preview_state.is_active = false;
 
-    println!("[Preview] Stopped preview streaming - Total frames: {}, Dropped: {}",
-        preview_state.metrics.total_frames,
-        preview_state.metrics.dropped_frames
+    println!(
+        "[Preview] Stopped preview streaming - Total frames: {}, Dropped: {}",
+        preview_state.metrics.total_frames, preview_state.metrics.dropped_frames
     );
 
     // Emit final metrics
     let final_metrics = preview_state.metrics.clone();
-    app_handle.emit("preview-stopped", final_metrics)
+    app_handle
+        .emit("preview-stopped", final_metrics)
         .map_err(|e| format!("Failed to emit preview-stopped event: {}", e))?;
 
     Ok(())
@@ -287,7 +284,8 @@ pub async fn update_preview_settings(
     state: tauri::State<'_, SharedPreviewState>,
     settings: PreviewSettings,
 ) -> Result<(), String> {
-    let mut preview_state = state.lock()
+    let mut preview_state = state
+        .lock()
         .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
     // Update FPS and recalculate interval
@@ -295,10 +293,9 @@ pub async fn update_preview_settings(
     preview_state.settings.jpeg_quality = settings.jpeg_quality;
     preview_state.settings.enable_backpressure = settings.enable_backpressure;
 
-    println!("[Preview] Updated settings - FPS: {}, Quality: {}, Backpressure: {}",
-        settings.target_fps,
-        settings.jpeg_quality,
-        settings.enable_backpressure
+    println!(
+        "[Preview] Updated settings - FPS: {}, Quality: {}, Backpressure: {}",
+        settings.target_fps, settings.jpeg_quality, settings.enable_backpressure
     );
 
     Ok(())
@@ -309,7 +306,8 @@ pub async fn update_preview_settings(
 pub async fn get_preview_metrics(
     state: tauri::State<'_, SharedPreviewState>,
 ) -> Result<PreviewMetrics, String> {
-    let preview_state = state.lock()
+    let preview_state = state
+        .lock()
         .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
     Ok(preview_state.metrics.clone())
@@ -320,7 +318,8 @@ pub async fn get_preview_metrics(
 pub async fn get_preview_settings(
     state: tauri::State<'_, SharedPreviewState>,
 ) -> Result<PreviewSettings, String> {
-    let preview_state = state.lock()
+    let preview_state = state
+        .lock()
         .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
     Ok(preview_state.settings.clone())
@@ -391,19 +390,23 @@ pub async fn start_preview_for_source(
     preview_state: tauri::State<'_, SharedPreviewState>,
     capture_session: tauri::State<'_, SharedPreviewCaptureSession>,
 ) -> Result<(), String> {
-    println!("[PreviewCapture] Starting preview for source: {} ({}x{} @ {}fps)",
-        source_id, width, height, frame_rate);
+    println!(
+        "[PreviewCapture] Starting preview for source: {} ({}x{} @ {}fps)",
+        source_id, width, height, frame_rate
+    );
 
     // Stop any existing preview session
     {
-        let mut session = capture_session.lock()
+        let mut session = capture_session
+            .lock()
             .map_err(|e| format!("Failed to lock capture session: {}", e))?;
         session.stop();
     }
 
     // Create new ScreenCaptureBridge
-    let bridge = ScreenCaptureBridge::new()
-        .ok_or_else(|| "Failed to create ScreenCaptureBridge (not available on this system)".to_string())?;
+    let bridge = ScreenCaptureBridge::new().ok_or_else(|| {
+        "Failed to create ScreenCaptureBridge (not available on this system)".to_string()
+    })?;
 
     // Configure stream settings (15fps for preview, full resolution)
     bridge.configure_stream(width, height, frame_rate, false);
@@ -411,14 +414,16 @@ pub async fn start_preview_for_source(
     // Configure source filter (display or window)
     if source_id.starts_with("display_") {
         // Extract display ID from "display_X" format
-        let display_id = source_id.strip_prefix("display_")
+        let display_id = source_id
+            .strip_prefix("display_")
             .and_then(|s| s.parse::<u32>().ok())
             .ok_or_else(|| format!("Invalid display ID format: {}", source_id))?;
 
         bridge.configure_display(display_id)?;
     } else if source_id.starts_with("window_") {
         // Extract window ID from "window_X" format
-        let window_id = source_id.strip_prefix("window_")
+        let window_id = source_id
+            .strip_prefix("window_")
             .and_then(|s| s.parse::<u32>().ok())
             .ok_or_else(|| format!("Invalid window ID format: {}", source_id))?;
 
@@ -434,7 +439,8 @@ pub async fn start_preview_for_source(
 
     // Update preview state
     {
-        let mut state = preview_state.lock()
+        let mut state = preview_state
+            .lock()
             .map_err(|e| format!("Failed to lock preview state: {}", e))?;
         state.is_active = true;
         state.last_emit_time = None;
@@ -448,7 +454,8 @@ pub async fn start_preview_for_source(
     }
 
     // Emit preview-started event
-    app_handle.emit("preview-started", ())
+    app_handle
+        .emit("preview-started", ())
         .map_err(|e| format!("Failed to emit preview-started event: {}", e))?;
 
     // Create shutdown flag
@@ -457,7 +464,8 @@ pub async fn start_preview_for_source(
 
     // Store the bridge in session state first
     {
-        let mut session = capture_session.lock()
+        let mut session = capture_session
+            .lock()
             .map_err(|e| format!("Failed to lock capture session: {}", e))?;
         session.bridge = Some(bridge);
         session.should_stop = should_stop;
@@ -488,10 +496,18 @@ pub async fn start_preview_for_source(
 
             // Process frame if available
             if let Some(frame) = frame_opt {
+                if frame.frame_number <= 5 || frame.frame_number % 60 == 0 {
+                    println!(
+                        "[PreviewCapture] Frame {} dequeued - jpeg_size={} bytes",
+                        frame.frame_number,
+                        frame.jpeg_data.len()
+                    );
+                }
+
                 // Convert JPEG data to base64
                 let base64_data = base64::Engine::encode(
                     &base64::engine::general_purpose::STANDARD,
-                    &frame.jpeg_data
+                    &frame.jpeg_data,
                 );
 
                 // Create preview frame event
@@ -504,8 +520,8 @@ pub async fn start_preview_for_source(
                     jpeg_size: frame.jpeg_data.len(),
                 };
 
-                // Check if we should emit this frame (throttle to target FPS)
-                let (should_emit, queue_size) = {
+                // Determine if we need to wait before emitting to honor target FPS
+                let sleep_duration = {
                     let session = capture_session_clone.lock().unwrap();
                     let queue_size = if let Some(bridge) = &session.bridge {
                         bridge.jpeg_frame_count()
@@ -515,32 +531,52 @@ pub async fn start_preview_for_source(
 
                     let mut state = preview_state_clone.lock().unwrap();
                     state.metrics.queue_size = queue_size;
-                    (state.should_emit_frame(), queue_size)
+
+                    if state.should_emit_frame() {
+                        None
+                    } else {
+                        let interval = state.emit_interval;
+                        let remaining = state
+                            .last_emit_time
+                            .map(|last_time| {
+                                let elapsed = last_time.elapsed();
+                                if elapsed < interval {
+                                    interval - elapsed
+                                } else {
+                                    Duration::from_millis(0)
+                                }
+                            })
+                            .unwrap_or(interval);
+
+                        if remaining.is_zero() {
+                            None
+                        } else {
+                            Some(remaining)
+                        }
+                    }
                 };
 
-                if should_emit {
-                    // Emit frame to frontend
-                    if let Err(e) = emit_preview_frame(&app_handle_clone, preview_frame.clone()) {
-                        eprintln!("[PreviewCapture] Failed to emit frame: {}", e);
-                    }
+                if let Some(duration) = sleep_duration {
+                    tokio::time::sleep(duration).await;
+                }
 
-                    // Update metrics
-                    let mut state = preview_state_clone.lock().unwrap();
-                    state.record_frame_emission(frame.jpeg_data.len());
-                    frame_count += 1;
+                // Emit frame to frontend
+                if let Err(e) = emit_preview_frame(&app_handle_clone, preview_frame.clone()) {
+                    eprintln!("[PreviewCapture] Failed to emit frame: {}", e);
+                }
 
-                    // Emit metrics every second
-                    if last_metrics_emit.elapsed().as_secs() >= 1 {
-                        let metrics = state.metrics.clone();
-                        if let Err(e) = emit_preview_metrics(&app_handle_clone, metrics) {
-                            eprintln!("[PreviewCapture] Failed to emit metrics: {}", e);
-                        }
-                        last_metrics_emit = std::time::Instant::now();
+                // Update metrics
+                let mut state = preview_state_clone.lock().unwrap();
+                state.record_frame_emission(frame.jpeg_data.len());
+                frame_count += 1;
+
+                // Emit metrics every second
+                if last_metrics_emit.elapsed().as_secs() >= 1 {
+                    let metrics = state.metrics.clone();
+                    if let Err(e) = emit_preview_metrics(&app_handle_clone, metrics) {
+                        eprintln!("[PreviewCapture] Failed to emit metrics: {}", e);
                     }
-                } else {
-                    // Frame was throttled
-                    let mut state = preview_state_clone.lock().unwrap();
-                    state.record_dropped_frame();
+                    last_metrics_emit = std::time::Instant::now();
                 }
             } else {
                 // No frame available, sleep briefly
@@ -548,12 +584,16 @@ pub async fn start_preview_for_source(
             }
         }
 
-        println!("[PreviewCapture] Frame polling task stopped (emitted {} frames)", frame_count);
+        println!(
+            "[PreviewCapture] Frame polling task stopped (emitted {} frames)",
+            frame_count
+        );
     });
 
     // Store the polling task in session state
     {
-        let mut session = capture_session.lock()
+        let mut session = capture_session
+            .lock()
             .map_err(|e| format!("Failed to lock capture session: {}", e))?;
         session.polling_task = Some(polling_task);
     }
@@ -573,14 +613,16 @@ pub async fn stop_preview_for_source(
 
     // Stop the capture session
     {
-        let mut session = capture_session.lock()
+        let mut session = capture_session
+            .lock()
             .map_err(|e| format!("Failed to lock capture session: {}", e))?;
         session.stop();
     }
 
     // Update preview state
     {
-        let mut state = preview_state.lock()
+        let mut state = preview_state
+            .lock()
             .map_err(|e| format!("Failed to lock preview state: {}", e))?;
 
         if !state.is_active {
@@ -589,14 +631,15 @@ pub async fn stop_preview_for_source(
 
         state.is_active = false;
 
-        println!("[PreviewCapture] Preview stopped - Total frames: {}, Dropped: {}",
-            state.metrics.total_frames,
-            state.metrics.dropped_frames
+        println!(
+            "[PreviewCapture] Preview stopped - Total frames: {}, Dropped: {}",
+            state.metrics.total_frames, state.metrics.dropped_frames
         );
 
         // Emit final metrics
         let final_metrics = state.metrics.clone();
-        app_handle.emit("preview-stopped", final_metrics)
+        app_handle
+            .emit("preview-stopped", final_metrics)
             .map_err(|e| format!("Failed to emit preview-stopped event: {}", e))?;
     }
 

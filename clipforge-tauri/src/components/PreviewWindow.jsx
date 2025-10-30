@@ -8,7 +8,7 @@ import './PreviewWindow.css';
  *
  * Features:
  * - Listens for preview-frame events from Tauri backend
- * - Double-buffered canvas rendering for smooth transitions
+ * - Canvas-based rendering for low-latency previews
  * - Floating overlay with drag and resize functionality
  * - FPS counter and recording indicator
  * - Performance optimizations with React.memo and useCallback
@@ -18,13 +18,11 @@ const PreviewWindow = React.memo(({
   onToggleVisibility,
   isPictureInPicture = false
 }) => {
-  // Canvas refs for double buffering
-  const frontCanvasRef = useRef(null);
-  const backCanvasRef = useRef(null);
+  // Canvas ref for single buffer rendering
+  const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   // State
-  const [currentBuffer, setCurrentBuffer] = useState(0); // 0 = front, 1 = back
   const [fps, setFps] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [metrics, setMetrics] = useState(null);
@@ -37,38 +35,46 @@ const PreviewWindow = React.memo(({
   const [lastFrameTime, setLastFrameTime] = useState(null);
   const [actualFps, setActualFps] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
+  const pendingImageRef = useRef(null);
 
   // FPS calculation interval
   const fpsIntervalRef = useRef(null);
 
   /**
    * Handle preview frame event from Tauri
-   * Uses double buffering for smooth rendering
+   * Decodes JPEG payloads and draws them into the canvas.
    */
   const handlePreviewFrame = useCallback((event) => {
     const { imageData, width, height, timestamp, frameNumber, jpegSize } = event.payload;
 
-    // Get the back buffer canvas (the one not currently visible)
-    const backCanvas = currentBuffer === 0 ? backCanvasRef.current : frontCanvasRef.current;
-    if (!backCanvas) return;
+    if (frameNumber <= 5 || frameNumber % 60 === 0) {
+      console.log('[PreviewWindow] Frame received', {
+        frameNumber,
+        jpegSize,
+        base64Length: imageData?.length ?? 0,
+        width,
+        height,
+      });
+    }
 
-    const ctx = backCanvas.getContext('2d', { alpha: false });
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    // Set canvas dimensions if changed
-    if (backCanvas.width !== width || backCanvas.height !== height) {
-      backCanvas.width = width;
-      backCanvas.height = height;
+    // Set canvas dimensions if changed to preserve pixel fidelity
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
     }
 
     // Create image from base64 data
-    const img = new Image();
-    img.onload = () => {
-      // Draw image to back buffer
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // Swap buffers
-      setCurrentBuffer(prev => prev === 0 ? 1 : 0);
+    const pendingImage = pendingImageRef.current ?? new Image();
+    pendingImageRef.current = pendingImage;
+    pendingImage.onload = () => {
+      // Draw image to canvas
+      ctx.drawImage(pendingImage, 0, 0, width, height);
 
       // Update FPS calculation
       const now = performance.now();
@@ -82,8 +88,11 @@ const PreviewWindow = React.memo(({
       setLastFrameTime(now);
       setFrameCount(prev => prev + 1);
     };
-    img.src = `data:image/jpeg;base64,${imageData}`;
-  }, [currentBuffer, lastFrameTime]);
+    pendingImage.onerror = (err) => {
+      console.error('[PreviewWindow] Failed to decode preview frame', err);
+    };
+    pendingImage.src = `data:image/jpeg;base64,${imageData}`;
+  }, [lastFrameTime]);
 
   /**
    * Handle preview metrics event from Tauri
@@ -289,17 +298,11 @@ const PreviewWindow = React.memo(({
         </div>
       </div>
 
-      {/* Canvas Container with Double Buffering */}
+      {/* Canvas Container */}
       <div className="preview-canvas-container">
         <canvas
-          ref={frontCanvasRef}
-          className={`preview-canvas ${currentBuffer === 0 ? 'active' : 'inactive'}`}
-          style={{ display: currentBuffer === 0 ? 'block' : 'none' }}
-        />
-        <canvas
-          ref={backCanvasRef}
-          className={`preview-canvas ${currentBuffer === 1 ? 'active' : 'inactive'}`}
-          style={{ display: currentBuffer === 1 ? 'block' : 'none' }}
+          ref={canvasRef}
+          className="preview-canvas"
         />
       </div>
 

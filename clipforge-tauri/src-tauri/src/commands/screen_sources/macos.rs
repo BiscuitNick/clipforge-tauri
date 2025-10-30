@@ -1,7 +1,7 @@
 use super::{ScreenSource, SourceEnumerator, SourceType};
 use crate::capture::ffi;
+use base64::{engine::general_purpose, Engine as _};
 use std::process::{Command, Stdio};
-use base64::{Engine as _, engine::general_purpose};
 
 /// macOS-specific screen source enumerator
 pub struct PlatformEnumerator;
@@ -43,20 +43,31 @@ impl PlatformEnumerator {
                         if line.contains("[AVFoundation") && line.contains("] [") {
                             // Extract device name to check if it's a screen
                             let lower_line = line.to_lowercase();
-                            if lower_line.contains("capture screen") || lower_line.contains("screen") && lower_line.contains("capture") {
+                            if lower_line.contains("capture screen")
+                                || lower_line.contains("screen") && lower_line.contains("capture")
+                            {
                                 // This is a screen capture device, stop counting cameras
-                                println!("[CameraDetection] Found first screen device, camera count: {}", camera_count);
+                                println!(
+                                    "[CameraDetection] Found first screen device, camera count: {}",
+                                    camera_count
+                                );
                                 break;
                             } else {
                                 // This is a camera device
                                 camera_count += 1;
-                                println!("[CameraDetection] Found camera device #{}: {}", camera_count, line);
+                                println!(
+                                    "[CameraDetection] Found camera device #{}: {}",
+                                    camera_count, line
+                                );
                             }
                         }
                     }
                 }
 
-                println!("[CameraDetection] Total camera devices detected: {}", camera_count);
+                println!(
+                    "[CameraDetection] Total camera devices detected: {}",
+                    camera_count
+                );
                 return camera_count;
             } else {
                 println!("[CameraDetection] Failed to run FFmpeg for device detection");
@@ -93,15 +104,12 @@ impl PlatformEnumerator {
 
     /// Capture thumbnail for a window by window ID
     fn capture_window_thumbnail(window_id: u32) -> Option<String> {
-        use std::process::Command;
         use std::fs;
+        use std::process::Command;
         use std::time::{SystemTime, UNIX_EPOCH};
 
         // Create temp file path
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .ok()?
-            .as_secs();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
         let temp_path = format!("/tmp/window_thumb_{}_{}.png", window_id, timestamp);
 
         // Use macOS screencapture to capture window
@@ -116,14 +124,20 @@ impl PlatformEnumerator {
             .ok()?;
 
         if !output.status.success() {
-            println!("[WindowThumbnail] screencapture failed for window {}: {:?}",
-                window_id, String::from_utf8_lossy(&output.stderr));
+            println!(
+                "[WindowThumbnail] screencapture failed for window {}: {:?}",
+                window_id,
+                String::from_utf8_lossy(&output.stderr)
+            );
             return None;
         }
 
         // Check if file was created
         if !std::path::Path::new(&temp_path).exists() {
-            println!("[WindowThumbnail] Thumbnail file not created for window {}", window_id);
+            println!(
+                "[WindowThumbnail] Thumbnail file not created for window {}",
+                window_id
+            );
             return None;
         }
 
@@ -136,7 +150,10 @@ impl PlatformEnumerator {
             .ok()?;
 
         if !resize_output.status.success() {
-            println!("[WindowThumbnail] Failed to resize thumbnail for window {}", window_id);
+            println!(
+                "[WindowThumbnail] Failed to resize thumbnail for window {}",
+                window_id
+            );
         }
 
         // Read PNG file and base64 encode
@@ -151,35 +168,40 @@ impl PlatformEnumerator {
 
     /// Capture thumbnail for a screen by AVFoundation device index
     fn capture_screen_thumbnail(avf_device_index: usize) -> Option<String> {
-        use std::process::Command;
         use std::fs;
+        use std::process::Command;
         use std::time::{SystemTime, UNIX_EPOCH};
 
         // Find FFmpeg
         let ffmpeg_path = super::super::ffmpeg_utils::find_ffmpeg()?;
 
         // Create temp file path
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .ok()?
-            .as_secs();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
         let temp_path = format!("/tmp/screen_thumb_{}_{}.png", avf_device_index, timestamp);
 
         // Capture single frame using FFmpeg with AVFoundation device index
         let output = Command::new(&ffmpeg_path)
-            .arg("-f").arg("avfoundation")
-            .arg("-framerate").arg("30") // Use 30fps for screen capture
-            .arg("-i").arg(format!("{}:", avf_device_index)) // No audio
-            .arg("-frames:v").arg("1") // Single frame
-            .arg("-vf").arg("scale=200:-1") // Scale to width 200, maintain aspect ratio
+            .arg("-f")
+            .arg("avfoundation")
+            .arg("-framerate")
+            .arg("30") // Use 30fps for screen capture
+            .arg("-i")
+            .arg(format!("{}:", avf_device_index)) // No audio
+            .arg("-frames:v")
+            .arg("1") // Single frame
+            .arg("-vf")
+            .arg("scale=200:-1") // Scale to width 200, maintain aspect ratio
             .arg("-y") // Overwrite
             .arg(&temp_path)
             .output()
             .ok()?;
 
         if !output.status.success() {
-            println!("[ScreenThumbnail] FFmpeg failed for device {}: {:?}",
-                avf_device_index, String::from_utf8_lossy(&output.stderr));
+            println!(
+                "[ScreenThumbnail] FFmpeg failed for device {}: {:?}",
+                avf_device_index,
+                String::from_utf8_lossy(&output.stderr)
+            );
             return None;
         }
 
@@ -192,7 +214,6 @@ impl PlatformEnumerator {
 
         Some(base64_string)
     }
-
 }
 
 impl SourceEnumerator for PlatformEnumerator {
@@ -208,8 +229,10 @@ impl SourceEnumerator for PlatformEnumerator {
 
             // Use display ID directly as the screen identifier
             let screen_id = format!("display_{}", display_id);
-            println!("[ScreenEnumeration SCK] Display {}: {}x{} @ ({}, {}), primary: {}",
-                display_id, display.width, display.height, display.x, display.y, is_primary);
+            println!(
+                "[ScreenEnumeration SCK] Display {}: {}x{} @ ({}, {}), primary: {}",
+                display_id, display.width, display.height, display.x, display.y, is_primary
+            );
 
             // Generate thumbnail using SCScreenshotManager
             let thumbnail = ffi::capture_display_thumbnail(display_id, 200).ok();
@@ -260,8 +283,10 @@ impl SourceEnumerator for PlatformEnumerator {
                 format!("{} - {}", owner, title)
             };
 
-            println!("[WindowEnumeration SCK] Window {}: '{}' ({}x{} @ {}, {})",
-                window_id, display_name, window.width, window.height, window.x, window.y);
+            println!(
+                "[WindowEnumeration SCK] Window {}: '{}' ({}x{} @ {}, {})",
+                window_id, display_name, window.width, window.height, window.x, window.y
+            );
 
             // Generate thumbnail using SCScreenshotManager
             let thumbnail = ffi::capture_window_thumbnail(window_id, 200).ok();

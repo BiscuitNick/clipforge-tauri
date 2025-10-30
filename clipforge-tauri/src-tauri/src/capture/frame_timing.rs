@@ -100,7 +100,7 @@ impl FrameTimer {
         if let Some(last_time) = self.last_frame_time {
             if self.frame_count > 1 {
                 let total_duration = Instant::now().duration_since(
-                    last_time - self.frame_duration * (self.frame_count as u32 - 1)
+                    last_time - self.frame_duration * (self.frame_count as u32 - 1),
                 );
                 return (self.frame_count as f32) / total_duration.as_secs_f32();
             }

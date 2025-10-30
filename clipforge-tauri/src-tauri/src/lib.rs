@@ -1,5 +1,5 @@
-use tauri::menu::*;
 use std::sync::{Arc, Mutex};
+use tauri::menu::*;
 
 mod commands;
 
@@ -24,7 +24,8 @@ pub fn run() {
     let preview_state = Arc::new(Mutex::new(commands::preview::PreviewState::new()));
 
     // Initialize preview capture session
-    let preview_capture_session = Arc::new(Mutex::new(commands::preview::PreviewCaptureSession::new()));
+    let preview_capture_session =
+        Arc::new(Mutex::new(commands::preview::PreviewCaptureSession::new()));
 
     tauri::Builder::default()
         .manage(recording_manager)

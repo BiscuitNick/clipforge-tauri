@@ -4,8 +4,8 @@
 // with separate implementations for preview (sending to frontend) and encoding
 // (sending to FFmpeg)
 
-use std::sync::Arc;
 use base64::Engine;
+use std::sync::Arc;
 
 /// Represents a processed frame with JPEG-compressed data and metadata
 #[derive(Debug, Clone)]
@@ -230,7 +230,10 @@ impl MultiFrameProcessor {
 
     /// Adds a processor to the multi-processor
     pub fn add_processor(&mut self, processor: Box<dyn FrameProcessor>) {
-        println!("[MultiProcessor] Added {} processor", processor.processor_type());
+        println!(
+            "[MultiProcessor] Added {} processor",
+            processor.processor_type()
+        );
         self.processors.push(processor);
     }
 
@@ -305,7 +308,9 @@ mod tests {
         let mut multi = MultiFrameProcessor::new();
 
         multi.add_processor(Box::new(PreviewFrameProcessor::new()));
-        multi.add_processor(Box::new(EncodingFrameProcessor::new("/tmp/test.mp4".to_string())));
+        multi.add_processor(Box::new(EncodingFrameProcessor::new(
+            "/tmp/test.mp4".to_string(),
+        )));
 
         assert_eq!(multi.processor_count(), 2);
         assert_eq!(multi.processor_type(), "Multi");

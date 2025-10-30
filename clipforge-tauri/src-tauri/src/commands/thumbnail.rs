@@ -1,6 +1,6 @@
+use super::ffmpeg_utils::find_ffmpeg;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use super::ffmpeg_utils::find_ffmpeg;
 
 /// Generate a thumbnail image from a video file at a specific timestamp
 /// Returns the path to the generated thumbnail
@@ -12,8 +12,8 @@ pub async fn generate_thumbnail(
     println!("[Thumbnail] Generating thumbnail for: {}", video_path);
 
     // Find ffmpeg executable
-    let ffmpeg_path = find_ffmpeg()
-        .ok_or_else(|| "FFmpeg not found. Please install FFmpeg.".to_string())?;
+    let ffmpeg_path =
+        find_ffmpeg().ok_or_else(|| "FFmpeg not found. Please install FFmpeg.".to_string())?;
 
     // Use provided timestamp or default to 1 second
     let ts = timestamp.unwrap_or(1.0);
@@ -43,12 +43,17 @@ pub async fn generate_thumbnail(
     // Run ffmpeg to extract thumbnail
     let output = Command::new(&ffmpeg_path)
         .args([
-            "-ss", &ts.to_string(),           // Seek to timestamp
-            "-i", &video_path,                // Input file
-            "-vframes", "1",                   // Extract 1 frame
-            "-vf", "scale=320:-1",            // Scale to 320px width, maintain aspect ratio
-            "-q:v", "2",                       // High quality (1-31, lower is better)
-            "-y",                              // Overwrite output file
+            "-ss",
+            &ts.to_string(), // Seek to timestamp
+            "-i",
+            &video_path, // Input file
+            "-vframes",
+            "1", // Extract 1 frame
+            "-vf",
+            "scale=320:-1", // Scale to 320px width, maintain aspect ratio
+            "-q:v",
+            "2",  // High quality (1-31, lower is better)
+            "-y", // Overwrite output file
             thumbnail_path.to_str().unwrap(),
         ])
         .output()

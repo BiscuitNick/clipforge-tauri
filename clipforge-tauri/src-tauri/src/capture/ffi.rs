@@ -3,10 +3,10 @@
 // This module provides safe Rust wrappers around the Swift ScreenCaptureKit
 // bridge, handling FFI safety, memory management, and type conversions
 
-use std::collections::VecDeque;
-use std::ffi::c_void;
-use std::sync::{Arc, Mutex};
 use base64::Engine;
+use std::collections::VecDeque;
+use std::ffi::{c_void, CStr};
+use std::sync::{Arc, Mutex};
 
 // ============================================================================
 // FFI Type Definitions
@@ -104,6 +104,10 @@ extern "C" {
     /// Pauses capture on a bridge instance
     fn screen_capture_bridge_pause(bridge: *mut c_void);
 
+    /// Retrieves and clears the last error message
+    /// Returns pointer to C string owned by caller (must free)
+    fn screen_capture_bridge_take_last_error(bridge: *mut c_void) -> *const std::os::raw::c_char;
+
     /// Dequeues a processed JPEG frame from the bridge
     /// Returns 1 if frame retrieved, 0 if queue is empty
     fn screen_capture_bridge_dequeue_frame(
@@ -154,10 +158,7 @@ extern "C" {
 
     /// Enumerates available windows using SCShareableContent
     /// Returns 1 on success, 0 on failure
-    fn screen_capture_enumerate_windows(
-        out_windows: *mut *mut c_void,
-        out_count: *mut i32,
-    ) -> i32;
+    fn screen_capture_enumerate_windows(out_windows: *mut *mut c_void, out_count: *mut i32) -> i32;
 
     /// Gets window title and owner name for a specific window ID
     /// Returns 1 on success, 0 on failure
@@ -263,7 +264,9 @@ impl ScreenCaptureBridge {
             println!("[ScreenCapture FFI] Capture started successfully");
             Ok(())
         } else {
-            let error_msg = "Failed to start capture - check configuration and permissions".to_string();
+            let error_msg = self.take_last_error().unwrap_or_else(|| {
+                "Failed to start capture - check configuration and permissions".to_string()
+            });
             eprintln!("[ScreenCapture FFI] {}", error_msg);
             Err(error_msg)
         }
@@ -392,6 +395,20 @@ impl ScreenCaptureBridge {
         println!("[ScreenCapture FFI] JPEG frame queue cleared");
     }
 
+    /// Retrieves and clears the last error message from Swift bridge
+    fn take_last_error(&self) -> Option<String> {
+        unsafe {
+            let ptr = screen_capture_bridge_take_last_error(self.bridge_ptr.0);
+            if ptr.is_null() {
+                return None;
+            }
+
+            let message = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+            libc::free(ptr as *mut libc::c_void);
+            Some(message)
+        }
+    }
+
     /// Configures the stream settings
     pub fn configure_stream(&self, width: u32, height: u32, frame_rate: u32, capture_audio: bool) {
         unsafe {
@@ -403,35 +420,50 @@ impl ScreenCaptureBridge {
                 if capture_audio { 1 } else { 0 },
             );
         }
-        println!("[ScreenCapture FFI] Stream configured: {}x{} @ {}fps, audio: {}",
-            width, height, frame_rate, capture_audio);
+        println!(
+            "[ScreenCapture FFI] Stream configured: {}x{} @ {}fps, audio: {}",
+            width, height, frame_rate, capture_audio
+        );
     }
 
     /// Configures to capture a specific display
     pub fn configure_display(&self, display_id: u32) -> Result<(), String> {
-        let result = unsafe {
-            screen_capture_bridge_configure_display(self.bridge_ptr.0, display_id)
-        };
+        let result =
+            unsafe { screen_capture_bridge_configure_display(self.bridge_ptr.0, display_id) };
 
         if result == 1 {
-            println!("[ScreenCapture FFI] Display filter configured: {}", display_id);
+            println!(
+                "[ScreenCapture FFI] Display filter configured: {}",
+                display_id
+            );
             Ok(())
         } else {
-            Err(format!("Failed to configure display filter for display {}", display_id))
+            let error_msg = self.take_last_error().unwrap_or_else(|| {
+                format!(
+                    "Failed to configure display filter for display {}",
+                    display_id
+                )
+            });
+            Err(error_msg)
         }
     }
 
     /// Configures to capture a specific window
     pub fn configure_window(&self, window_id: u32) -> Result<(), String> {
-        let result = unsafe {
-            screen_capture_bridge_configure_window(self.bridge_ptr.0, window_id)
-        };
+        let result =
+            unsafe { screen_capture_bridge_configure_window(self.bridge_ptr.0, window_id) };
 
         if result == 1 {
-            println!("[ScreenCapture FFI] Window filter configured: {}", window_id);
+            println!(
+                "[ScreenCapture FFI] Window filter configured: {}",
+                window_id
+            );
             Ok(())
         } else {
-            Err(format!("Failed to configure window filter for window {}", window_id))
+            let error_msg = self.take_last_error().unwrap_or_else(|| {
+                format!("Failed to configure window filter for window {}", window_id)
+            });
+            Err(error_msg)
         }
     }
 }
@@ -476,13 +508,17 @@ pub fn enumerate_displays() -> Result<Vec<CDisplayInfo>, String> {
         }
 
         // Convert C array to Rust Vec
-        let displays_slice = std::slice::from_raw_parts(displays_ptr as *const CDisplayInfo, count as usize);
+        let displays_slice =
+            std::slice::from_raw_parts(displays_ptr as *const CDisplayInfo, count as usize);
         let displays = displays_slice.to_vec();
 
         // Free the Swift-allocated array
         screen_capture_free_array(displays_ptr);
 
-        println!("[ScreenCapture Enum] Enumerated {} displays", displays.len());
+        println!(
+            "[ScreenCapture Enum] Enumerated {} displays",
+            displays.len()
+        );
         Ok(displays)
     }
 }
@@ -507,7 +543,8 @@ pub fn enumerate_windows() -> Result<Vec<CWindowInfo>, String> {
         }
 
         // Convert C array to Rust Vec
-        let windows_slice = std::slice::from_raw_parts(windows_ptr as *const CWindowInfo, count as usize);
+        let windows_slice =
+            std::slice::from_raw_parts(windows_ptr as *const CWindowInfo, count as usize);
         let windows = windows_slice.to_vec();
 
         // Free the Swift-allocated array
@@ -579,7 +616,10 @@ pub fn capture_display_thumbnail(display_id: u32, max_width: i32) -> Result<Stri
         );
 
         if result != 1 || data_ptr.is_null() || length == 0 {
-            return Err(format!("Failed to capture thumbnail for display {}", display_id));
+            return Err(format!(
+                "Failed to capture thumbnail for display {}",
+                display_id
+            ));
         }
 
         // Convert to Vec and base64 encode
@@ -589,7 +629,10 @@ pub fn capture_display_thumbnail(display_id: u32, max_width: i32) -> Result<Stri
         // Free the Swift-allocated buffer
         screen_capture_free_array(data_ptr as *mut c_void);
 
-        println!("[ScreenCapture Thumbnail] Captured display {} thumbnail: {} bytes", display_id, length);
+        println!(
+            "[ScreenCapture Thumbnail] Captured display {} thumbnail: {} bytes",
+            display_id, length
+        );
         Ok(base64_string)
     }
 }
@@ -616,7 +659,10 @@ pub fn capture_window_thumbnail(window_id: u32, max_width: i32) -> Result<String
         );
 
         if result != 1 || data_ptr.is_null() || length == 0 {
-            return Err(format!("Failed to capture thumbnail for window {}", window_id));
+            return Err(format!(
+                "Failed to capture thumbnail for window {}",
+                window_id
+            ));
         }
 
         // Convert to Vec and base64 encode
@@ -626,7 +672,10 @@ pub fn capture_window_thumbnail(window_id: u32, max_width: i32) -> Result<String
         // Free the Swift-allocated buffer
         screen_capture_free_array(data_ptr as *mut c_void);
 
-        println!("[ScreenCapture Thumbnail] Captured window {} thumbnail: {} bytes", window_id, length);
+        println!(
+            "[ScreenCapture Thumbnail] Captured window {} thumbnail: {} bytes",
+            window_id, length
+        );
         Ok(base64_string)
     }
 }
@@ -741,7 +790,10 @@ mod tests {
 
         // On macOS 15, this should be true
         #[cfg(target_os = "macos")]
-        assert!(is_available, "ScreenCaptureKit should be available on macOS 12.3+");
+        assert!(
+            is_available,
+            "ScreenCaptureKit should be available on macOS 12.3+"
+        );
     }
 
     #[test]

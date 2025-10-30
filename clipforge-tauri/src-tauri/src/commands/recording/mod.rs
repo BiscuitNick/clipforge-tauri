@@ -1,16 +1,16 @@
+use super::permissions::{PermissionHandler, PlatformPermissions};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 use tokio::task::JoinHandle;
-use super::permissions::{PermissionHandler, PlatformPermissions};
 
 mod screen_capture;
 use screen_capture::ScreenCaptureSession;
 
 // Re-export FFmpeg input and encoding modes for external use
-pub use screen_capture::{InputMode, EncodingMode};
+pub use screen_capture::{EncodingMode, InputMode};
 
 // ============================================================================
 // Data Structures
@@ -88,7 +88,9 @@ impl RecordingConfig {
     pub fn validate(&self) -> Result<(), String> {
         // Check for valid dimensions
         if self.width == 0 || self.height == 0 {
-            return Err("Invalid video dimensions: width and height must be greater than 0".to_string());
+            return Err(
+                "Invalid video dimensions: width and height must be greater than 0".to_string(),
+            );
         }
 
         // Check reasonable dimension limits
@@ -131,23 +133,43 @@ impl RecordingConfig {
             "mp4" => {
                 // MP4 supports h264, h265, and various audio codecs
                 match self.video_codec.as_str() {
-                    "h264" | "h265" | "hevc" => {},
-                    _ => return Err(format!("MP4 format does not support '{}' video codec. Use h264 or h265.", self.video_codec)),
+                    "h264" | "h265" | "hevc" => {}
+                    _ => {
+                        return Err(format!(
+                            "MP4 format does not support '{}' video codec. Use h264 or h265.",
+                            self.video_codec
+                        ))
+                    }
                 }
                 match self.audio_codec.as_str() {
-                    "aac" | "mp3" => {},
-                    _ => return Err(format!("MP4 format does not support '{}' audio codec. Use aac or mp3.", self.audio_codec)),
+                    "aac" | "mp3" => {}
+                    _ => {
+                        return Err(format!(
+                            "MP4 format does not support '{}' audio codec. Use aac or mp3.",
+                            self.audio_codec
+                        ))
+                    }
                 }
             }
             "webm" => {
                 // WebM supports VP8, VP9, AV1 for video and Vorbis, Opus for audio
                 match self.video_codec.as_str() {
-                    "vp8" | "vp9" | "av1" => {},
-                    _ => return Err(format!("WebM format does not support '{}' video codec. Use vp8, vp9, or av1.", self.video_codec)),
+                    "vp8" | "vp9" | "av1" => {}
+                    _ => {
+                        return Err(format!(
+                            "WebM format does not support '{}' video codec. Use vp8, vp9, or av1.",
+                            self.video_codec
+                        ))
+                    }
                 }
                 match self.audio_codec.as_str() {
-                    "vorbis" | "opus" => {},
-                    _ => return Err(format!("WebM format does not support '{}' audio codec. Use vorbis or opus.", self.audio_codec)),
+                    "vorbis" | "opus" => {}
+                    _ => {
+                        return Err(format!(
+                            "WebM format does not support '{}' audio codec. Use vorbis or opus.",
+                            self.audio_codec
+                        ))
+                    }
                 }
             }
             "mkv" => {
@@ -157,11 +179,19 @@ impl RecordingConfig {
             "mov" => {
                 // MOV (QuickTime) is similar to MP4
                 match self.video_codec.as_str() {
-                    "h264" | "h265" | "hevc" | "prores" => {},
-                    _ => return Err(format!("MOV format does not support '{}' video codec. Use h264, h265, or prores.", self.video_codec)),
+                    "h264" | "h265" | "hevc" | "prores" => {}
+                    _ => return Err(format!(
+                        "MOV format does not support '{}' video codec. Use h264, h265, or prores.",
+                        self.video_codec
+                    )),
                 }
             }
-            _ => return Err(format!("Unsupported output format: '{}'. Use mp4, webm, mkv, or mov.", self.output_format)),
+            _ => {
+                return Err(format!(
+                    "Unsupported output format: '{}'. Use mp4, webm, mkv, or mov.",
+                    self.output_format
+                ))
+            }
         }
 
         Ok(())
@@ -426,23 +456,27 @@ impl RecordingState {
             (Recording, Stopping) => Ok(()),
             (Paused, Recording) => Ok(()), // Resume
             (Paused, Stopping) => Ok(()),
-            (_, Idle) => Ok(()), // Can always go back to idle (stop/reset)
+            (_, Idle) => Ok(()),  // Can always go back to idle (stop/reset)
             (_, Error) => Ok(()), // Can always transition to error state
 
             // Invalid transitions
             (current, target) if current == target => {
                 Err(format!("Already in {:?} state", current))
             }
-            (current, target) => {
-                Err(format!("Cannot transition from {:?} to {:?}", current, target))
-            }
+            (current, target) => Err(format!(
+                "Cannot transition from {:?} to {:?}",
+                current, target
+            )),
         }
     }
 
     /// Validate that recording can be started
     pub fn validate_can_start(&self) -> Result<(), String> {
         if self.status != RecordingStatus::Idle {
-            return Err(format!("Cannot start recording: current status is {:?}, expected Idle", self.status));
+            return Err(format!(
+                "Cannot start recording: current status is {:?}, expected Idle",
+                self.status
+            ));
         }
         Ok(())
     }
@@ -450,7 +484,10 @@ impl RecordingState {
     /// Validate that recording can be paused
     pub fn validate_can_pause(&self) -> Result<(), String> {
         if self.status != RecordingStatus::Recording {
-            return Err(format!("Cannot pause: current status is {:?}, expected Recording", self.status));
+            return Err(format!(
+                "Cannot pause: current status is {:?}, expected Recording",
+                self.status
+            ));
         }
         Ok(())
     }
@@ -458,7 +495,10 @@ impl RecordingState {
     /// Validate that recording can be resumed
     pub fn validate_can_resume(&self) -> Result<(), String> {
         if self.status != RecordingStatus::Paused {
-            return Err(format!("Cannot resume: current status is {:?}, expected Paused", self.status));
+            return Err(format!(
+                "Cannot resume: current status is {:?}, expected Paused",
+                self.status
+            ));
         }
         Ok(())
     }
@@ -467,7 +507,10 @@ impl RecordingState {
     pub fn validate_can_stop(&self) -> Result<(), String> {
         match &self.status {
             RecordingStatus::Recording | RecordingStatus::Paused => Ok(()),
-            status => Err(format!("Cannot stop: current status is {:?}, expected Recording or Paused", status))
+            status => Err(format!(
+                "Cannot stop: current status is {:?}, expected Recording or Paused",
+                status
+            )),
         }
     }
 }
@@ -482,8 +525,7 @@ pub struct RecordingManager {
 
 impl RecordingManager {
     pub fn new() -> Self {
-        let temp_manager = TempFileManager::new()
-            .expect("Failed to initialize temp file manager");
+        let temp_manager = TempFileManager::new().expect("Failed to initialize temp file manager");
 
         Self {
             current_recording: None,
@@ -702,7 +744,10 @@ pub enum RecordingError {
     /// Codec not supported
     CodecNotSupported(String),
     /// Dependency missing (e.g., FFmpeg)
-    DependencyMissing { dependency: String, install_instructions: String },
+    DependencyMissing {
+        dependency: String,
+        install_instructions: String,
+    },
     /// Failed to initialize capture
     CaptureInitFailed(String),
     /// Failed to stop capture
@@ -716,11 +761,20 @@ impl RecordingError {
     pub fn user_message(&self) -> String {
         match self {
             RecordingError::PermissionDenied(resource) => {
-                format!("Permission denied for {}. Please grant access in System Preferences.", resource)
+                format!(
+                    "Permission denied for {}. Please grant access in System Preferences.",
+                    resource
+                )
             }
-            RecordingError::DiskSpaceLow { available, required } => {
-                format!("Insufficient disk space. Available: {} MB, Required: {} MB",
-                    available / 1_000_000, required / 1_000_000)
+            RecordingError::DiskSpaceLow {
+                available,
+                required,
+            } => {
+                format!(
+                    "Insufficient disk space. Available: {} MB, Required: {} MB",
+                    available / 1_000_000,
+                    required / 1_000_000
+                )
             }
             RecordingError::IoError(err) => {
                 format!("File error: {}. Please check your storage device.", err)
@@ -729,18 +783,25 @@ impl RecordingError {
                 format!("Invalid configuration: {}", err)
             }
             RecordingError::RecordingInProgress | RecordingError::AlreadyRecording => {
-                "A recording is already in progress. Please stop it before starting a new one.".to_string()
+                "A recording is already in progress. Please stop it before starting a new one."
+                    .to_string()
             }
             RecordingError::NoActiveRecording | RecordingError::NotRecording => {
                 "No recording is currently active.".to_string()
             }
             RecordingError::HardwareUnavailable(device) => {
-                format!("{} is not available. Please check your device connections.", device)
+                format!(
+                    "{} is not available. Please check your device connections.",
+                    device
+                )
             }
             RecordingError::CodecNotSupported(codec) => {
                 format!("Codec '{}' is not supported on this system.", codec)
             }
-            RecordingError::DependencyMissing { dependency, install_instructions } => {
+            RecordingError::DependencyMissing {
+                dependency,
+                install_instructions,
+            } => {
                 format!("{} is not installed. {}", dependency, install_instructions)
             }
             RecordingError::CaptureInitFailed(err) => {
@@ -758,15 +819,17 @@ impl RecordingError {
     /// Get recovery suggestions
     pub fn recovery_suggestion(&self) -> Option<String> {
         match self {
-            RecordingError::PermissionDenied(_) => {
-                Some("Open System Preferences > Security & Privacy and grant the necessary permissions.".to_string())
-            }
-            RecordingError::DiskSpaceLow { .. } => {
-                Some("Free up disk space or choose a different location for recordings.".to_string())
-            }
-            RecordingError::HardwareUnavailable(_) => {
-                Some("Check that your device is connected and not being used by another application.".to_string())
-            }
+            RecordingError::PermissionDenied(_) => Some(
+                "Open System Preferences > Security & Privacy and grant the necessary permissions."
+                    .to_string(),
+            ),
+            RecordingError::DiskSpaceLow { .. } => Some(
+                "Free up disk space or choose a different location for recordings.".to_string(),
+            ),
+            RecordingError::HardwareUnavailable(_) => Some(
+                "Check that your device is connected and not being used by another application."
+                    .to_string(),
+            ),
             _ => None,
         }
     }
@@ -830,8 +893,7 @@ impl TempFileManager {
     /// Clean up a specific temporary file
     pub fn cleanup_file(&mut self, path: &Path) -> Result<(), String> {
         if path.exists() {
-            fs::remove_file(path)
-                .map_err(|e| format!("Failed to remove temp file: {}", e))?;
+            fs::remove_file(path).map_err(|e| format!("Failed to remove temp file: {}", e))?;
         }
 
         self.active_files.retain(|p| p != path);
@@ -868,8 +930,8 @@ impl TempFileManager {
         }
 
         let mut cleaned = 0;
-        let entries = fs::read_dir(&temp_dir)
-            .map_err(|e| format!("Failed to read temp directory: {}", e))?;
+        let entries =
+            fs::read_dir(&temp_dir).map_err(|e| format!("Failed to read temp directory: {}", e))?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -906,9 +968,10 @@ impl TempFileManager {
                 // TODO: Implement actual disk space check using platform APIs
                 Ok(())
             }
-            Err(e) => {
-                Err(RecordingError::IoError(format!("Cannot write to temp directory: {}", e)))
-            }
+            Err(e) => Err(RecordingError::IoError(format!(
+                "Cannot write to temp directory: {}",
+                e
+            ))),
         }
     }
 }
@@ -982,7 +1045,7 @@ pub async fn validate_device_availability(
     device_id: Option<String>,
 ) -> Result<DeviceAvailability, String> {
     use crate::commands::camera_sources::{CameraEnumerator, PlatformEnumerator as CameraEnum};
-    use crate::commands::screen_sources::{SourceEnumerator, PlatformEnumerator as ScreenEnum};
+    use crate::commands::screen_sources::{PlatformEnumerator as ScreenEnum, SourceEnumerator};
 
     match device_type.as_str() {
         "camera" => {
@@ -1009,13 +1072,16 @@ pub async fn validate_device_availability(
                         is_available: true,
                         error_message: None,
                         fallback_available: cameras.len() > 1,
-                        fallback_device_id: cameras.iter()
+                        fallback_device_id: cameras
+                            .iter()
                             .find(|c| c.id != *id)
                             .map(|c| c.id.clone()),
                     })
                 } else {
                     // Device not found, offer fallback
-                    let default_camera = cameras.iter().find(|c| c.is_default)
+                    let default_camera = cameras
+                        .iter()
+                        .find(|c| c.is_default)
                         .or_else(|| cameras.first());
 
                     Ok(DeviceAvailability {
@@ -1029,7 +1095,9 @@ pub async fn validate_device_availability(
                 }
             } else {
                 // No specific device requested, use default
-                let default_camera = cameras.iter().find(|c| c.is_default)
+                let default_camera = cameras
+                    .iter()
+                    .find(|c| c.is_default)
                     .or_else(|| cameras.first());
 
                 Ok(DeviceAvailability {
@@ -1070,13 +1138,16 @@ pub async fn validate_device_availability(
                         is_available: true,
                         error_message: None,
                         fallback_available: screens.len() > 1,
-                        fallback_device_id: screens.iter()
+                        fallback_device_id: screens
+                            .iter()
                             .find(|s| s.id != *id)
                             .map(|s| s.id.clone()),
                     })
                 } else {
                     // Screen not found, offer fallback
-                    let primary_screen = screens.iter().find(|s| s.is_primary)
+                    let primary_screen = screens
+                        .iter()
+                        .find(|s| s.is_primary)
                         .or_else(|| screens.first());
 
                     Ok(DeviceAvailability {
@@ -1090,7 +1161,9 @@ pub async fn validate_device_availability(
                 }
             } else {
                 // No specific screen requested, use primary
-                let primary_screen = screens.iter().find(|s| s.is_primary)
+                let primary_screen = screens
+                    .iter()
+                    .find(|s| s.is_primary)
                     .or_else(|| screens.first());
 
                 Ok(DeviceAvailability {
@@ -1195,12 +1268,18 @@ impl CleanupRegistry {
                 if age > max_age && entry.resource_path.exists() {
                     match fs::remove_file(&entry.resource_path) {
                         Ok(_) => {
-                            println!("[CleanupRegistry] Removed old file: {:?}", entry.resource_path);
+                            println!(
+                                "[CleanupRegistry] Removed old file: {:?}",
+                                entry.resource_path
+                            );
                             cleaned += 1;
                             return false;
                         }
                         Err(e) => {
-                            eprintln!("[CleanupRegistry] Failed to remove old file {:?}: {}", entry.resource_path, e);
+                            eprintln!(
+                                "[CleanupRegistry] Failed to remove old file {:?}: {}",
+                                entry.resource_path, e
+                            );
                         }
                     }
                 }
@@ -1248,7 +1327,7 @@ impl Default for LongRecordingConfig {
             max_duration_seconds: 0, // Unlimited by default
             enable_chunking: true,
             chunk_duration_seconds: 1800, // 30 minutes
-            max_chunk_size_mb: 2048, // 2 GB
+            max_chunk_size_mb: 2048,      // 2 GB
             enable_memory_monitoring: true,
         }
     }
@@ -1262,9 +1341,7 @@ pub async fn get_long_recording_config() -> Result<LongRecordingConfig, String> 
 
 /// Validate long recording configuration
 #[tauri::command]
-pub async fn validate_long_recording_config(
-    config: LongRecordingConfig,
-) -> Result<bool, String> {
+pub async fn validate_long_recording_config(config: LongRecordingConfig) -> Result<bool, String> {
     if config.chunk_duration_seconds < 60 {
         return Err("Chunk duration must be at least 60 seconds".to_string());
     }
@@ -1292,7 +1369,7 @@ pub fn cleanup_stuck_ffmpeg_processes() {
     let result = Command::new("pkill")
         .arg("-9")
         .arg("-f")
-        .arg("ffmpeg.*avfoundation")  // Match FFmpeg with AVFoundation (macOS screen capture)
+        .arg("ffmpeg.*avfoundation") // Match FFmpeg with AVFoundation (macOS screen capture)
         .output();
 
     match result {
@@ -1316,7 +1393,10 @@ pub fn cleanup_stuck_ffmpeg_processes() {
     // Also clean up temporary files older than 1 hour
     if let Ok(count) = TempFileManager::cleanup_orphaned_files() {
         if count > 0 {
-            println!("[StartupCleanup] Cleaned up {} orphaned temporary files", count);
+            println!(
+                "[StartupCleanup] Cleaned up {} orphaned temporary files",
+                count
+            );
         }
     }
 }
@@ -1343,9 +1423,7 @@ pub fn initialize_recording_module() {
 
 /// Check the status of a specific permission
 #[tauri::command]
-pub async fn check_permission(
-    permission_type: PermissionType,
-) -> Result<PermissionResult, String> {
+pub async fn check_permission(permission_type: PermissionType) -> Result<PermissionResult, String> {
     // Use platform-specific implementation
     Ok(PlatformPermissions::check_permission(&permission_type))
 }
@@ -1408,17 +1486,23 @@ pub async fn start_recording(
     };
 
     // Create and start screen capture session
-    let mut capture_session = ScreenCaptureSession::new(source_id.clone(), temp_path.clone(), config);
+    let mut capture_session =
+        ScreenCaptureSession::new(source_id.clone(), temp_path.clone(), config);
 
     // If recording a window, get window bounds and determine which screen it's on
     if source_id.starts_with("window_") {
-        if let Some(window_id) = source_id.strip_prefix("window_").and_then(|s| s.parse::<u32>().ok()) {
+        if let Some(window_id) = source_id
+            .strip_prefix("window_")
+            .and_then(|s| s.parse::<u32>().ok())
+        {
             // Get window bounds and screens from the system
-            use super::screen_sources::{SourceEnumerator, PlatformEnumerator};
+            use super::screen_sources::{PlatformEnumerator, SourceEnumerator};
             if let Ok(windows) = PlatformEnumerator::enumerate_windows() {
                 if let Some(window) = windows.iter().find(|w| w.id == source_id) {
-                    println!("[RecordingManager] Window position: x={}, y={}, w={}, h={}",
-                        window.x, window.y, window.width, window.height);
+                    println!(
+                        "[RecordingManager] Window position: x={}, y={}, w={}, h={}",
+                        window.x, window.y, window.width, window.height
+                    );
 
                     // Get all screens to find which one contains the window
                     if let Ok(screens) = PlatformEnumerator::enumerate_screens() {
@@ -1426,7 +1510,10 @@ pub async fn start_recording(
                         let window_center_x = window.x + (window.width as i32 / 2);
                         let window_center_y = window.y + (window.height as i32 / 2);
 
-                        println!("[RecordingManager] Window center: ({}, {})", window_center_x, window_center_y);
+                        println!(
+                            "[RecordingManager] Window center: ({}, {})",
+                            window_center_x, window_center_y
+                        );
 
                         // Find the screen that contains this point
                         let mut found_screen = None;
@@ -1438,8 +1525,11 @@ pub async fn start_recording(
                                 screen.id, screen.x, screen.y, screen.width, screen.height,
                                 screen.x, screen_right, screen.y, screen_bottom);
 
-                            if window_center_x >= screen.x && window_center_x < screen_right &&
-                               window_center_y >= screen.y && window_center_y < screen_bottom {
+                            if window_center_x >= screen.x
+                                && window_center_x < screen_right
+                                && window_center_y >= screen.y
+                                && window_center_y < screen_bottom
+                            {
                                 println!("[RecordingManager] Window is on screen: {}", screen.id);
                                 found_screen = Some(screen);
                                 break;
@@ -1459,11 +1549,21 @@ pub async fn start_recording(
                                 println!("[RecordingManager] Relative crop coordinates: x={}, y={}, w={}, h={}",
                                     relative_x, relative_y, window.width, window.height);
 
-                                capture_session.set_window_bounds(relative_x, relative_y, window.width, window.height);
+                                capture_session.set_window_bounds(
+                                    relative_x,
+                                    relative_y,
+                                    window.width,
+                                    window.height,
+                                );
                             }
                         } else {
                             println!("[RecordingManager] Warning: Could not determine which screen contains the window, using absolute coordinates");
-                            capture_session.set_window_bounds(window.x, window.y, window.width, window.height);
+                            capture_session.set_window_bounds(
+                                window.x,
+                                window.y,
+                                window.width,
+                                window.height,
+                            );
                         }
                     }
                 }
@@ -1471,7 +1571,8 @@ pub async fn start_recording(
         }
     }
 
-    capture_session.start(include_audio)
+    capture_session
+        .start(include_audio)
         .map_err(|e| format!("Failed to start capture: {}", e))?;
 
     // Update recording state with file path
@@ -1507,7 +1608,8 @@ pub async fn stop_recording(
 
         // Stop the capture session
         if let Some(mut capture_session) = manager.capture_session.take() {
-            let output_path = capture_session.stop()
+            let output_path = capture_session
+                .stop()
                 .map_err(|e| format!("Failed to stop capture: {}", e))?;
             recording_state.file_path = Some(output_path.to_string_lossy().to_string());
         }
@@ -1553,8 +1655,10 @@ pub async fn pause_recording(
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:paused");
 
-    println!("[Recording] Recording paused - duration: {:.2}s, total pause: {}ms",
-             recording_state.duration, recording_state.pause_time);
+    println!(
+        "[Recording] Recording paused - duration: {:.2}s, total pause: {}ms",
+        recording_state.duration, recording_state.pause_time
+    );
 
     Ok(recording_state)
 }
@@ -1587,8 +1691,10 @@ pub async fn resume_recording(
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:resumed");
 
-    println!("[Recording] Recording resumed - cumulative pause time: {}ms",
-             recording_state.pause_time);
+    println!(
+        "[Recording] Recording resumed - cumulative pause time: {}ms",
+        recording_state.pause_time
+    );
 
     Ok(recording_state)
 }
@@ -1630,11 +1736,26 @@ pub async fn get_supported_codecs(format: String) -> Result<SupportedCodecs, Str
             vec!["vorbis".to_string(), "opus".to_string()],
         ),
         "mkv" => (
-            vec!["h264".to_string(), "h265".to_string(), "vp8".to_string(), "vp9".to_string()],
-            vec!["aac".to_string(), "opus".to_string(), "vorbis".to_string(), "mp3".to_string()],
+            vec![
+                "h264".to_string(),
+                "h265".to_string(),
+                "vp8".to_string(),
+                "vp9".to_string(),
+            ],
+            vec![
+                "aac".to_string(),
+                "opus".to_string(),
+                "vorbis".to_string(),
+                "mp3".to_string(),
+            ],
         ),
         "mov" => (
-            vec!["h264".to_string(), "h265".to_string(), "hevc".to_string(), "prores".to_string()],
+            vec![
+                "h264".to_string(),
+                "h265".to_string(),
+                "hevc".to_string(),
+                "prores".to_string(),
+            ],
             vec!["aac".to_string()],
         ),
         _ => return Err(format!("Unsupported format: {}", format)),
@@ -1730,7 +1851,11 @@ pub struct DiskSpaceInfo {
 
 impl DiskSpaceInfo {
     /// Estimate recording time based on bitrate and available space
-    pub fn estimate_recording_time(available_mb: u64, video_bitrate_kbps: u32, audio_bitrate_kbps: u32) -> f64 {
+    pub fn estimate_recording_time(
+        available_mb: u64,
+        video_bitrate_kbps: u32,
+        audio_bitrate_kbps: u32,
+    ) -> f64 {
         let total_bitrate_kbps = video_bitrate_kbps + audio_bitrate_kbps;
         let total_bitrate_mbps = total_bitrate_kbps as f64 / 8.0 / 1024.0; // Convert to MB/s
         if total_bitrate_mbps == 0.0 {
@@ -1805,7 +1930,8 @@ pub async fn get_disk_space_info(
 
                 let video_br = video_bitrate_kbps.unwrap_or(5000);
                 let audio_br = audio_bitrate_kbps.unwrap_or(128);
-                let estimated_minutes = DiskSpaceInfo::estimate_recording_time(available_mb, video_br, audio_br);
+                let estimated_minutes =
+                    DiskSpaceInfo::estimate_recording_time(available_mb, video_br, audio_br);
                 let warning_level = DiskSpaceInfo::get_warning_level(available_mb);
 
                 Ok(DiskSpaceInfo {
@@ -1874,7 +2000,10 @@ pub async fn save_pip_metadata(
     file.flush()
         .map_err(|e| format!("Failed to flush metadata file: {}", e))?;
 
-    println!("[RecordingManager] Saved PiP metadata to: {}", file_path.display());
+    println!(
+        "[RecordingManager] Saved PiP metadata to: {}",
+        file_path.display()
+    );
 
     // Return absolute file path
     file_path
@@ -1921,8 +2050,8 @@ pub async fn save_webcam_recording(
     let final_file_path = temp_mgr.temp_dir.join(&final_filename);
 
     // Write blob data to temporary file
-    let mut file = fs::File::create(&temp_file_path)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file =
+        fs::File::create(&temp_file_path).map_err(|e| format!("Failed to create file: {}", e))?;
 
     file.write_all(&data)
         .map_err(|e| format!("Failed to write data: {}", e))?;
@@ -1934,8 +2063,8 @@ pub async fn save_webcam_recording(
 
     // Remux with FFmpeg to embed duration metadata
     // This ensures the file has proper duration information
-    let ffmpeg_path = super::ffmpeg_utils::find_ffmpeg()
-        .ok_or_else(|| "FFmpeg not found".to_string())?;
+    let ffmpeg_path =
+        super::ffmpeg_utils::find_ffmpeg().ok_or_else(|| "FFmpeg not found".to_string())?;
 
     let ffmpeg_output = Command::new(&ffmpeg_path)
         .arg("-i")

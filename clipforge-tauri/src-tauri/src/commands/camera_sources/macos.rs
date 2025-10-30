@@ -10,9 +10,7 @@ pub struct PlatformEnumerator;
 
 impl CameraEnumerator for PlatformEnumerator {
     fn enumerate_cameras() -> Result<Vec<CameraDevice>, String> {
-        unsafe {
-            enumerate_camera_devices()
-        }
+        unsafe { enumerate_camera_devices() }
     }
 }
 
@@ -35,7 +33,8 @@ unsafe fn enumerate_camera_devices() -> Result<Vec<CameraDevice>, String> {
     let count: usize = msg_send![devices, count];
 
     // Get default device
-    let default_device: id = msg_send![av_capture_device_class, defaultDeviceWithMediaType: media_type];
+    let default_device: id =
+        msg_send![av_capture_device_class, defaultDeviceWithMediaType: media_type];
     let default_id: id = if default_device != nil {
         msg_send![default_device, uniqueID]
     } else {

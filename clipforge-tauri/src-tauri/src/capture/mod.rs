@@ -14,7 +14,7 @@ pub mod frame_processor;
 pub mod frame_timing;
 
 pub use frame_processor::{
-    FrameProcessor, PreviewFrameProcessor, EncodingFrameProcessor,
-    MultiFrameProcessor, ProcessedFrame,
+    EncodingFrameProcessor, FrameProcessor, MultiFrameProcessor, PreviewFrameProcessor,
+    ProcessedFrame,
 };
 pub use frame_timing::{FrameTimer, FrameTimingStats};

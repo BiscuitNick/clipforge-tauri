@@ -22,7 +22,10 @@ fn compile_swift_bridge() {
 
     // Check if Swift file exists
     if !swift_src.exists() {
-        println!("cargo:warning=Swift source file not found: {}", swift_src.display());
+        println!(
+            "cargo:warning=Swift source file not found: {}",
+            swift_src.display()
+        );
         return;
     }
 
@@ -38,7 +41,10 @@ fn compile_swift_bridge() {
         .arg("-Xlinker")
         .arg("-install_name")
         .arg("-Xlinker")
-        .arg(format!("@rpath/{}", swift_lib.file_name().unwrap().to_str().unwrap()))
+        .arg(format!(
+            "@rpath/{}",
+            swift_lib.file_name().unwrap().to_str().unwrap()
+        ))
         .arg("-framework")
         .arg("ScreenCaptureKit")
         .arg("-framework")
@@ -56,7 +62,10 @@ fn compile_swift_bridge() {
         panic!("Swift compilation failed:\n{}", stderr);
     }
 
-    println!("cargo:warning=Swift compilation successful: {}", swift_lib.display());
+    println!(
+        "cargo:warning=Swift compilation successful: {}",
+        swift_lib.display()
+    );
 
     // Tell cargo to link the Swift library
     println!("cargo:rustc-link-search=native={}", out_dir);
