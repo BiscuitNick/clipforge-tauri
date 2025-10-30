@@ -25,6 +25,21 @@ struct ProcessedFrame {
     let frameNumber: UInt64
 }
 
+/// Represents a processed audio buffer ready for encoding
+@available(macOS 12.3, *)
+struct ProcessedAudioBuffer {
+    /// Raw PCM audio data (s16le format: signed 16-bit little-endian)
+    let pcmData: Data
+    /// Sample rate in Hz (e.g., 48000)
+    let sampleRate: Double
+    /// Number of channels (1=mono, 2=stereo)
+    let channels: Int
+    /// Presentation timestamp in seconds
+    let timestamp: Double
+    /// Number of frames in this buffer
+    let frameCount: Int
+}
+
 // MARK: - Content Cache
 
 /// Cache for SCShareableContent to avoid redundant async calls
@@ -114,6 +129,18 @@ class ScreenCaptureKitBridge: NSObject {
 
     /// Lock for thread-safe queue access
     private let queueLock = NSLock()
+
+    /// Audio buffer queue for buffering processed audio
+    private var audioQueue: [ProcessedAudioBuffer] = []
+
+    /// Maximum audio queue size (default: 10 buffers)
+    private var maxAudioQueueSize: Int = 10
+
+    /// Lock for thread-safe audio queue access
+    private let audioQueueLock = NSLock()
+
+    /// Audio sample counter for debugging
+    private var audioBufferCounter: UInt64 = 0
 
     // MARK: - Initialization
 
@@ -221,6 +248,68 @@ class ScreenCaptureKitBridge: NSObject {
 
         if clearedCount > 0 {
             print("[ScreenCaptureKit Queue] 🗑️ Cleared \(clearedCount) frames from queue")
+        }
+    }
+
+    // MARK: - Audio Queue Methods
+
+    /// Enqueues a processed audio buffer with overflow handling
+    /// - Parameter buffer: The processed audio buffer to enqueue
+    private func enqueueAudioBuffer(_ buffer: ProcessedAudioBuffer) {
+        audioQueueLock.lock()
+        defer { audioQueueLock.unlock() }
+
+        // Check if queue is full
+        if audioQueue.count >= maxAudioQueueSize {
+            // Drop oldest buffer
+            let droppedBuffer = audioQueue.removeFirst()
+            #if DEBUG
+            print("[ScreenCaptureKit Audio] ⚠️ Audio queue full, dropped buffer (ts: \(String(format: "%.2f", droppedBuffer.timestamp))s)")
+            #endif
+        }
+
+        // Add new buffer to end of queue
+        audioQueue.append(buffer)
+
+        #if DEBUG
+        if audioBufferCounter % 30 == 0 {  // Log occasionally
+            print("[ScreenCaptureKit Audio] 🔊 Enqueued audio buffer, queue size: \(audioQueue.count)/\(maxAudioQueueSize)")
+        }
+        #endif
+    }
+
+    /// Dequeues the oldest audio buffer from the queue
+    /// - Returns: The oldest audio buffer, or nil if queue is empty
+    func dequeueAudioBuffer() -> ProcessedAudioBuffer? {
+        audioQueueLock.lock()
+        defer { audioQueueLock.unlock() }
+
+        guard !audioQueue.isEmpty else {
+            return nil
+        }
+
+        return audioQueue.removeFirst()
+    }
+
+    /// Gets the current audio queue size
+    /// - Returns: Number of audio buffers in the queue
+    func getAudioQueueSize() -> Int {
+        audioQueueLock.lock()
+        defer { audioQueueLock.unlock() }
+
+        return audioQueue.count
+    }
+
+    /// Clears all audio buffers from the queue
+    func clearAudioQueue() {
+        audioQueueLock.lock()
+        defer { audioQueueLock.unlock() }
+
+        let clearedCount = audioQueue.count
+        audioQueue.removeAll()
+
+        if clearedCount > 0 {
+            print("[ScreenCaptureKit Audio] 🗑️ Cleared \(clearedCount) audio buffers from queue")
         }
     }
 
@@ -706,25 +795,156 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
     /// Handles audio buffers
     /// - Parameter sampleBuffer: The sample buffer containing audio data
     private func handleAudioBuffer(_ sampleBuffer: CMSampleBuffer) {
+        // Increment audio buffer counter
+        audioBufferCounter += 1
+
         // Get audio format description
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
-            print("[ScreenCaptureKit Output] ⚠️ Failed to get audio format description")
+            print("[ScreenCaptureKit Audio] ⚠️ Failed to get audio format description")
             return
         }
 
+        // Get presentation timestamp for A/V sync
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let timeSeconds = CMTimeGetSeconds(presentationTime)
 
+        // Get audio format
+        guard let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
+            print("[ScreenCaptureKit Audio] ⚠️ Failed to get audio stream description")
+            return
+        }
+
+        let sampleRate = asbd.pointee.mSampleRate
+        let channels = Int(asbd.pointee.mChannelsPerFrame)
+        let format = asbd.pointee.mFormatID
+
         #if DEBUG
         // Log audio info occasionally
-        if Int(timeSeconds * 1000) % 1000 < 33 {
-            if let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
-                print("[ScreenCaptureKit Output] 🔊 Audio buffer: \(asbd.pointee.mSampleRate)Hz time:\(String(format: "%.2f", timeSeconds))s")
-            }
+        if audioBufferCounter % 30 == 0 {
+            let formatStr = fourCCToString(format)
+            print("[ScreenCaptureKit Audio] 🔊 Audio buffer #\(audioBufferCounter): \(sampleRate)Hz, \(channels)ch, format:\(formatStr), time:\(String(format: "%.2f", timeSeconds))s")
         }
         #endif
 
-        // TODO: Audio processing will be implemented in Task 20
+        // Extract audio block buffer
+        guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
+            print("[ScreenCaptureKit Audio] ⚠️ Failed to get audio data buffer")
+            return
+        }
+
+        // Get the number of samples (frames) in this buffer
+        let numSamples = CMSampleBufferGetNumSamples(sampleBuffer)
+
+        // Get audio data pointer and length
+        var lengthAtOffset: Int = 0
+        var dataPointer: UnsafeMutablePointer<Int8>?
+        let status = CMBlockBufferGetDataPointer(
+            blockBuffer,
+            atOffset: 0,
+            lengthAtOffsetOut: &lengthAtOffset,
+            totalLengthOut: nil,
+            dataPointerOut: &dataPointer
+        )
+
+        guard status == noErr, let audioData = dataPointer else {
+            print("[ScreenCaptureKit Audio] ⚠️ Failed to get audio data pointer (status: \(status))")
+            return
+        }
+
+        // Convert audio to PCM s16le format for FFmpeg
+        guard let pcmData = convertAudioToPCM(
+            sourceData: audioData,
+            dataLength: lengthAtOffset,
+            sourceFormat: asbd.pointee,
+            numSamples: numSamples
+        ) else {
+            print("[ScreenCaptureKit Audio] ⚠️ Failed to convert audio to PCM")
+            return
+        }
+
+        // Create processed audio buffer with metadata
+        let processedBuffer = ProcessedAudioBuffer(
+            pcmData: pcmData,
+            sampleRate: sampleRate,
+            channels: channels,
+            timestamp: timeSeconds,
+            frameCount: numSamples
+        )
+
+        // Enqueue the processed audio buffer
+        enqueueAudioBuffer(processedBuffer)
+
+        #if DEBUG
+        if audioBufferCounter % 30 == 0 {
+            print("[ScreenCaptureKit Audio] ✅ Processed audio buffer: \(pcmData.count) bytes, \(numSamples) samples")
+        }
+        #endif
+    }
+
+    /// Converts audio data to PCM s16le format (signed 16-bit little-endian)
+    /// - Parameters:
+    ///   - sourceData: Pointer to source audio data
+    ///   - dataLength: Length of source data in bytes
+    ///   - sourceFormat: Source audio format description
+    ///   - numSamples: Number of audio samples (frames)
+    /// - Returns: PCM data, or nil if conversion fails
+    private func convertAudioToPCM(
+        sourceData: UnsafeMutablePointer<Int8>,
+        dataLength: Int,
+        sourceFormat: AudioStreamBasicDescription,
+        numSamples: Int
+    ) -> Data? {
+        // ScreenCaptureKit typically provides Float32 PCM audio
+        // We need to convert it to Int16 PCM (s16le) for FFmpeg
+
+        let sourceBytesPerFrame = Int(sourceFormat.mBytesPerFrame)
+        let sourceChannels = Int(sourceFormat.mChannelsPerFrame)
+        let isFloat = sourceFormat.mFormatFlags & kAudioFormatFlagIsFloat != 0
+        let isBigEndian = sourceFormat.mFormatFlags & kAudioFormatFlagIsBigEndian != 0
+
+        // Calculate expected output size (2 bytes per sample per channel for s16le)
+        let outputSize = numSamples * sourceChannels * 2
+
+        var pcmData = Data(count: outputSize)
+
+        if isFloat && sourceFormat.mBitsPerChannel == 32 {
+            // Convert Float32 to Int16
+            pcmData.withUnsafeMutableBytes { (outputPtr: UnsafeMutableRawBufferPointer) in
+                let outputSamples = outputPtr.bindMemory(to: Int16.self)
+
+                sourceData.withMemoryRebound(to: Float32.self, capacity: numSamples * sourceChannels) { floatPtr in
+                    for i in 0..<(numSamples * sourceChannels) {
+                        // Clamp float value to [-1.0, 1.0] range
+                        let floatSample = max(-1.0, min(1.0, floatPtr[i]))
+                        // Convert to Int16 range [-32768, 32767]
+                        let intSample = Int16(floatSample * 32767.0)
+                        outputSamples[i] = intSample
+                    }
+                }
+            }
+        } else if sourceFormat.mBitsPerChannel == 16 {
+            // Already Int16, just copy (with potential endian conversion)
+            sourceData.withMemoryRebound(to: Int16.self, capacity: numSamples * sourceChannels) { int16Ptr in
+                pcmData.withUnsafeMutableBytes { (outputPtr: UnsafeMutableRawBufferPointer) in
+                    let outputSamples = outputPtr.bindMemory(to: Int16.self)
+
+                    for i in 0..<(numSamples * sourceChannels) {
+                        var sample = int16Ptr[i]
+                        // Convert big-endian to little-endian if needed
+                        if isBigEndian {
+                            sample = sample.byteSwapped
+                        }
+                        outputSamples[i] = sample
+                    }
+                }
+            }
+        } else {
+            // Unsupported format
+            print("[ScreenCaptureKit Audio] ⚠️ Unsupported audio format: \(sourceFormat.mBitsPerChannel) bits, float: \(isFloat)")
+            return nil
+        }
+
+        return pcmData
     }
 
     // MARK: - Utility Functions
@@ -1317,3 +1537,103 @@ public func screen_capture_window_thumbnail(
     outLength.pointee = 0
     return 0
 }
+
+
+// MARK: - Audio FFI Functions
+
+/// Dequeues an audio buffer from the bridge instance
+/// - Parameters:
+///   - bridge: Pointer to the bridge instance
+///   - outData: Pointer to store PCM data pointer
+///   - outLength: Pointer to store data length
+///   - outSampleRate: Pointer to store sample rate
+///   - outChannels: Pointer to store channel count
+///   - outTimestamp: Pointer to store timestamp
+///   - outFrameCount: Pointer to store frame count
+/// - Returns: 1 if buffer retrieved, 0 if queue is empty
+@_cdecl("screen_capture_bridge_dequeue_audio")
+public func screen_capture_bridge_dequeue_audio(
+    _ bridge: UnsafeMutableRawPointer?,
+    _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+    _ outLength: UnsafeMutablePointer<Int32>?,
+    _ outSampleRate: UnsafeMutablePointer<Double>?,
+    _ outChannels: UnsafeMutablePointer<Int32>?,
+    _ outTimestamp: UnsafeMutablePointer<Double>?,
+    _ outFrameCount: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let bridge = bridge,
+          let outData = outData,
+          let outLength = outLength,
+          let outSampleRate = outSampleRate,
+          let outChannels = outChannels,
+          let outTimestamp = outTimestamp,
+          let outFrameCount = outFrameCount else {
+        print("[ScreenCaptureKit FFI] ERROR: Null pointers provided for audio dequeue")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+
+        guard let audioBuffer = bridgeInstance.dequeueAudioBuffer() else {
+            // Queue is empty
+            return 0
+        }
+
+        // Allocate memory for PCM data
+        let dataPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: audioBuffer.pcmData.count)
+        audioBuffer.pcmData.copyBytes(to: dataPtr, count: audioBuffer.pcmData.count)
+
+        // Set output parameters
+        outData.pointee = dataPtr
+        outLength.pointee = Int32(audioBuffer.pcmData.count)
+        outSampleRate.pointee = audioBuffer.sampleRate
+        outChannels.pointee = Int32(audioBuffer.channels)
+        outTimestamp.pointee = audioBuffer.timestamp
+        outFrameCount.pointee = Int32(audioBuffer.frameCount)
+
+        return 1
+    }
+
+    return 0
+}
+
+/// Gets the current audio queue size
+/// - Parameter bridge: Pointer to the bridge instance
+/// - Returns: Number of audio buffers in the queue, or -1 on error
+@_cdecl("screen_capture_bridge_get_audio_queue_size")
+public func screen_capture_bridge_get_audio_queue_size(_ bridge: UnsafeMutableRawPointer?) -> Int32 {
+    guard let bridge = bridge else {
+        return -1
+    }
+
+    if #available(macOS 12.3, *) {
+        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+        return Int32(bridgeInstance.getAudioQueueSize())
+    }
+
+    return -1
+}
+
+/// Clears the audio queue
+/// - Parameter bridge: Pointer to the bridge instance
+@_cdecl("screen_capture_bridge_clear_audio_queue")
+public func screen_capture_bridge_clear_audio_queue(_ bridge: UnsafeMutableRawPointer?) {
+    guard let bridge = bridge else {
+        return
+    }
+
+    if #available(macOS 12.3, *) {
+        let bridgeInstance = Unmanaged<ScreenCaptureKitBridge>.fromOpaque(bridge).takeUnretainedValue()
+        bridgeInstance.clearAudioQueue()
+    }
+}
+
+/// Frees memory allocated for audio buffer PCM data
+/// - Parameter pcmData: Pointer to PCM data to free
+@_cdecl("screen_capture_free_audio_data")
+public func screen_capture_free_audio_data(_ pcmData: UnsafeMutablePointer<UInt8>?) {
+    guard let pcmData = pcmData else { return }
+    pcmData.deallocate()
+}
+

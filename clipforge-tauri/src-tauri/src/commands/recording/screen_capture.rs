@@ -499,12 +499,8 @@ impl ScreenCaptureSession {
             ));
         }
 
-        let stdin = self.stdin_mut()
-            .ok_or_else(|| RecordingError::CaptureStopFailed(
-                "FFmpeg stdin not available".to_string()
-            ))?;
-
-        // Calculate expected frame size (width * height * 3 bytes for RGB24)
+        // Calculate expected frame size BEFORE borrowing stdin
+        // (width * height * 3 bytes for RGB24)
         let expected_size = (self.config.width * self.config.height * 3) as usize;
         if frame_data.len() != expected_size {
             return Err(RecordingError::CaptureStopFailed(
@@ -512,6 +508,12 @@ impl ScreenCaptureSession {
                     expected_size, frame_data.len())
             ));
         }
+
+        // Now get mutable borrow for stdin
+        let stdin = self.stdin_mut()
+            .ok_or_else(|| RecordingError::CaptureStopFailed(
+                "FFmpeg stdin not available".to_string()
+            ))?;
 
         // Write frame data to stdin
         match stdin.write_all(frame_data) {
