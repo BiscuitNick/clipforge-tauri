@@ -37,6 +37,32 @@ pub struct Frame {
 /// Thread-safe frame queue for buffering captured frames
 pub type FrameQueue = Arc<Mutex<VecDeque<Frame>>>;
 
+/// Display information from SCDisplay (must match Swift CDisplayInfo)
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct CDisplayInfo {
+    pub display_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub x: i32,
+    pub y: i32,
+    pub is_primary: u8, // boolean as u8
+}
+
+/// Window information from SCWindow (must match Swift CWindowInfo)
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct CWindowInfo {
+    pub window_id: u32,
+    pub owner_pid: i32,
+    pub width: u32,
+    pub height: u32,
+    pub x: i32,
+    pub y: i32,
+    pub layer: i32,
+    pub is_on_screen: u8, // boolean as u8
+}
+
 // ============================================================================
 // External C Function Declarations (from Swift)
 // ============================================================================
@@ -63,6 +89,33 @@ extern "C" {
     /// Checks if ScreenCaptureKit is available on this system
     /// Returns 1 if available, 0 otherwise
     fn screen_capture_is_available() -> i32;
+
+    // Content enumeration functions
+    /// Enumerates available displays using SCShareableContent
+    /// Returns 1 on success, 0 on failure
+    fn screen_capture_enumerate_displays(
+        out_displays: *mut *mut c_void,
+        out_count: *mut i32,
+    ) -> i32;
+
+    /// Enumerates available windows using SCShareableContent
+    /// Returns 1 on success, 0 on failure
+    fn screen_capture_enumerate_windows(
+        out_windows: *mut *mut c_void,
+        out_count: *mut i32,
+    ) -> i32;
+
+    /// Gets window title and owner name for a specific window ID
+    /// Returns 1 on success, 0 on failure
+    fn screen_capture_get_window_metadata(
+        window_id: u32,
+        out_title: *mut std::os::raw::c_char,
+        out_owner: *mut std::os::raw::c_char,
+        buffer_size: i32,
+    ) -> i32;
+
+    /// Frees memory allocated by enumerate functions
+    fn screen_capture_free_array(ptr: *mut c_void);
 }
 
 // ============================================================================
@@ -213,6 +266,111 @@ impl Drop for ScreenCaptureBridge {
         }
 
         println!("[ScreenCapture FFI] Bridge destroyed");
+    }
+}
+
+// ============================================================================
+// Content Enumeration API
+// ============================================================================
+
+/// Enumerates all available displays using ScreenCaptureKit
+///
+/// # Returns
+/// - `Ok(Vec<CDisplayInfo>)` on success
+/// - `Err(String)` with error message on failure
+pub fn enumerate_displays() -> Result<Vec<CDisplayInfo>, String> {
+    unsafe {
+        let mut displays_ptr: *mut c_void = std::ptr::null_mut();
+        let mut count: i32 = 0;
+
+        let result = screen_capture_enumerate_displays(
+            &mut displays_ptr as *mut *mut c_void,
+            &mut count as *mut i32,
+        );
+
+        if result != 1 || displays_ptr.is_null() || count == 0 {
+            return Err("Failed to enumerate displays".to_string());
+        }
+
+        // Convert C array to Rust Vec
+        let displays_slice = std::slice::from_raw_parts(displays_ptr as *const CDisplayInfo, count as usize);
+        let displays = displays_slice.to_vec();
+
+        // Free the Swift-allocated array
+        screen_capture_free_array(displays_ptr);
+
+        println!("[ScreenCapture Enum] Enumerated {} displays", displays.len());
+        Ok(displays)
+    }
+}
+
+/// Enumerates all available windows using ScreenCaptureKit
+///
+/// # Returns
+/// - `Ok(Vec<CWindowInfo>)` on success
+/// - `Err(String)` with error message on failure
+pub fn enumerate_windows() -> Result<Vec<CWindowInfo>, String> {
+    unsafe {
+        let mut windows_ptr: *mut c_void = std::ptr::null_mut();
+        let mut count: i32 = 0;
+
+        let result = screen_capture_enumerate_windows(
+            &mut windows_ptr as *mut *mut c_void,
+            &mut count as *mut i32,
+        );
+
+        if result != 1 || windows_ptr.is_null() || count == 0 {
+            return Err("Failed to enumerate windows".to_string());
+        }
+
+        // Convert C array to Rust Vec
+        let windows_slice = std::slice::from_raw_parts(windows_ptr as *const CWindowInfo, count as usize);
+        let windows = windows_slice.to_vec();
+
+        // Free the Swift-allocated array
+        screen_capture_free_array(windows_ptr);
+
+        println!("[ScreenCapture Enum] Enumerated {} windows", windows.len());
+        Ok(windows)
+    }
+}
+
+/// Gets window metadata (title and owner name) for a specific window ID
+///
+/// # Parameters
+/// - `window_id`: The window ID to query
+///
+/// # Returns
+/// - `Ok((String, String))` with (title, owner_name) on success
+/// - `Err(String)` with error message on failure
+pub fn get_window_metadata(window_id: u32) -> Result<(String, String), String> {
+    const BUFFER_SIZE: usize = 256;
+
+    unsafe {
+        let mut title_buffer = vec![0u8; BUFFER_SIZE];
+        let mut owner_buffer = vec![0u8; BUFFER_SIZE];
+
+        let result = screen_capture_get_window_metadata(
+            window_id,
+            title_buffer.as_mut_ptr() as *mut std::os::raw::c_char,
+            owner_buffer.as_mut_ptr() as *mut std::os::raw::c_char,
+            BUFFER_SIZE as i32,
+        );
+
+        if result != 1 {
+            return Err(format!("Failed to get metadata for window {}", window_id));
+        }
+
+        // Convert C strings to Rust Strings
+        let title = std::ffi::CStr::from_ptr(title_buffer.as_ptr() as *const std::os::raw::c_char)
+            .to_string_lossy()
+            .into_owned();
+
+        let owner = std::ffi::CStr::from_ptr(owner_buffer.as_ptr() as *const std::os::raw::c_char)
+            .to_string_lossy()
+            .into_owned();
+
+        Ok((title, owner))
     }
 }
 

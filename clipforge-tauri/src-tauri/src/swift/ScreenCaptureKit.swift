@@ -73,8 +73,9 @@ class ScreenCaptureKitBridge: NSObject {
         config.scalesToFit = false
         config.capturesAudio = captureAudio
 
-        // Background color (black with full alpha)
-        config.backgroundColor = CGColor(red: 0, green: 0, blue: 0, alpha: 1.0)
+        // Background color (black with full alpha) - store in variable for strong reference
+        let bgColor = CGColor(red: 0, green: 0, blue: 0, alpha: 1.0)
+        config.backgroundColor = bgColor
 
         // Store configuration
         self.streamConfiguration = config
@@ -489,4 +490,283 @@ public func screen_capture_is_available() -> Int32 {
         print("[ScreenCaptureKit FFI] ScreenCaptureKit is NOT available (requires macOS 12.3+)")
         return 0
     }
+}
+
+// MARK: - Content Enumeration Structures
+
+/// C-compatible display information structure
+@available(macOS 12.3, *)
+public struct CDisplayInfo {
+    public var displayID: UInt32
+    public var width: UInt32
+    public var height: UInt32
+    public var x: Int32
+    public var y: Int32
+    public var isPrimary: UInt8  // boolean as u8
+
+    public init(displayID: UInt32, width: UInt32, height: UInt32, x: Int32, y: Int32, isPrimary: Bool) {
+        self.displayID = displayID
+        self.width = width
+        self.height = height
+        self.x = x
+        self.y = y
+        self.isPrimary = isPrimary ? 1 : 0
+    }
+}
+
+/// C-compatible window information structure
+@available(macOS 12.3, *)
+public struct CWindowInfo {
+    public var windowID: UInt32
+    public var ownerPID: Int32
+    public var width: UInt32
+    public var height: UInt32
+    public var x: Int32
+    public var y: Int32
+    public var layer: Int32
+    public var isOnScreen: UInt8  // boolean as u8
+
+    public init(windowID: UInt32, ownerPID: Int32, width: UInt32, height: UInt32, x: Int32, y: Int32, layer: Int32, isOnScreen: Bool) {
+        self.windowID = windowID
+        self.ownerPID = ownerPID
+        self.width = width
+        self.height = height
+        self.x = x
+        self.y = y
+        self.layer = layer
+        self.isOnScreen = isOnScreen ? 1 : 0
+    }
+}
+
+// MARK: - Content Enumeration Functions
+
+/// Enumerates available displays using SCShareableContent
+/// - Parameters:
+///   - outDisplays: Pointer to array that will be filled with display info
+///   - outCount: Pointer to store the number of displays found
+/// - Returns: 1 if successful, 0 otherwise
+@_cdecl("screen_capture_enumerate_displays")
+public func screen_capture_enumerate_displays(
+    _ outDisplays: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+    _ outCount: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let outDisplays = outDisplays, let outCount = outCount else {
+        print("[ScreenCaptureKit FFI] ERROR: Null pointers provided for display enumeration")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        // Use a semaphore to make async call synchronous for FFI
+        let semaphore = DispatchSemaphore(value: 0)
+        var displays: [CDisplayInfo] = []
+        var success = false
+
+        Task {
+            do {
+                // Get shareable content
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+                // Get main display for primary detection
+                let mainDisplayID = CGMainDisplayID()
+
+                // Map SCDisplay to CDisplayInfo
+                displays = content.displays.map { display in
+                    let isPrimary = display.displayID == mainDisplayID
+
+                    // Get display bounds
+                    let frame = display.frame
+
+                    return CDisplayInfo(
+                        displayID: display.displayID,
+                        width: UInt32(display.width),
+                        height: UInt32(display.height),
+                        x: Int32(frame.origin.x),
+                        y: Int32(frame.origin.y),
+                        isPrimary: isPrimary
+                    )
+                }
+
+                print("[ScreenCaptureKit Enum] Found \(displays.count) displays")
+                success = true
+            } catch {
+                print("[ScreenCaptureKit Enum] ERROR: Failed to get shareable content: \(error.localizedDescription)")
+                success = false
+            }
+            semaphore.signal()
+        }
+
+        // Wait for async operation to complete
+        semaphore.wait()
+
+        if success && !displays.isEmpty {
+            // Allocate memory for display array
+            let buffer = UnsafeMutablePointer<CDisplayInfo>.allocate(capacity: displays.count)
+            for (index, display) in displays.enumerated() {
+                buffer[index] = display
+            }
+
+            outDisplays.pointee = UnsafeMutableRawPointer(buffer)
+            outCount.pointee = Int32(displays.count)
+            return 1
+        } else {
+            outDisplays.pointee = nil
+            outCount.pointee = 0
+            return 0
+        }
+    } else {
+        print("[ScreenCaptureKit FFI] ERROR: ScreenCaptureKit requires macOS 12.3 or later")
+        outDisplays.pointee = nil
+        outCount.pointee = 0
+        return 0
+    }
+}
+
+/// Enumerates available windows using SCShareableContent
+/// - Parameters:
+///   - outWindows: Pointer to array that will be filled with window info
+///   - outCount: Pointer to store the number of windows found
+/// - Returns: 1 if successful, 0 otherwise
+@_cdecl("screen_capture_enumerate_windows")
+public func screen_capture_enumerate_windows(
+    _ outWindows: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+    _ outCount: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let outWindows = outWindows, let outCount = outCount else {
+        print("[ScreenCaptureKit FFI] ERROR: Null pointers provided for window enumeration")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        // Use a semaphore to make async call synchronous for FFI
+        let semaphore = DispatchSemaphore(value: 0)
+        var windows: [CWindowInfo] = []
+        var success = false
+
+        Task {
+            do {
+                // Get shareable content
+                let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+
+                // Map SCWindow to CWindowInfo
+                windows = content.windows.map { window in
+                    let frame = window.frame
+
+                    return CWindowInfo(
+                        windowID: window.windowID,
+                        ownerPID: Int32(window.owningApplication?.processID ?? -1),
+                        width: UInt32(frame.width),
+                        height: UInt32(frame.height),
+                        x: Int32(frame.origin.x),
+                        y: Int32(frame.origin.y),
+                        layer: Int32(window.windowLayer),
+                        isOnScreen: window.isOnScreen
+                    )
+                }
+
+                print("[ScreenCaptureKit Enum] Found \(windows.count) windows")
+                success = true
+            } catch {
+                print("[ScreenCaptureKit Enum] ERROR: Failed to get shareable content: \(error.localizedDescription)")
+                success = false
+            }
+            semaphore.signal()
+        }
+
+        // Wait for async operation to complete
+        semaphore.wait()
+
+        if success && !windows.isEmpty {
+            // Allocate memory for window array
+            let buffer = UnsafeMutablePointer<CWindowInfo>.allocate(capacity: windows.count)
+            for (index, window) in windows.enumerated() {
+                buffer[index] = window
+            }
+
+            outWindows.pointee = UnsafeMutableRawPointer(buffer)
+            outCount.pointee = Int32(windows.count)
+            return 1
+        } else {
+            outWindows.pointee = nil
+            outCount.pointee = 0
+            return 0
+        }
+    } else {
+        print("[ScreenCaptureKit FFI] ERROR: ScreenCaptureKit requires macOS 12.3 or later")
+        outWindows.pointee = nil
+        outCount.pointee = 0
+        return 0
+    }
+}
+
+/// Gets window title and owner name for a specific window ID
+/// - Parameters:
+///   - windowID: The window ID to query
+///   - outTitle: Buffer to store window title (must be at least 256 bytes)
+///   - outOwner: Buffer to store owner name (must be at least 256 bytes)
+///   - bufferSize: Size of the buffers
+/// - Returns: 1 if successful, 0 otherwise
+@_cdecl("screen_capture_get_window_metadata")
+public func screen_capture_get_window_metadata(
+    _ windowID: UInt32,
+    _ outTitle: UnsafeMutablePointer<CChar>?,
+    _ outOwner: UnsafeMutablePointer<CChar>?,
+    _ bufferSize: Int32
+) -> Int32 {
+    guard let outTitle = outTitle, let outOwner = outOwner else {
+        print("[ScreenCaptureKit FFI] ERROR: Null buffers provided")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        let semaphore = DispatchSemaphore(value: 0)
+        var title = ""
+        var owner = ""
+        var success = false
+
+        Task {
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+                if let window = content.windows.first(where: { $0.windowID == windowID }) {
+                    title = window.title ?? ""
+                    owner = window.owningApplication?.applicationName ?? ""
+                    success = true
+                    print("[ScreenCaptureKit Metadata] Window \(windowID): '\(title)' owned by '\(owner)'")
+                }
+            } catch {
+                print("[ScreenCaptureKit Metadata] ERROR: \(error.localizedDescription)")
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+
+        if success {
+            // Copy strings to output buffers
+            let titleBytes = Array(title.utf8CString)
+            let ownerBytes = Array(owner.utf8CString)
+
+            let titleLen = min(titleBytes.count, Int(bufferSize))
+            let ownerLen = min(ownerBytes.count, Int(bufferSize))
+
+            titleBytes.prefix(titleLen).withUnsafeBufferPointer { ptr in
+                outTitle.initialize(from: ptr.baseAddress!, count: titleLen)
+            }
+            ownerBytes.prefix(ownerLen).withUnsafeBufferPointer { ptr in
+                outOwner.initialize(from: ptr.baseAddress!, count: ownerLen)
+            }
+
+            return 1
+        }
+    }
+
+    return 0
+}
+
+/// Frees memory allocated by enumerate functions
+/// - Parameter ptr: Pointer to free
+@_cdecl("screen_capture_free_array")
+public func screen_capture_free_array(_ ptr: UnsafeMutableRawPointer?) {
+    guard let ptr = ptr else { return }
+    ptr.deallocate()
 }
