@@ -7,6 +7,55 @@ import CoreMedia
 // This module provides Swift wrapper for ScreenCaptureKit APIs
 // to be called from Rust via FFI
 
+// MARK: - Content Cache
+
+/// Cache for SCShareableContent to avoid redundant async calls
+@available(macOS 12.3, *)
+class ContentCache {
+    static let shared = ContentCache()
+
+    private var cachedContent: SCShareableContent?
+    private var cacheTimestamp: Date?
+    private let cacheTTL: TimeInterval = 1.0 // 1 second TTL
+    private let lock = NSLock()
+
+    private init() {}
+
+    /// Gets cached content if valid, otherwise fetches fresh content
+    func getContent(excludeDesktopWindows: Bool = false) async throws -> SCShareableContent {
+        lock.lock()
+        defer { lock.unlock() }
+
+        // Check if cache is valid
+        if let cached = cachedContent,
+           let timestamp = cacheTimestamp,
+           Date().timeIntervalSince(timestamp) < cacheTTL {
+            print("[ContentCache] Using cached content (age: \(String(format: "%.2f", Date().timeIntervalSince(timestamp)))s)")
+            return cached
+        }
+
+        // Cache miss or expired, fetch fresh content
+        print("[ContentCache] Fetching fresh content...")
+        let content = try await SCShareableContent.excludingDesktopWindows(excludeDesktopWindows, onScreenWindowsOnly: true)
+
+        cachedContent = content
+        cacheTimestamp = Date()
+
+        print("[ContentCache] Cached \(content.displays.count) displays, \(content.windows.count) windows")
+        return content
+    }
+
+    /// Invalidates the cache
+    func invalidate() {
+        lock.lock()
+        defer { lock.unlock() }
+
+        cachedContent = nil
+        cacheTimestamp = nil
+        print("[ContentCache] Cache invalidated")
+    }
+}
+
 /// Availability check for ScreenCaptureKit (requires macOS 12.3+)
 @available(macOS 12.3, *)
 class ScreenCaptureKitBridge: NSObject {
@@ -88,8 +137,8 @@ class ScreenCaptureKitBridge: NSObject {
     /// - Returns: True if successful, false otherwise
     func configureDisplayFilter(displayID: CGDirectDisplayID) async -> Bool {
         do {
-            // Get shareable content
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            // Get shareable content (cached)
+            let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
             // Find the display with matching ID
             guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
@@ -114,8 +163,8 @@ class ScreenCaptureKitBridge: NSObject {
     /// - Returns: True if successful, false otherwise
     func configureWindowFilter(windowID: CGWindowID) async -> Bool {
         do {
-            // Get shareable content
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            // Get shareable content (cached)
+            let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
             // Find the window with matching ID
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
@@ -563,8 +612,8 @@ public func screen_capture_enumerate_displays(
 
         Task {
             do {
-                // Get shareable content
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                // Get shareable content (cached)
+                let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
                 // Get main display for primary detection
                 let mainDisplayID = CGMainDisplayID()
@@ -644,8 +693,8 @@ public func screen_capture_enumerate_windows(
 
         Task {
             do {
-                // Get shareable content
-                let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+                // Get shareable content (cached)
+                let content = try await ContentCache.shared.getContent(excludeDesktopWindows: true)
 
                 // Map SCWindow to CWindowInfo
                 windows = content.windows.map { window in
@@ -725,7 +774,8 @@ public func screen_capture_get_window_metadata(
 
         Task {
             do {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                // Get shareable content (cached)
+                let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
                 if let window = content.windows.first(where: { $0.windowID == windowID }) {
                     title = window.title ?? ""
@@ -769,4 +819,202 @@ public func screen_capture_get_window_metadata(
 public func screen_capture_free_array(_ ptr: UnsafeMutableRawPointer?) {
     guard let ptr = ptr else { return }
     ptr.deallocate()
+}
+
+/// Invalidates the SCShareableContent cache
+/// Call this to force fresh enumeration on next request
+@_cdecl("screen_capture_invalidate_cache")
+public func screen_capture_invalidate_cache() {
+    if #available(macOS 12.3, *) {
+        ContentCache.shared.invalidate()
+    }
+}
+
+// MARK: - Thumbnail Generation Functions
+
+/// Captures a thumbnail of a display using SCScreenshotManager
+/// - Parameters:
+///   - displayID: The display ID to capture
+///   - maxWidth: Maximum width for the thumbnail
+///   - outData: Pointer to store the PNG data
+///   - outLength: Pointer to store the PNG data length
+/// - Returns: 1 if successful, 0 otherwise
+@_cdecl("screen_capture_display_thumbnail")
+public func screen_capture_display_thumbnail(
+    _ displayID: UInt32,
+    _ maxWidth: Int32,
+    _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+    _ outLength: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let outData = outData, let outLength = outLength else {
+        print("[ScreenCaptureKit Thumbnail] ERROR: Null output pointers")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        let semaphore = DispatchSemaphore(value: 0)
+        var pngData: Data?
+        var success = false
+
+        Task {
+            do {
+                // Get shareable content (cached)
+                let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
+
+                // Find the display
+                guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
+                    print("[ScreenCaptureKit Thumbnail] Display \(displayID) not found")
+                    semaphore.signal()
+                    return
+                }
+
+                // Create content filter for the display
+                let filter = SCContentFilter(display: display, excludingWindows: [])
+
+                // Configure screenshot settings
+                let config = SCStreamConfiguration()
+
+                // Calculate thumbnail dimensions maintaining aspect ratio
+                let aspectRatio = CGFloat(display.height) / CGFloat(display.width)
+                let thumbWidth = min(Int(maxWidth), display.width)
+                let thumbHeight = Int(CGFloat(thumbWidth) * aspectRatio)
+
+                config.width = thumbWidth
+                config.height = thumbHeight
+                config.pixelFormat = kCVPixelFormatType_32BGRA
+                config.showsCursor = false
+
+                // Capture the screenshot
+                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+
+                // Convert CGImage to PNG data
+                if let mutableData = CFDataCreateMutable(nil, 0),
+                   let destination = CGImageDestinationCreateWithData(mutableData, "public.png" as CFString, 1, nil) {
+                    CGImageDestinationAddImage(destination, image, nil)
+                    if CGImageDestinationFinalize(destination) {
+                        pngData = mutableData as Data
+                        success = true
+                        print("[ScreenCaptureKit Thumbnail] Captured display \(displayID) thumbnail: \(pngData?.count ?? 0) bytes")
+                    }
+                }
+            } catch {
+                print("[ScreenCaptureKit Thumbnail] ERROR: \(error.localizedDescription)")
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+
+        if success, let data = pngData {
+            // Allocate buffer and copy data
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
+            data.copyBytes(to: buffer, count: data.count)
+
+            outData.pointee = buffer
+            outLength.pointee = Int32(data.count)
+            return 1
+        }
+    }
+
+    outData.pointee = nil
+    outLength.pointee = 0
+    return 0
+}
+
+/// Captures a thumbnail of a window using SCScreenshotManager
+/// - Parameters:
+///   - windowID: The window ID to capture
+///   - maxWidth: Maximum width for the thumbnail
+///   - outData: Pointer to store the PNG data
+///   - outLength: Pointer to store the PNG data length
+/// - Returns: 1 if successful, 0 otherwise
+@_cdecl("screen_capture_window_thumbnail")
+public func screen_capture_window_thumbnail(
+    _ windowID: UInt32,
+    _ maxWidth: Int32,
+    _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+    _ outLength: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let outData = outData, let outLength = outLength else {
+        print("[ScreenCaptureKit Thumbnail] ERROR: Null output pointers")
+        return 0
+    }
+
+    if #available(macOS 12.3, *) {
+        let semaphore = DispatchSemaphore(value: 0)
+        var pngData: Data?
+        var success = false
+
+        Task {
+            do {
+                // Get shareable content (cached)
+                let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
+
+                // Find the window
+                guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+                    print("[ScreenCaptureKit Thumbnail] Window \(windowID) not found")
+                    semaphore.signal()
+                    return
+                }
+
+                // Get a display for the filter (required by SCContentFilter)
+                guard let display = content.displays.first else {
+                    print("[ScreenCaptureKit Thumbnail] No displays available")
+                    semaphore.signal()
+                    return
+                }
+
+                // Create content filter including only this window
+                let filter = SCContentFilter(display: display, including: [window])
+
+                // Configure screenshot settings
+                let config = SCStreamConfiguration()
+
+                // Calculate thumbnail dimensions maintaining aspect ratio
+                let windowWidth = Int(window.frame.width)
+                let windowHeight = Int(window.frame.height)
+                let aspectRatio = CGFloat(windowHeight) / CGFloat(windowWidth)
+                let thumbWidth = min(Int(maxWidth), windowWidth)
+                let thumbHeight = Int(CGFloat(thumbWidth) * aspectRatio)
+
+                config.width = thumbWidth
+                config.height = thumbHeight
+                config.pixelFormat = kCVPixelFormatType_32BGRA
+                config.showsCursor = false
+
+                // Capture the screenshot
+                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+
+                // Convert CGImage to PNG data
+                if let mutableData = CFDataCreateMutable(nil, 0),
+                   let destination = CGImageDestinationCreateWithData(mutableData, "public.png" as CFString, 1, nil) {
+                    CGImageDestinationAddImage(destination, image, nil)
+                    if CGImageDestinationFinalize(destination) {
+                        pngData = mutableData as Data
+                        success = true
+                        print("[ScreenCaptureKit Thumbnail] Captured window \(windowID) thumbnail: \(pngData?.count ?? 0) bytes")
+                    }
+                }
+            } catch {
+                print("[ScreenCaptureKit Thumbnail] ERROR: \(error.localizedDescription)")
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+
+        if success, let data = pngData {
+            // Allocate buffer and copy data
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
+            data.copyBytes(to: buffer, count: data.count)
+
+            outData.pointee = buffer
+            outLength.pointee = Int32(data.count)
+            return 1
+        }
+    }
+
+    outData.pointee = nil
+    outLength.pointee = 0
+    return 0
 }

@@ -211,11 +211,8 @@ impl SourceEnumerator for PlatformEnumerator {
             println!("[ScreenEnumeration SCK] Display {}: {}x{} @ ({}, {}), primary: {}",
                 display_id, display.width, display.height, display.x, display.y, is_primary);
 
-            // Generate thumbnail using ScreenCaptureKit (TODO: implement SCScreenshotManager in task 15.4)
-            // For now, fallback to FFmpeg method
-            let camera_count = Self::get_camera_device_count();
-            let avf_device_index = i + camera_count;
-            let thumbnail = Self::capture_screen_thumbnail(avf_device_index);
+            // Generate thumbnail using SCScreenshotManager
+            let thumbnail = ffi::capture_display_thumbnail(display_id, 200).ok();
 
             let mut source = ScreenSource::new(
                 screen_id,
@@ -266,8 +263,8 @@ impl SourceEnumerator for PlatformEnumerator {
             println!("[WindowEnumeration SCK] Window {}: '{}' ({}x{} @ {}, {})",
                 window_id, display_name, window.width, window.height, window.x, window.y);
 
-            // Generate thumbnail for the window
-            let thumbnail = Self::capture_window_thumbnail(window_id);
+            // Generate thumbnail using SCScreenshotManager
+            let thumbnail = ffi::capture_window_thumbnail(window_id, 200).ok();
 
             let mut source = ScreenSource::new(
                 format!("window_{}", window_id),

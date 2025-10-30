@@ -6,6 +6,7 @@
 use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::sync::{Arc, Mutex};
+use base64::Engine;
 
 // ============================================================================
 // FFI Type Definitions
@@ -116,6 +117,25 @@ extern "C" {
 
     /// Frees memory allocated by enumerate functions
     fn screen_capture_free_array(ptr: *mut c_void);
+
+    // Thumbnail generation functions
+    /// Captures a thumbnail of a display
+    /// Returns 1 on success, 0 on failure
+    fn screen_capture_display_thumbnail(
+        display_id: u32,
+        max_width: i32,
+        out_data: *mut *mut u8,
+        out_length: *mut i32,
+    ) -> i32;
+
+    /// Captures a thumbnail of a window
+    /// Returns 1 on success, 0 on failure
+    fn screen_capture_window_thumbnail(
+        window_id: u32,
+        max_width: i32,
+        out_data: *mut *mut u8,
+        out_length: *mut i32,
+    ) -> i32;
 }
 
 // ============================================================================
@@ -371,6 +391,80 @@ pub fn get_window_metadata(window_id: u32) -> Result<(String, String), String> {
             .into_owned();
 
         Ok((title, owner))
+    }
+}
+
+/// Captures a thumbnail of a display as base64-encoded PNG
+///
+/// # Parameters
+/// - `display_id`: The display ID to capture
+/// - `max_width`: Maximum width for the thumbnail (default 200)
+///
+/// # Returns
+/// - `Ok(String)` with base64-encoded PNG data on success
+/// - `Err(String)` with error message on failure
+pub fn capture_display_thumbnail(display_id: u32, max_width: i32) -> Result<String, String> {
+    unsafe {
+        let mut data_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: i32 = 0;
+
+        let result = screen_capture_display_thumbnail(
+            display_id,
+            max_width,
+            &mut data_ptr as *mut *mut u8,
+            &mut length as *mut i32,
+        );
+
+        if result != 1 || data_ptr.is_null() || length == 0 {
+            return Err(format!("Failed to capture thumbnail for display {}", display_id));
+        }
+
+        // Convert to Vec and base64 encode
+        let png_data = std::slice::from_raw_parts(data_ptr, length as usize);
+        let base64_string = base64::engine::general_purpose::STANDARD.encode(png_data);
+
+        // Free the Swift-allocated buffer
+        screen_capture_free_array(data_ptr as *mut c_void);
+
+        println!("[ScreenCapture Thumbnail] Captured display {} thumbnail: {} bytes", display_id, length);
+        Ok(base64_string)
+    }
+}
+
+/// Captures a thumbnail of a window as base64-encoded PNG
+///
+/// # Parameters
+/// - `window_id`: The window ID to capture
+/// - `max_width`: Maximum width for the thumbnail (default 200)
+///
+/// # Returns
+/// - `Ok(String)` with base64-encoded PNG data on success
+/// - `Err(String)` with error message on failure
+pub fn capture_window_thumbnail(window_id: u32, max_width: i32) -> Result<String, String> {
+    unsafe {
+        let mut data_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: i32 = 0;
+
+        let result = screen_capture_window_thumbnail(
+            window_id,
+            max_width,
+            &mut data_ptr as *mut *mut u8,
+            &mut length as *mut i32,
+        );
+
+        if result != 1 || data_ptr.is_null() || length == 0 {
+            return Err(format!("Failed to capture thumbnail for window {}", window_id));
+        }
+
+        // Convert to Vec and base64 encode
+        let png_data = std::slice::from_raw_parts(data_ptr, length as usize);
+        let base64_string = base64::engine::general_purpose::STANDARD.encode(png_data);
+
+        // Free the Swift-allocated buffer
+        screen_capture_free_array(data_ptr as *mut c_void);
+
+        println!("[ScreenCapture Thumbnail] Captured window {} thumbnail: {} bytes", window_id, length);
+        Ok(base64_string)
     }
 }
 
