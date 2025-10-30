@@ -4,6 +4,7 @@ import MediaLibraryPanel from "./components/MediaLibraryPanel";
 import VideoPreviewPanel from "./components/VideoPreviewPanel";
 import TimelineClipsPanel from "./components/TimelineClipsPanel";
 import Timeline from "./components/Timeline";
+import PreviewWindow from "./components/PreviewWindow";
 import { useTimeline } from "./hooks/useTimeline";
 import { useMediaLibrary } from "./hooks/useMediaLibrary";
 import { DndContext } from "@dnd-kit/core";
@@ -27,6 +28,7 @@ function App() {
   const [webcamStream, setWebcamStream] = React.useState(null); // Track webcam stream for preview
   const [webcamRecordingDuration, setWebcamRecordingDuration] = React.useState(0); // Track webcam recording duration
   const [isWebcamPaused, setIsWebcamPaused] = React.useState(false); // Track webcam recording paused state
+  const [isPreviewWindowVisible, setIsPreviewWindowVisible] = React.useState(false); // Track preview window visibility
 
   // Panel visibility state - flexible panel system (2-4 panels)
   const [panelVisibility, setPanelVisibility] = React.useState({
@@ -358,7 +360,7 @@ function App() {
     };
   }, []);
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for undo/redo and preview window toggle
   React.useEffect(() => {
     const handleKeyDown = (e) => {
       // Check for Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
@@ -371,6 +373,12 @@ function App() {
           // Undo: Cmd+Z or Ctrl+Z
           timeline.undo();
         }
+      }
+
+      // Toggle preview window with Cmd+P (Mac) or Ctrl+P (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        setIsPreviewWindowVisible(prev => !prev);
       }
     };
 
@@ -471,6 +479,17 @@ function App() {
             ◀ Clips
           </button>
         )}
+        {/* Preview Window Toggle */}
+        {!isPreviewWindowVisible && (
+          <button
+            className="panel-toggle preview-window-toggle"
+            onClick={() => setIsPreviewWindowVisible(true)}
+            aria-label="Show Preview Window"
+            title="Show Preview Window (Cmd/Ctrl+P)"
+          >
+            👁 Preview
+          </button>
+        )}
       </div>
 
       {/* Bottom section: Timeline */}
@@ -553,6 +572,13 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Preview Window - Floating overlay for real-time screen capture preview */}
+      <PreviewWindow
+        isVisible={isPreviewWindowVisible}
+        onToggleVisibility={() => setIsPreviewWindowVisible(prev => !prev)}
+        isPictureInPicture={false}
+      />
     </div>
     </DndContext>
   );

@@ -1,0 +1,372 @@
+/* PreviewWindow - Floating overlay component for real-time screen capture preview */
+
+.preview-window {
+  position: fixed;
+  z-index: 9999;
+  background: #1a1a1a;
+  border: 2px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  min-width: 160px;
+  min-height: 90px;
+}
+
+.preview-window.dragging {
+  cursor: move;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8);
+  transform: scale(1.02);
+}
+
+.preview-window.resizing {
+  cursor: nwse-resize;
+}
+
+/* Picture-in-Picture mode - minimal styling */
+.preview-window.pip-mode {
+  border-radius: 4px;
+  border-width: 1px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.preview-window.pip-mode .preview-drag-handle {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.preview-window.pip-mode .preview-metrics {
+  display: none;
+}
+
+/* Drag Handle */
+.preview-drag-handle {
+  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+  padding: 8px 12px;
+  cursor: move;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #333;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+  transition: background 0.2s ease;
+}
+
+.preview-drag-handle:hover {
+  background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
+}
+
+.preview-drag-handle:active {
+  background: linear-gradient(180deg, #3a3a3a 0%, #2f2f2f 100%);
+  cursor: grabbing;
+}
+
+.preview-title {
+  flex: 1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.preview-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.preview-control-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 4px;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.preview-control-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Canvas Container */
+.preview-canvas-container {
+  flex: 1;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.preview-canvas.active {
+  opacity: 1;
+  transition: opacity 0.1s ease;
+}
+
+.preview-canvas.inactive {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+/* Overlay Information */
+.preview-overlay {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Recording Indicator */
+.preview-recording-indicator {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(220, 38, 38, 0.9);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  animation: pulse-recording 2s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  animation: blink-recording 1.5s ease-in-out infinite;
+}
+
+@keyframes blink-recording {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.recording-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* FPS Counter */
+.preview-fps-counter {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f0;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(0, 255, 0, 0.3);
+}
+
+/* Metrics Display */
+.preview-metrics {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #ccc;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Resize Handle */
+.preview-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+  z-index: 20;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 4px;
+}
+
+.resize-corner {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 12px 12px;
+  border-color: transparent transparent #666 transparent;
+  transition: border-color 0.2s ease;
+}
+
+.preview-resize-handle:hover .resize-corner {
+  border-color: transparent transparent #888 transparent;
+}
+
+.preview-resize-handle:active .resize-corner {
+  border-color: transparent transparent #aaa transparent;
+}
+
+/* Show/Hide Transitions */
+.preview-window-enter {
+  opacity: 0;
+  transform: scale(0.9) translateY(20px);
+}
+
+.preview-window-enter-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.preview-window-exit {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.preview-window-exit-active {
+  opacity: 0;
+  transform: scale(0.9) translateY(20px);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+/* Auto-hide on inactivity (can be implemented with JS) */
+.preview-window.auto-hide {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.preview-window.auto-hide:hover {
+  opacity: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .preview-window {
+    min-width: 120px;
+    min-height: 68px;
+  }
+
+  .preview-drag-handle {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .preview-fps-counter {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .preview-recording-indicator {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}
+
+/* Accessibility */
+.preview-window:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.preview-control-btn:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .preview-window {
+    border-color: #fff;
+    border-width: 3px;
+  }
+
+  .preview-drag-handle {
+    background: #000;
+    color: #fff;
+  }
+
+  .preview-fps-counter,
+  .preview-metrics {
+    background: #000;
+    color: #fff;
+    border-color: #fff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .preview-window,
+  .preview-canvas,
+  .preview-drag-handle,
+  .preview-control-btn {
+    transition: none;
+  }
+
+  @keyframes pulse-recording {
+    0%, 100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes blink-recording {
+    0%, 100% {
+      opacity: 1;
+    }
+  }
+}

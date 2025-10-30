@@ -208,6 +208,16 @@ button:focus {
   color: #6ab7ff;
 }
 
+.panel-toggle.preview-window-toggle {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.panel-toggle.preview-window-toggle:hover {
+  border-color: #34d399;
+  color: #34d399;
+}
+
 /* Export progress overlay */
 .export-overlay {
   position: fixed;
