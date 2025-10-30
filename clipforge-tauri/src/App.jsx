@@ -141,7 +141,12 @@ function App() {
           console.log("[App] Preview stopped after recording completed");
         })
         .catch((error) => {
-          console.error("[App] Failed to stop preview:", error);
+          const message = error?.message || String(error);
+          if (message.includes("Preview is not active")) {
+            console.log("[App] Preview was already inactive after recording");
+          } else {
+            console.error("[App] Failed to stop preview:", error);
+          }
         });
 
       setRecordingState(null);
@@ -164,6 +169,17 @@ function App() {
   // Handle stop recording
   const handleStopRecording = async () => {
     try {
+      try {
+        await invoke('stop_preview_for_source');
+        console.log("[App] Preview stopped prior to recording shutdown");
+      } catch (previewError) {
+        const message = previewError?.message || String(previewError);
+        if (message.includes("Preview is not active")) {
+          console.log("[App] Preview already inactive when stopping recording");
+        } else {
+          console.warn("[App] Preview stop before recording returned:", previewError);
+        }
+      }
       const result = await invoke('stop_recording');
       console.log("[App] Recording stopped:", result);
       handleRecordingStateChange(result);

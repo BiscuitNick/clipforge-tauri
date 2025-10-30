@@ -4,7 +4,7 @@ use super::super::ffmpeg_utils;
 use super::{RecordingConfig, RecordingError};
 #[cfg(target_os = "macos")]
 use crate::capture::ffi;
-use std::io::{ErrorKind, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::thread;
@@ -158,14 +158,47 @@ impl ScreenCaptureSession {
         let mut command = self.build_ffmpeg_command(&ffmpeg_path, include_audio)?;
 
         // Start FFmpeg process with stdin piped so we can send commands
-        let child = command
+        let mut child = command
             .stdin(Stdio::piped()) // Changed from null to piped to allow sending 'q' command
-            .stdout(Stdio::piped())
+            .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| RecordingError::CaptureInitFailed(e.to_string()))?;
 
         println!("[ScreenCapture] FFmpeg started with PID: {}", child.id());
+
+        if let Some(stderr) = child.stderr.take() {
+            let output_path = self.output_path.clone();
+            thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    match line {
+                        Ok(line) => println!("[ScreenCapture][ffmpeg] {}", line),
+                        Err(err) => {
+                            println!(
+                                "[ScreenCapture][ffmpeg] Error reading stderr for {}: {}",
+                                output_path.display(),
+                                err
+                            );
+                            break;
+                        }
+                    }
+                }
+                println!(
+                    "[ScreenCapture][ffmpeg] Stderr stream closed for {}",
+                    output_path.display()
+                );
+            });
+        }
+
+        // If FFmpeg exits immediately, surface the failure instead of pretending the session started.
+        if let Ok(Some(status)) = child.try_wait() {
+            if !status.success() {
+                return Err(RecordingError::CaptureInitFailed(format!(
+                    "FFmpeg exited immediately with status: {status}"
+                )));
+            }
+        }
 
         self.ffmpeg_process = Some(child);
         Ok(())
@@ -226,6 +259,9 @@ impl ScreenCaptureSession {
             .arg("-framerate")
             .arg(self.config.frame_rate.to_string());
 
+        // Use wallclock timestamps to keep frame timing stable
+        command.arg("-use_wallclock_as_timestamps").arg("1");
+
         // Parse source ID to determine capture type
         println!("[ScreenCapture] Source ID: {}", self.source_id);
 
@@ -266,7 +302,7 @@ impl ScreenCaptureSession {
             let input_device = if include_audio {
                 format!("{}:0", resolved_index)
             } else {
-                format!("{}:", resolved_index)
+                resolved_index.to_string()
             };
 
             println!("[ScreenCapture] FFmpeg input device: {}", input_device);
@@ -288,7 +324,7 @@ impl ScreenCaptureSession {
             let input_device = if include_audio {
                 format!("{}:0", screen_device)
             } else {
-                format!("{}:", screen_device)
+                screen_device.to_string()
             };
 
             println!(
@@ -307,7 +343,7 @@ impl ScreenCaptureSession {
             let input_device = if include_audio {
                 format!("{}:0", first_screen_device)
             } else {
-                format!("{}:", first_screen_device)
+                first_screen_device
             };
 
             println!(
@@ -385,15 +421,72 @@ impl ScreenCaptureSession {
 
     /// Add encoding arguments based on configuration
     fn add_encoding_args(&self, command: &mut Command) {
-        // Apply crop filter if window bounds are set
+        // Build video filters to satisfy codec requirements (even dimensions, optional crop)
+        let mut video_filters: Vec<String> = Vec::new();
+
         if let Some((x, y, width, height)) = self.window_bounds {
+            let mut crop_width = width;
+            let mut crop_height = height;
+
+            if crop_width % 2 != 0 && crop_width > 1 {
+                crop_width -= 1;
+                println!(
+                    "[ScreenCapture] Adjusted crop width to even value: {} -> {}",
+                    width, crop_width
+                );
+            }
+
+            if crop_height % 2 != 0 && crop_height > 1 {
+                crop_height -= 1;
+                println!(
+                    "[ScreenCapture] Adjusted crop height to even value: {} -> {}",
+                    height, crop_height
+                );
+            }
+
             println!(
                 "[ScreenCapture] Applying crop filter: {}:{}:{}:{}",
-                width, height, x, y
+                crop_width, crop_height, x, y
             );
-            // Crop filter format: crop=width:height:x:y
-            let crop_filter = format!("crop={}:{}:{}:{}", width, height, x, y);
-            command.arg("-vf").arg(crop_filter);
+            video_filters.push(format!("crop={}:{}:{}:{}", crop_width, crop_height, x, y));
+        }
+
+        // Normalize timestamps and frame cadence
+        video_filters.push("setpts=PTS-STARTPTS".to_string());
+        video_filters.push(format!("fps={}", self.config.frame_rate));
+
+        let mut target_width = self.config.width;
+        if target_width % 2 != 0 {
+            let adjusted = if target_width > 1 {
+                target_width - 1
+            } else {
+                2
+            };
+            println!(
+                "[ScreenCapture] Adjusted target width to even value: {} -> {}",
+                target_width, adjusted
+            );
+            target_width = adjusted;
+        }
+
+        let mut target_height = self.config.height;
+        if target_height % 2 != 0 {
+            let adjusted = if target_height > 1 {
+                target_height - 1
+            } else {
+                2
+            };
+            println!(
+                "[ScreenCapture] Adjusted target height to even value: {} -> {}",
+                target_height, adjusted
+            );
+            target_height = adjusted;
+        }
+
+        video_filters.push(format!("scale={}:{}", target_width, target_height));
+
+        if !video_filters.is_empty() {
+            command.arg("-vf").arg(video_filters.join(","));
         }
 
         // Video codec
@@ -403,13 +496,6 @@ impl ScreenCaptureSession {
         command
             .arg("-b:v")
             .arg(format!("{}k", self.config.video_bitrate));
-
-        // Resolution (scale if needed) - only if not using crop
-        if self.window_bounds.is_none() {
-            command
-                .arg("-s")
-                .arg(format!("{}x{}", self.config.width, self.config.height));
-        }
 
         // Keyframe interval (every 2 seconds)
         let keyframe_interval = self.config.frame_rate * 2;
@@ -477,6 +563,9 @@ impl ScreenCaptureSession {
             command
                 .arg("-ac")
                 .arg(self.config.audio_channels.to_string());
+            command
+                .arg("-af")
+                .arg("aresample=async=1:first_pts=0");
         }
 
         // Output format
@@ -506,7 +595,7 @@ impl ScreenCaptureSession {
                 // Method 1: Try sending 'q' to stdin (FFmpeg's quit command)
                 if let Some(mut stdin) = child.stdin.take() {
                     println!("[ScreenCapture] Sending 'q' command to FFmpeg");
-                    let _ = stdin.write_all(b"q");
+                    let _ = stdin.write_all(b"q\n");
                     let _ = stdin.flush();
                     drop(stdin); // Close stdin
 
@@ -514,58 +603,68 @@ impl ScreenCaptureSession {
                     thread::sleep(Duration::from_millis(500));
                 }
 
-                // Check if process exited after 'q' command
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        println!(
-                            "[ScreenCapture] FFmpeg exited gracefully with status: {:?}",
-                            status
-                        );
-                    }
-                    Ok(None) => {
-                        // Still running, try SIGINT
-                        println!("[ScreenCapture] FFmpeg still running, sending SIGINT");
-                        let pid = child.id() as i32;
-                        unsafe {
-                            libc::kill(pid, libc::SIGINT);
+                // Allow process time to exit gracefully after 'q'
+                let mut exited = false;
+                for _ in 0..50 {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            println!(
+                                "[ScreenCapture] FFmpeg exited gracefully with status: {:?}",
+                                status
+                            );
+                            exited = true;
+                            break;
                         }
+                        Ok(None) => thread::sleep(Duration::from_millis(100)),
+                        Err(e) => {
+                            println!("[ScreenCapture] Error checking process status: {}", e);
+                            return Err(RecordingError::CaptureStopFailed(e.to_string()));
+                        }
+                    }
+                }
 
-                        // Wait up to 5 seconds for graceful shutdown
-                        for i in 0..50 {
-                            thread::sleep(Duration::from_millis(100));
-                            match child.try_wait() {
-                                Ok(Some(status)) => {
-                                    println!("[ScreenCapture] FFmpeg exited after SIGINT with status: {:?}", status);
-                                    break;
-                                }
-                                Ok(None) if i == 49 => {
-                                    // Last iteration, force kill
-                                    println!(
-                                        "[ScreenCapture] FFmpeg not responding, force killing"
-                                    );
-                                    let _ = child.kill();
-                                    let _ = child.wait();
+                if !exited {
+                    // Still running, try SIGINT
+                    println!("[ScreenCapture] FFmpeg still running, sending SIGINT");
+                    let pid = child.id() as i32;
+                    unsafe {
+                        libc::kill(pid, libc::SIGINT);
+                    }
 
-                                    // Also try to clean up any orphaned ffmpeg processes
-                                    println!(
-                                        "[ScreenCapture] Cleaning up orphaned FFmpeg processes"
-                                    );
-                                    let _ = Command::new("pkill")
-                                        .arg("-9")
-                                        .arg("-f")
-                                        .arg(&format!(
-                                            "ffmpeg.*{}",
-                                            self.output_path.to_string_lossy()
-                                        ))
-                                        .output();
-                                }
-                                _ => continue,
+                    // Wait up to 5 seconds for graceful shutdown
+                    for i in 0..100 {
+                        thread::sleep(Duration::from_millis(100));
+                        match child.try_wait() {
+                            Ok(Some(status)) => {
+                                println!(
+                                    "[ScreenCapture] FFmpeg exited after SIGINT with status: {:?}",
+                                    status
+                                );
+                                exited = true;
+                                break;
+                            }
+                            Ok(None) if i == 49 => {
+                                // Last iteration, force kill
+                                println!("[ScreenCapture] FFmpeg not responding, force killing");
+                                let _ = child.kill();
+
+                                // Also try to clean up any orphaned ffmpeg processes
+                                println!("[ScreenCapture] Cleaning up orphaned FFmpeg processes");
+                                let _ = Command::new("pkill")
+                                    .arg("-9")
+                                    .arg("-f")
+                                    .arg(&format!(
+                                        "ffmpeg.*{}",
+                                        self.output_path.to_string_lossy()
+                                    ))
+                                    .output();
+                            }
+                            Ok(None) => continue,
+                            Err(e) => {
+                                println!("[ScreenCapture] Error checking process status: {}", e);
+                                return Err(RecordingError::CaptureStopFailed(e.to_string()));
                             }
                         }
-                    }
-                    Err(e) => {
-                        println!("[ScreenCapture] Error checking process status: {}", e);
-                        return Err(RecordingError::CaptureStopFailed(e.to_string()));
                     }
                 }
             }
@@ -577,15 +676,43 @@ impl ScreenCaptureSession {
                 child
                     .kill()
                     .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
-                child
-                    .wait()
-                    .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
+            }
+
+            // Wait for FFmpeg process to exit and report status
+            let status = child
+                .wait()
+                .map_err(|e| RecordingError::CaptureStopFailed(e.to_string()))?;
+
+            if !status.success() {
+                println!(
+                    "[ScreenCapture] ⚠️ FFmpeg exited with non-zero status: {:?}",
+                    status
+                );
+                return Err(RecordingError::CaptureStopFailed(format!(
+                    "FFmpeg exited with status: {status}"
+                )));
             }
 
             // Verify the file exists and has content
             if !self.output_path.exists() {
                 return Err(RecordingError::CaptureStopFailed(
                     "Output file was not created".to_string(),
+                ));
+            }
+
+            let file_metadata = std::fs::metadata(&self.output_path).map_err(|e| {
+                RecordingError::CaptureStopFailed(format!(
+                    "Failed to read output metadata: {e}"
+                ))
+            })?;
+
+            if file_metadata.len() == 0 {
+                println!(
+                    "[ScreenCapture] ⚠️ Output file is empty after FFmpeg exit: {}",
+                    self.output_path.display()
+                );
+                return Err(RecordingError::CaptureStopFailed(
+                    "Output file is empty".to_string(),
                 ));
             }
 
