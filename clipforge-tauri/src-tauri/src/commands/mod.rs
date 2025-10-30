@@ -7,3 +7,4 @@ pub mod permissions;
 pub mod screen_sources;
 pub mod camera_sources;
 pub mod thumbnail;
+pub mod preview;

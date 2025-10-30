@@ -20,8 +20,12 @@ pub fn run() {
     // Initialize recording manager state
     let recording_manager = Arc::new(Mutex::new(commands::recording::RecordingManager::new()));
 
+    // Initialize preview state
+    let preview_state = Arc::new(Mutex::new(commands::preview::PreviewState::new()));
+
     tauri::Builder::default()
         .manage(recording_manager)
+        .manage(preview_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -57,7 +61,12 @@ pub fn run() {
             commands::screen_sources::enumerate_screens,
             commands::screen_sources::enumerate_windows,
             commands::camera_sources::enumerate_cameras,
-            commands::camera_sources::get_default_camera
+            commands::camera_sources::get_default_camera,
+            commands::preview::start_preview,
+            commands::preview::stop_preview,
+            commands::preview::update_preview_settings,
+            commands::preview::get_preview_metrics,
+            commands::preview::get_preview_settings
         ])
         .setup(|app| {
             // Create the menu
