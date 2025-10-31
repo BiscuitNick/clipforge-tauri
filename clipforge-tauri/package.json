@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "start": "tauri dev"
+    "start": "tauri dev",
+    "build:macos": "npm run tauri build && ./src-tauri/scripts/post-build-macos.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

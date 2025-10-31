@@ -9,7 +9,14 @@ fn main() {
     // Only compile Swift code on macOS
     if cfg!(target_os = "macos") {
         compile_swift_bridge();
+        setup_macos_rpath();
     }
+}
+
+fn setup_macos_rpath() {
+    // Add rpath for macOS app bundle
+    println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+    println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path/../Frameworks");
 }
 
 fn compile_swift_bridge() {
@@ -31,7 +38,7 @@ fn compile_swift_bridge() {
 
     println!("cargo:warning=Compiling Swift bridge module...");
 
-    // Compile Swift code into a dynamic library
+    // Compile Swift code into a dynamic library with proper install name
     let output = Command::new("swiftc")
         .arg("-emit-library")
         .arg("-o")
@@ -41,10 +48,7 @@ fn compile_swift_bridge() {
         .arg("-Xlinker")
         .arg("-install_name")
         .arg("-Xlinker")
-        .arg(format!(
-            "@rpath/{}",
-            swift_lib.file_name().unwrap().to_str().unwrap()
-        ))
+        .arg("@executable_path/../Frameworks/libScreenCaptureKitBridge.dylib")
         .arg("-framework")
         .arg("ScreenCaptureKit")
         .arg("-framework")
@@ -65,6 +69,17 @@ fn compile_swift_bridge() {
     println!(
         "cargo:warning=Swift compilation successful: {}",
         swift_lib.display()
+    );
+
+    // Copy the library to the lib directory for Tauri bundling
+    let lib_dir = PathBuf::from(&manifest_dir).join("lib");
+    std::fs::create_dir_all(&lib_dir).expect("Failed to create lib directory");
+    let dest_lib = lib_dir.join("libScreenCaptureKitBridge.dylib");
+    std::fs::copy(&swift_lib, &dest_lib).expect("Failed to copy Swift library to lib directory");
+
+    println!(
+        "cargo:warning=Copied library to: {}",
+        dest_lib.display()
     );
 
     // Tell cargo to link the Swift library
