@@ -15,7 +15,6 @@ function ImportPanel({ onImport }) {
     const appWindow = getCurrentWindow();
 
     const dropHandler = appWindow.listen("tauri://drag-drop", (event) => {
-      console.log("File drop event:", event);
       setIsDragging(false);
 
       if (event.payload && event.payload.paths) {
@@ -84,8 +83,6 @@ function ImportPanel({ onImport }) {
 
       setMessage(`Successfully imported ${result.length} video file(s)!`);
       setMessageType("success");
-      console.log("Import result:", result);
-
       // Call onImport callback with the imported video metadata
       if (onImport && result.length > 0) {
         onImport(result);
@@ -96,7 +93,6 @@ function ImportPanel({ onImport }) {
         setMessageType("");
       }, 3000);
     } catch (error) {
-      console.error("Import error:", error);
       setMessage(`Error importing files: ${error}`);
       setMessageType("error");
 
@@ -126,7 +122,6 @@ function ImportPanel({ onImport }) {
         await importVideos(filePaths);
       }
     } catch (error) {
-      console.error("File picker error:", error);
       setMessage(`Error opening file picker: ${error}`);
       setMessageType("error");
 

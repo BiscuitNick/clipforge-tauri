@@ -1,93 +1,93 @@
 {
 	"meta": {
-		"generatedAt": "2025-10-28T21:38:03.551Z",
+		"generatedAt": "2025-10-30T15:52:04.895Z",
 		"tasksAnalyzed": 10,
-		"totalTasks": 10,
+		"totalTasks": 22,
 		"analysisCount": 10,
 		"thresholdScore": 5,
 		"projectName": "Taskmaster",
-		"usedResearch": false
+		"usedResearch": true
 	},
 	"complexityAnalysis": [
 		{
-			"taskId": 1,
-			"taskTitle": "Set up recording infrastructure and permissions",
-			"complexityScore": 8,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Break down into: 1) Create recording.rs module structure, 2) Implement macOS permission handling (screen, camera, mic), 3) Set up cross-platform permission abstraction, 4) Create recording state management system, 5) Define recording configuration data structures, 6) Implement cleanup and error recovery mechanisms",
-			"reasoning": "High complexity due to platform-specific permission APIs, state management requirements, and need for robust error handling across multiple recording types. Requires deep Tauri integration and careful architectural design."
+			"taskId": 13,
+			"taskTitle": "Create Swift ScreenCaptureKit bridge module",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break down into: 1) Swift file creation and basic ScreenCaptureKit imports, 2) SCStreamDelegate protocol implementation, 3) SCStreamOutput protocol implementation, 4) SCStreamConfiguration setup with video settings, 5) SCContentFilter implementation for display/window filtering, 6) Start/stop/pause method implementation with error handling, 7) @objc annotation setup for C/Objective-C exposure, 8) CMSampleBuffer processing and CVPixelBuffer extraction with memory management.",
+			"reasoning": "This task requires deep Apple framework knowledge, complex Swift-to-C interop, memory management, and working with underdocumented ScreenCaptureKit APIs. The codebase currently has no Swift code, requiring a completely new build pipeline setup."
 		},
 		{
-			"taskId": 2,
-			"taskTitle": "Implement screen and window enumeration",
-			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Implement macOS screen/window enumeration using Core Graphics, 2) Create data structures for source metadata, 3) Generate window/screen thumbnails, 4) Handle multi-monitor configurations, 5) Implement frontend serialization and IPC commands",
-			"reasoning": "Requires platform-specific APIs for screen capture enumeration, thumbnail generation, and handling various edge cases like multiple monitors and different window types. Complex due to native API integration."
-		},
-		{
-			"taskId": 3,
-			"taskTitle": "Implement core screen recording functionality",
+			"taskId": 14,
+			"taskTitle": "Build Rust FFI bridge for Swift interop",
 			"complexityScore": 9,
 			"recommendedSubtasks": 7,
-			"expansionPrompt": "Break down into: 1) Implement AVFoundation screen capture for macOS, 2) Configure H.264/AAC encoding pipeline, 3) Add system audio capture integration, 4) Implement recording controls (start/stop/pause), 5) Add real-time duration and file size tracking, 6) Handle recording to temporary then final locations, 7) Implement recording cancellation and cleanup",
-			"reasoning": "Most complex task - requires deep platform API integration, video/audio encoding configuration, real-time monitoring, and careful resource management. AVFoundation complexity and cross-platform considerations make this very challenging."
+			"expansionPrompt": "Break down into: 1) Create src-tauri/src/capture/ffi.rs module structure, 2) Implement extern 'C' functions matching Swift @objc exports, 3) Set up objc and block crates for Objective-C runtime handling, 4) Implement thread-safe frame queue using Arc<Mutex<VecDeque<Frame>>>, 5) Create CVPixelBuffer to Rust Vec<u8> conversion, 6) Handle Swift object lifecycle with proper retain/release using objc::rc::StrongPtr, 7) Add build.rs configuration to compile and link Swift code.",
+			"reasoning": "FFI between Swift and Rust is notoriously complex, involving unsafe code, memory management across language boundaries, and thread safety concerns. The current codebase has objc crate experience but no Swift FFI."
 		},
 		{
-			"taskId": 4,
-			"taskTitle": "Create screen recording UI components",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create recording button and integrate into MediaLibraryPanel, 2) Build screen selection modal with thumbnail grid, 3) Implement recording status indicator with timer, 4) Add audio controls and error display components",
-			"reasoning": "Moderate complexity - existing React patterns and UI components can be leveraged. Main challenges are state management integration and real-time timer updates."
-		},
-		{
-			"taskId": 5,
-			"taskTitle": "Implement webcam recording system",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Implement camera enumeration backend command, 2) Set up MediaRecorder API with getUserMedia, 3) Create blob-to-file Tauri command for MP4 saving, 4) Build camera selection UI and live preview, 5) Implement recording controls with audio toggle",
-			"reasoning": "Moderate complexity using web APIs but requires careful blob handling, Tauri file operations, and coordination between frontend MediaRecorder and backend file saving."
-		},
-		{
-			"taskId": 6,
-			"taskTitle": "Add audio capture and monitoring features",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Create audio device enumeration backend, 2) Implement Web Audio API analyzer for VU meter, 3) Build audio level indicator UI component, 4) Add mute/unmute controls with visual feedback, 5) Integrate audio with screen and webcam recording",
-			"reasoning": "Requires Web Audio API expertise for real-time analysis, backend audio enumeration, and integration with multiple recording modes. Moderate complexity with some technical challenges."
-		},
-		{
-			"taskId": 7,
-			"taskTitle": "Build Picture-in-Picture recording system",
+			"taskId": 15,
+			"taskTitle": "Replace screen enumeration with SCShareableContent",
 			"complexityScore": 7,
 			"recommendedSubtasks": 6,
-			"expansionPrompt": "Break down into: 1) Implement simultaneous screen+webcam capture backend, 2) Create PiP configuration data model, 3) Build PiP position/size selector UI, 4) Implement live preview with overlay, 5) Handle separate file recording with sync metadata, 6) Store configuration for export compositing",
-			"reasoning": "Complex due to simultaneous recording coordination, UI preview requirements, and metadata management for later compositing. Requires careful synchronization handling."
+			"expansionPrompt": "Break down into: 1) Replace NSScreen API calls with SCShareableContent.getShareableContent(), 2) Map SCDisplay objects to existing ScreenSource structure, 3) Extract window metadata from SCWindow objects, 4) Implement thumbnail generation using SCScreenshotManager, 5) Handle async nature with tokio::task::spawn_blocking, 6) Implement content caching with TTL for performance optimization.",
+			"reasoning": "Moderate complexity due to API migration and async handling. The existing screen_sources/macos.rs has good patterns to build upon, but requires careful mapping to maintain compatibility."
 		},
 		{
-			"taskId": 8,
-			"taskTitle": "Integrate recordings with media library",
-			"complexityScore": 4,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Hook recording completion to auto-import system, 2) Integrate with existing thumbnail generation, 3) Update MediaLibraryPanel to show new recordings, 4) Extract and display file metadata",
-			"reasoning": "Lower complexity as it leverages existing systems. Main work is integration points and ensuring smooth data flow from recording to library display."
+			"taskId": 16,
+			"taskTitle": "Implement frame processing and preview pipeline",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break down into: 1) Extract pixel data from CMSampleBuffer using CVPixelBufferGetBaseAddress, 2) Implement pixel format conversion from 420v/BGRA to RGB using Accelerate framework, 3) Create frame throttling mechanism (60fps to 15fps) using modulo counters, 4) Implement JPEG compression using image crate with configurable quality, 5) Add frame queue with size limits and overflow handling, 6) Include timestamp metadata using CMSampleBufferGetPresentationTimeStamp, 7) Create FrameProcessor trait with preview and encoding implementations.",
+			"reasoning": "High complexity due to real-time performance requirements, image processing, and the need to balance quality vs performance. Requires careful memory management to prevent frame buffer bloat."
 		},
 		{
-			"taskId": 9,
-			"taskTitle": "Implement PiP export compositing",
+			"taskId": 17,
+			"taskTitle": "Integrate Tauri event system for preview frames",
 			"complexityScore": 6,
 			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Extend export system for PiP detection, 2) Calculate FFmpeg overlay filter parameters, 3) Implement video compositing pipeline, 4) Handle audio track selection, 5) Add composite progress tracking",
-			"reasoning": "Moderate complexity requiring FFmpeg filter expertise and integration with existing export system. Mathematical calculations for overlay positioning add complexity."
+			"expansionPrompt": "Break down into: 1) Define PreviewFrame event payload struct with base64 image data and metadata, 2) Implement event emission using app_handle.emit(), 3) Add preview control commands (start_preview, stop_preview), 4) Implement backpressure detection and frame dropping strategy, 5) Add performance metrics and debouncing using tokio::time::interval.",
+			"reasoning": "Moderate complexity leveraging existing Tauri event patterns in the codebase. Main challenges are backpressure handling and performance optimization."
 		},
 		{
-			"taskId": 10,
-			"taskTitle": "Add comprehensive error handling and edge cases",
-			"complexityScore": 5,
+			"taskId": 18,
+			"taskTitle": "Build React preview component for real-time display",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Create PreviewWindow.tsx component with Tauri event listener, 2) Implement base64 to image conversion and Canvas API display, 3) Add double buffering using two canvas elements, 4) Style as floating overlay with drag handle and resize corners, 5) Implement show/hide toggle with CSS transitions, 6) Add FPS counter and recording indicator overlay with performance optimizations.",
+			"reasoning": "Moderate complexity frontend work. The codebase already has React components and Tauri event handling patterns to build upon. Main challenges are smooth real-time rendering and UI performance."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Configure FFmpeg stdin pipeline for raw frames",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Modify screen_capture.rs to build FFmpeg command with -f rawvideo input parameters, 2) Set input parameters (-video_size, -framerate, -i pipe:0), 3) Implement frame writer that pipes raw frames to FFmpeg stdin, 4) Handle stdin write errors and EPIPE for FFmpeg termination, 5) Add frame timing using tokio::time::interval for consistent frame rate, 6) Support variable frame rate mode and real-time encoding flag.",
+			"reasoning": "Moderately complex due to need to modify existing FFmpeg integration and handle stdin piping. Current screen_capture.rs provides good foundation but requires significant changes to support raw frame input."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Implement audio capture via ScreenCaptureKit",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Configure SCStreamConfiguration with capturesAudio = true, 2) Add microphone capture using addStreamOutput with audio type, 3) Extract audio samples from CMSampleBuffer in audio callback, 4) Convert audio format from Core Audio to raw PCM for FFmpeg, 5) Implement audio-video synchronization using presentation timestamps, 6) Create separate audio pipe to FFmpeg and support audio device selection.",
+			"reasoning": "Moderately complex audio handling requiring sync with video pipeline. Current codebase has audio support in FFmpeg commands but no ScreenCaptureKit audio experience."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Implement recording controls and state management",
+			"complexityScore": 6,
 			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Implement permission error handling with user guidance, 2) Handle device unavailability gracefully, 3) Add disk space monitoring and errors, 4) Implement long recording memory management, 5) Create comprehensive cleanup for all failure scenarios",
-			"reasoning": "Moderate complexity spread across many edge cases. Requires thorough testing and consideration of various failure modes but builds on existing infrastructure."
+			"expansionPrompt": "Break down into: 1) Implement pause using SCStream.stopCapture() while maintaining configuration, 2) Add resume with SCStream.startCapture() from paused state, 3) Update RecordingState to track paused duration for accurate timestamps, 4) Modify FFmpeg pipeline to handle discontinuous timestamps during pause, 5) Add state validation to prevent invalid transitions and handle system sleep/wake events.",
+			"reasoning": "Moderate complexity building on existing recording state management. Current recording/mod.rs has good state handling patterns but needs extension for ScreenCaptureKit pause/resume."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Add comprehensive testing and performance validation",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Create integration tests using XCTest for Swift components and Rust tests for FFI layer, 2) Implement performance benchmarks comparing with current FFmpeg-only approach, 3) Create stress tests for memory usage over long sessions and high resolution recording, 4) Create CI pipeline tests for macOS compatibility and automated permission flow testing.",
+			"reasoning": "Lower complexity testing and validation work. The task is comprehensive but follows standard testing patterns. Main challenge is setting up XCTest integration with the Rust build system."
 		}
 	]
 }

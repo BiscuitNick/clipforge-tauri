@@ -36,7 +36,9 @@
     "active": true,
     "targets": "all",
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "infoPlist": "Info.plist",
+      "frameworks": ["lib/libScreenCaptureKitBridge.dylib"]
     },
     "icon": [
       "icons/32x32.png",

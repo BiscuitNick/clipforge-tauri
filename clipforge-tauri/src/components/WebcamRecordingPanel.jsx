@@ -314,10 +314,6 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
             mimeType,
             duration
           });
-
-          console.log('[WebcamRecording] Recording saved to:', filePath);
-          console.log('[WebcamRecording] Final duration from ref:', duration, 'State duration:', recordingDuration);
-
           if (onRecordingComplete) {
             onRecordingComplete({
               filePath,
@@ -350,9 +346,7 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
       setIsRecording(true);
 
       // Start timer
-      startTimeRef.current = Date.now();
-      console.log('[WebcamRecording] Recording started at:', startTimeRef.current);
-      timerIntervalRef.current = setInterval(() => {
+      startTimeRef.current = Date.now();      timerIntervalRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         setRecordingDuration(elapsed);
       }, 1000);
@@ -373,9 +367,7 @@ function WebcamRecordingPanel({ onRecordingComplete, onError }) {
         const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
         finalDurationRef.current = finalDuration;
         console.log('[WebcamRecording] Stopping - startTime:', startTimeRef.current, 'now:', Date.now(), 'duration:', finalDuration);
-      } else {
-        console.warn('[WebcamRecording] startTimeRef is null when stopping!');
-      }
+      } else {      }
 
       mediaRecorder.stop();
       setIsRecording(false);

@@ -1,5 +1,5 @@
-use crate::commands::recording::{PermissionResult, PermissionStatus, PermissionType};
 use super::PermissionHandler;
+use crate::commands::recording::{PermissionResult, PermissionStatus, PermissionType};
 
 /// Stub implementation for non-macOS platforms
 pub struct PlatformPermissions;

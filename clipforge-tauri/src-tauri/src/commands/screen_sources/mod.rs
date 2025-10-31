@@ -51,13 +51,7 @@ pub struct ScreenSource {
 
 impl ScreenSource {
     /// Create a new screen source
-    pub fn new(
-        id: String,
-        name: String,
-        source_type: SourceType,
-        width: u32,
-        height: u32,
-    ) -> Self {
+    pub fn new(id: String, name: String, source_type: SourceType, width: u32, height: u32) -> Self {
         Self {
             id,
             name,

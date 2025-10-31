@@ -36,11 +36,7 @@ impl CameraDevice {
             id,
             name,
             is_default: false,
-            resolutions: vec![
-                (1920, 1080),
-                (1280, 720),
-                (640, 480),
-            ],
+            resolutions: vec![(1920, 1080), (1280, 720), (640, 480)],
             has_audio: false,
         }
     }

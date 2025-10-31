@@ -141,9 +141,7 @@ export function useTimeline() {
       startTime = Math.max(0, targetPosition);
 
       // Check for collision before adding
-      if (!canDropAtPosition(startTime, mediaData.duration)) {
-        console.warn("Cannot drop clip at position", startTime, "- collision detected");
-        return null; // Don't add the clip
+      if (!canDropAtPosition(startTime, mediaData.duration)) {        return null; // Don't add the clip
       }
     } else {
       // Default: append to end
@@ -571,29 +569,21 @@ export function useTimeline() {
 
   // Copy selected clip to clipboard
   const copyClip = useCallback(() => {
-    if (!selectedClipId) {
-      console.warn("No clip selected to copy");
-      return false;
+    if (!selectedClipId) {      return false;
     }
 
     const clipToCopy = clips.find(c => c.id === selectedClipId);
-    if (!clipToCopy) {
-      console.warn("Selected clip not found");
-      return false;
+    if (!clipToCopy) {      return false;
     }
 
     // Store clip data without the unique ID
     const { id, ...clipData } = clipToCopy;
-    setClipboardClip(clipData);
-    console.log("Clip copied to clipboard:", clipData.filename);
-    return true;
+    setClipboardClip(clipData);    return true;
   }, [selectedClipId, clips]);
 
   // Paste clip from clipboard
   const pasteClip = useCallback(() => {
-    if (!clipboardClip) {
-      console.warn("No clip in clipboard to paste");
-      return null;
+    if (!clipboardClip) {      return null;
     }
 
     // Calculate position to append at end of timeline
@@ -616,17 +606,13 @@ export function useTimeline() {
     // Save history before mutation
     saveHistory();
 
-    setClips(prev => [...prev, newClip]);
-    console.log("Clip pasted at position:", endPosition);
-    return newClip;
+    setClips(prev => [...prev, newClip]);    return newClip;
   }, [clipboardClip, clips, saveHistory]);
 
   // Split clip at specified time
   const splitClip = useCallback((clipId, splitTime) => {
     const clip = clips.find(c => c.id === clipId);
-    if (!clip) {
-      console.warn("Clip not found:", clipId);
-      return null;
+    if (!clip) {      return null;
     }
 
     // Calculate the clip's effective duration
@@ -636,9 +622,7 @@ export function useTimeline() {
     const clipEnd = clip.startTime + clipDuration;
 
     // Validate split position
-    if (splitTime <= clip.startTime || splitTime >= clipEnd) {
-      console.warn("Split position must be within clip boundaries");
-      return null;
+    if (splitTime <= clip.startTime || splitTime >= clipEnd) {      return null;
     }
 
     // Prevent splits that would create clips shorter than 1 frame
@@ -646,9 +630,7 @@ export function useTimeline() {
     const leftDuration = splitTime - clip.startTime;
     const rightDuration = clipEnd - splitTime;
 
-    if (leftDuration < MIN_CLIP_DURATION || rightDuration < MIN_CLIP_DURATION) {
-      console.warn("Split would create clips shorter than minimum duration");
-      return null;
+    if (leftDuration < MIN_CLIP_DURATION || rightDuration < MIN_CLIP_DURATION) {      return null;
     }
 
     // Calculate split point in source media time
@@ -683,10 +665,7 @@ export function useTimeline() {
     // If the split clip was selected, select the left part
     if (selectedClipId === clipId) {
       setSelectedClipId(leftClip.id);
-    }
-
-    console.log(`Split clip at ${splitTime}s`, { leftClip, rightClip });
-    return { leftClip, rightClip };
+    }    return { leftClip, rightClip };
   }, [clips, selectedClipId, saveHistory]);
 
   return {

@@ -1,9 +1,9 @@
-use crate::commands::recording::{PermissionResult, PermissionStatus, PermissionType};
 use super::PermissionHandler;
-use objc::{class, msg_send, sel, sel_impl};
-use objc::runtime::{BOOL, YES};
-use objc_foundation::{INSString, NSString};
+use crate::commands::recording::{PermissionResult, PermissionStatus, PermissionType};
 use block::ConcreteBlock;
+use objc::runtime::{BOOL, YES};
+use objc::{class, msg_send, sel, sel_impl};
+use objc_foundation::{INSString, NSString};
 
 /// macOS-specific permission implementation
 pub struct PlatformPermissions;
@@ -16,7 +16,8 @@ impl PlatformPermissions {
 
             // Get authorization status for video
             let media_type = NSString::from_str("vide");
-            let status: i64 = msg_send![av_capture_device_class, authorizationStatusForMediaType: media_type];
+            let status: i64 =
+                msg_send![av_capture_device_class, authorizationStatusForMediaType: media_type];
 
             Self::convert_av_authorization_status(status)
         }
@@ -29,7 +30,8 @@ impl PlatformPermissions {
 
             // Get authorization status for audio
             let media_type = NSString::from_str("soun");
-            let status: i64 = msg_send![av_capture_device_class, authorizationStatusForMediaType: media_type];
+            let status: i64 =
+                msg_send![av_capture_device_class, authorizationStatusForMediaType: media_type];
 
             Self::convert_av_authorization_status(status)
         }
@@ -115,9 +117,9 @@ impl PlatformPermissions {
     fn convert_av_authorization_status(status: i64) -> PermissionStatus {
         match status {
             0 => PermissionStatus::NotDetermined, // AVAuthorizationStatusNotDetermined
-            1 => PermissionStatus::Restricted,     // AVAuthorizationStatusRestricted
-            2 => PermissionStatus::Denied,         // AVAuthorizationStatusDenied
-            3 => PermissionStatus::Granted,        // AVAuthorizationStatusAuthorized
+            1 => PermissionStatus::Restricted,    // AVAuthorizationStatusRestricted
+            2 => PermissionStatus::Denied,        // AVAuthorizationStatusDenied
+            3 => PermissionStatus::Granted,       // AVAuthorizationStatusAuthorized
             _ => PermissionStatus::NotDetermined,
         }
     }

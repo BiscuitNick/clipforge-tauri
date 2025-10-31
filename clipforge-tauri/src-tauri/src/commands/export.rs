@@ -1,8 +1,8 @@
+use super::ffmpeg_utils::find_ffmpeg;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::process::Command;
 use std::fs;
-use super::ffmpeg_utils::find_ffmpeg;
+use std::process::Command;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,9 +137,6 @@ fn composite_pip_recording(
     metadata: &PiPMetadata,
     output_path: &std::path::Path,
 ) -> Result<(), String> {
-    println!("Compositing PiP recording: {} + {}",
-        metadata.screen_file_path, metadata.webcam_file_path);
-
     // Calculate overlay coordinates
     let coordinates = calculate_pip_coordinates(
         &metadata.pip_config,
@@ -147,16 +144,15 @@ fn composite_pip_recording(
         metadata.screen_dimensions.height,
     );
 
-    println!("Overlay position: {}x{} at ({}, {})",
-        coordinates.width, coordinates.height, coordinates.x, coordinates.y);
+    println!(
+        "Overlay position: {}x{} at ({}, {})",
+        coordinates.width, coordinates.height, coordinates.x, coordinates.y
+    );
 
     // Build FFmpeg filter_complex for PiP overlay
     let filter_complex = format!(
         "[1:v]scale={}:{}[webcam];[0:v][webcam]overlay={}:{}[outv]",
-        coordinates.width,
-        coordinates.height,
-        coordinates.x,
-        coordinates.y
+        coordinates.width, coordinates.height, coordinates.x, coordinates.y
     );
 
     // Execute FFmpeg compositing
@@ -201,7 +197,7 @@ fn composite_pip_recording(
 pub async fn export_timeline(
     app: AppHandle,
     clips: Vec<ClipData>,
-    output_path: String
+    output_path: String,
 ) -> Result<(), String> {
     println!("Exporting {} clips to: {}", clips.len(), output_path);
 
@@ -210,11 +206,8 @@ pub async fn export_timeline(
     }
 
     // Find ffmpeg executable
-    let ffmpeg_path = find_ffmpeg()
-        .ok_or_else(|| "ffmpeg not found. Please install FFmpeg.".to_string())?;
-
-    println!("Using ffmpeg at: {:?}", ffmpeg_path);
-
+    let ffmpeg_path =
+        find_ffmpeg().ok_or_else(|| "ffmpeg not found. Please install FFmpeg.".to_string())?;
     // Get first clip's resolution and framerate to use for the output
     let target_width = clips[0].width;
     let target_height = clips[0].height;
@@ -240,47 +233,51 @@ pub async fn export_timeline(
     let mut segment_files = Vec::new();
     for (i, clip) in clips.iter().enumerate() {
         current_step += 1;
-        let _ = app.emit("export-progress", ExportProgress {
-            current: current_step,
-            total: total_steps,
-            message: format!("Processing clip {} of {}", i + 1, clips.len()),
-        });
+        let _ = app.emit(
+            "export-progress",
+            ExportProgress {
+                current: current_step,
+                total: total_steps,
+                message: format!("Processing clip {} of {}", i + 1, clips.len()),
+            },
+        );
 
         // Determine the actual video path - composite PiP if needed
         let actual_video_path: String;
-        let composite_temp_file: Option<std::path::PathBuf>;
 
         if clip.media_type.as_deref() == Some("pip") && clip.pip_metadata_path.is_some() {
             // This is a PiP recording - composite it first
             let metadata_path = clip.pip_metadata_path.as_ref().unwrap();
-            println!("Detected PiP clip, loading metadata from: {}", metadata_path);
-
-            let _ = app.emit("export-progress", ExportProgress {
-                current: current_step,
-                total: total_steps,
-                message: format!("Compositing PiP clip {} of {}", i + 1, clips.len()),
-            });
+            let _ = app.emit(
+                "export-progress",
+                ExportProgress {
+                    current: current_step,
+                    total: total_steps,
+                    message: format!("Compositing PiP clip {} of {}", i + 1, clips.len()),
+                },
+            );
 
             let pip_metadata = load_pip_metadata(metadata_path)?;
             let composite_output = temp_dir.join(format!("pip_composite_{:03}.mp4", i));
 
             composite_pip_recording(&ffmpeg_path, &pip_metadata, &composite_output)?;
 
-            actual_video_path = composite_output.to_str()
+            actual_video_path = composite_output
+                .to_str()
                 .ok_or_else(|| "Failed to convert composite path to string".to_string())?
                 .to_string();
-            composite_temp_file = Some(composite_output);
         } else {
             // Regular video clip
             actual_video_path = clip.video_path.clone();
-            composite_temp_file = None;
         }
 
         let temp_output = temp_dir.join(format!("segment_{:03}.mp4", segment_files.len()));
         let trimmed_duration = clip.trim_end - clip.trim_start;
 
-        println!("Processing clip {}: {} (trim: {}-{}, duration: {}s)",
-            i, actual_video_path, clip.trim_start, clip.trim_end, trimmed_duration);
+        println!(
+            "Processing clip {}: {} (trim: {}-{}, duration: {}s)",
+            i, actual_video_path, clip.trim_start, clip.trim_end, trimmed_duration
+        );
 
         // Use FFmpeg to trim and normalize the clip
         let output = Command::new(&ffmpeg_path)
@@ -322,21 +319,24 @@ pub async fn export_timeline(
                 current_step += 1;
                 let gap_duration = next_start - current_end;
 
-                let _ = app.emit("export-progress", ExportProgress {
-                    current: current_step,
-                    total: total_steps,
-                    message: format!("Creating gap ({:.1}s)", gap_duration),
-                });
-
-                println!("Creating gap of {:.2}s between clips {} and {}", gap_duration, i, i + 1);
-
+                let _ = app.emit(
+                    "export-progress",
+                    ExportProgress {
+                        current: current_step,
+                        total: total_steps,
+                        message: format!("Creating gap ({:.1}s)", gap_duration),
+                    },
+                );
                 // Create black video for the gap
                 let black_output = temp_dir.join(format!("segment_{:03}.mp4", segment_files.len()));
                 let output = Command::new(&ffmpeg_path)
                     .arg("-f")
                     .arg("lavfi")
                     .arg("-i")
-                    .arg(format!("color=c=black:s={}x{}:r={}", target_width, target_height, target_fps))
+                    .arg(format!(
+                        "color=c=black:s={}x{}:r={}",
+                        target_width, target_height, target_fps
+                    ))
                     .arg("-f")
                     .arg("lavfi")
                     .arg("-i")
@@ -365,11 +365,14 @@ pub async fn export_timeline(
     }
 
     current_step += 1;
-    let _ = app.emit("export-progress", ExportProgress {
-        current: current_step,
-        total: total_steps,
-        message: "Finalizing export...".to_string(),
-    });
+    let _ = app.emit(
+        "export-progress",
+        ExportProgress {
+            current: current_step,
+            total: total_steps,
+            message: "Finalizing export...".to_string(),
+        },
+    );
 
     // Create concat file for FFmpeg
     let concat_file = temp_dir.join("concat.txt");
@@ -405,9 +408,5 @@ pub async fn export_timeline(
     }
 
     // Clean up temp files
-    fs::remove_dir_all(&temp_dir)
-        .map_err(|e| format!("Failed to clean up temp files: {}", e))?;
-
-    println!("Export completed successfully: {}", output_path);
-    Ok(())
+    fs::remove_dir_all(&temp_dir).map_err(|e| format!("Failed to clean up temp files: {}", e))?;    Ok(())
 }

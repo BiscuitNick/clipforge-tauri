@@ -56,14 +56,6 @@ export function usePiPRecording() {
 
       // Store webcam stream reference
       webcamStreamRef.current = webcamStream;
-
-      console.log('[PiPRecording] Starting PiP recording:', {
-        recordingId,
-        startTime,
-        screenSource: screenSource.id,
-        pipConfig
-      });
-
       // Step 1: Start screen recording via Tauri backend
       const screenRecording = await invoke('start_recording', {
         recordingType: 'screen',
@@ -73,12 +65,8 @@ export function usePiPRecording() {
       });
 
       screenFilePathRef.current = screenRecording.file_path;
-      console.log('[PiPRecording] Screen recording started:', screenFilePathRef.current);
-
       // Step 2: Start webcam recording via MediaRecorder
       await startWebcamRecording(webcamStream);
-      console.log('[PiPRecording] Webcam recording started');
-
       // Step 3: Start duration timer
       timerIntervalRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -87,9 +75,11 @@ export function usePiPRecording() {
 
       setIsRecording(true);
 
-      return recordingId;
+      return {
+        recordingId,
+        screenRecording,
+      };
     } catch (err) {
-      console.error('[PiPRecording] Failed to start recording:', err);
       setError(err.message || 'Failed to start recording');
       // Cleanup on error
       await cleanup();
@@ -152,22 +142,12 @@ export function usePiPRecording() {
 
       // Calculate final duration
       const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
-
-      console.log('[PiPRecording] Stopping recording...', {
-        recordingId: recordingIdRef.current,
-        duration
-      });
-
       // Step 1: Stop screen recording
       const screenResult = await invoke('stop_recording');
       screenFilePathRef.current = screenResult.file_path;
-      console.log('[PiPRecording] Screen recording stopped:', screenFilePathRef.current);
-
       // Step 2: Stop webcam recording and save
       const webcamFilePath = await stopWebcamRecording(duration);
       webcamFilePathRef.current = webcamFilePath;
-      console.log('[PiPRecording] Webcam recording stopped:', webcamFilePathRef.current);
-
       // Step 3: Create metadata
       const metadata = {
         id: recordingIdRef.current,
@@ -185,17 +165,43 @@ export function usePiPRecording() {
       // Step 4: Save metadata to file
       await saveMetadata(metadata);
 
+      // Step 5: Composite screen + webcam into final output
+      let compositedFilePath = null;
+      try {
+        compositedFilePath = await invoke('composite_pip_recording', {
+          screenPath: screenFilePathRef.current,
+          webcamPath: webcamFilePathRef.current,
+          position: pipConfig.position,
+          size: pipConfig.size,
+          includeWebcamAudio: pipConfig.includeAudio ?? false,
+          screenWidth: screenDimensions.width,
+          screenHeight: screenDimensions.height,
+          webcamWidth: webcamDimensions.width,
+          webcamHeight: webcamDimensions.height,
+        });
+        metadata.compositedFilePath = compositedFilePath;
+      } catch {
+        // Failed to composite PiP recording
+      }
+
+      const screenPath = screenFilePathRef.current;
+      const webcamPath = webcamFilePathRef.current;
+      const compositeSucceeded = compositedFilePath !== null;
+      const finalCompositePath = compositedFilePath || screenPath;
+
       // Step 5: Cleanup
       cleanup();
 
       setIsRecording(false);
       setRecordingDuration(0);
-
-      console.log('[PiPRecording] Recording completed successfully:', metadata);
-
-      return metadata;
+      return {
+        metadata,
+        screenFilePath: screenPath,
+        webcamFilePath: webcamPath,
+        compositedFilePath: finalCompositePath,
+        compositeSucceeded,
+      };
     } catch (err) {
-      console.error('[PiPRecording] Failed to stop recording:', err);
       setError(err.message || 'Failed to stop recording');
       throw err;
     }
@@ -255,8 +261,7 @@ export function usePiPRecording() {
       await invoke('save_pip_metadata', {
         metadata: JSON.stringify(metadata, null, 2)
       });
-    } catch (err) {
-      console.error('[PiPRecording] Failed to save metadata:', err);
+    } catch {
       // Don't throw here - metadata save failure shouldn't fail the whole recording
     }
   };
@@ -264,51 +269,66 @@ export function usePiPRecording() {
   /**
    * Pause the recording
    */
-  const pauseRecording = useCallback(() => {
+  const pauseRecording = useCallback(async () => {
     if (!isRecording || isPaused) {
       return;
     }
 
-    // Pause webcam recording
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.pause();
+    try {
+      // Pause screen recording (backend)
+      await invoke('pause_recording');
+
+      // Pause webcam recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.pause();
+      }
+
+      // Pause timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+
+      setIsPaused(true);
+    } catch (err) {
+      console.error('Failed to pause PiP recording:', err);
+      setError(err.message || 'Failed to pause recording');
+      throw err;
     }
-
-    // Note: Screen recording pause would need to be implemented in backend
-    // For now, we'll just pause the webcam and timer
-
-    // Pause timer
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-
-    setIsPaused(true);
   }, [isRecording, isPaused]);
 
   /**
    * Resume the recording
    */
-  const resumeRecording = useCallback(() => {
+  const resumeRecording = useCallback(async () => {
     if (!isRecording || !isPaused) {
       return;
     }
 
-    // Resume webcam recording
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
-      mediaRecorderRef.current.resume();
+    try {
+      // Resume screen recording (backend)
+      await invoke('resume_recording');
+
+      // Resume webcam recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+        mediaRecorderRef.current.resume();
+      }
+
+      // Resume timer
+      const pausedDuration = recordingDuration;
+      startTimeRef.current = Date.now() - (pausedDuration * 1000);
+
+      timerIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setRecordingDuration(elapsed);
+      }, 1000);
+
+      setIsPaused(false);
+    } catch (err) {
+      console.error('Failed to resume PiP recording:', err);
+      setError(err.message || 'Failed to resume recording');
+      throw err;
     }
-
-    // Resume timer
-    const pausedDuration = recordingDuration;
-    startTimeRef.current = Date.now() - (pausedDuration * 1000);
-
-    timerIntervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      setRecordingDuration(elapsed);
-    }, 1000);
-
-    setIsPaused(false);
   }, [isRecording, isPaused, recordingDuration]);
 
   /**
