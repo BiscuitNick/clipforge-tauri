@@ -1,0 +1,50 @@
+name: macOS Release DMG
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: clipforge-tauri
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: clipforge-tauri/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build DMG
+        run: npm run build:macos
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipforge-macos-dmg
+          path: clipforge-tauri/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+      - name: Attach DMG to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: clipforge-tauri/src-tauri/target/release/bundle/dmg/*.dmg
