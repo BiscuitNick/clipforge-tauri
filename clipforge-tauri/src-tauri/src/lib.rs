@@ -1,3 +1,6 @@
+#![allow(unexpected_cfgs)]
+#![allow(deprecated)]
+
 use std::sync::{Arc, Mutex};
 use tauri::menu::*;
 

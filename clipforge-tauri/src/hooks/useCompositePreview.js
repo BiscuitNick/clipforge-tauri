@@ -172,12 +172,8 @@ export function useCompositePreview(screenCanvas, webcamVideo, pipConfig, enable
 
   // Start/stop compositing based on enabled state
   useEffect(() => {
-    if (enabled) {
-      console.log('[useCompositePreview] Starting composite rendering');
-      renderComposite();
-    } else {
-      console.log('[useCompositePreview] Stopping composite rendering');
-      if (animationFrameRef.current) {
+    if (enabled) {      renderComposite();
+    } else {      if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }

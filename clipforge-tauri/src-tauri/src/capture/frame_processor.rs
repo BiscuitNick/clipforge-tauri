@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // Frame processing module for preview and encoding pipelines
 //
 // This module provides a trait-based architecture for processing captured frames
@@ -94,12 +96,7 @@ impl FrameProcessor for PreviewFrameProcessor {
             self.processed_count += 1;
 
             // Log occasionally to avoid spam
-            if self.processed_count % 30 == 0 {
-                println!(
-                    "[PreviewProcessor] Processed {} frames, latest: {}x{} @ {:.2}s",
-                    self.processed_count, frame.width, frame.height, frame.timestamp
-                );
-            }
+            if self.processed_count % 30 == 0 {            }
 
             Ok(())
         } else {
@@ -107,12 +104,7 @@ impl FrameProcessor for PreviewFrameProcessor {
         }
     }
 
-    fn flush(&mut self) -> Result<(), String> {
-        println!(
-            "[PreviewProcessor] Flushed - total frames processed: {}",
-            self.processed_count
-        );
-        Ok(())
+    fn flush(&mut self) -> Result<(), String> {        Ok(())
     }
 
     fn processor_type(&self) -> &str {
@@ -155,11 +147,6 @@ impl EncodingFrameProcessor {
     ///
     /// This would typically set up FFmpeg or another encoder
     fn initialize_encoder(&mut self) -> Result<(), String> {
-        println!(
-            "[EncodingProcessor] Initializing encoder for output: {}",
-            self.output_path
-        );
-
         // TODO: Initialize FFmpeg encoder with frame dimensions and settings
         // This will be implemented when integrating with the actual encoding pipeline
 
@@ -181,12 +168,7 @@ impl EncodingFrameProcessor {
         self.processed_count += 1;
 
         // Log occasionally
-        if self.processed_count % 30 == 0 {
-            println!(
-                "[EncodingProcessor] Encoded {} frames, latest: {}x{} @ {:.2}s",
-                self.processed_count, frame.width, frame.height, frame.timestamp
-            );
-        }
+        if self.processed_count % 30 == 0 {        }
 
         Ok(())
     }
@@ -198,11 +180,6 @@ impl FrameProcessor for EncodingFrameProcessor {
     }
 
     fn flush(&mut self) -> Result<(), String> {
-        println!(
-            "[EncodingProcessor] Flushing encoder - total frames: {}",
-            self.processed_count
-        );
-
         // TODO: Finalize FFmpeg encoding and close output file
 
         Ok(())

@@ -67,14 +67,51 @@
 }
 
 .preview-title {
-  flex: 1;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   letter-spacing: 0.5px;
+  margin-right: 8px;
+}
+
+/* Source Selector Dropdown */
+.preview-source-selector {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #ccc;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  flex: 1;
+  max-width: 140px;
+}
+
+.preview-source-selector:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.preview-source-selector:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.preview-source-selector option {
+  background: #1a1a1a;
+  color: #ccc;
+}
+
+.preview-source-selector option:disabled {
+  color: #666;
 }
 
 .preview-controls {
   display: flex;
   gap: 4px;
+  margin-left: 8px;
 }
 
 .preview-control-btn {
@@ -116,6 +153,14 @@
   height: 100%;
   display: block;
   object-fit: contain;
+}
+
+.preview-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #000;
 }
 
 /* Overlay Information */

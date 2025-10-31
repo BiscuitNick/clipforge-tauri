@@ -1,6 +1,8 @@
+#![allow(dead_code)]
+
 use super::{ScreenSource, SourceEnumerator, SourceType};
+use base64::Engine as _;
 use crate::capture::ffi;
-use base64::{engine::general_purpose, Engine as _};
 use std::process::{Command, Stdio};
 
 /// macOS-specific screen source enumerator
@@ -25,18 +27,13 @@ impl PlatformEnumerator {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 let mut camera_count = 0;
                 let mut in_video_section = false;
-
-                println!("[CameraDetection] Analyzing FFmpeg device list output");
-
                 // Parse FFmpeg output to count video devices
                 for line in stderr.lines() {
                     if line.contains("AVFoundation video devices:") {
                         in_video_section = true;
-                        println!("[CameraDetection] Found video devices section");
                         continue;
                     } else if line.contains("AVFoundation audio devices:") {
                         // We've reached the audio section, stop counting
-                        println!("[CameraDetection] Reached audio section, stopping count");
                         break;
                     } else if in_video_section {
                         // Look for device entries like "[AVFoundation indev @ 0x...] [0] FaceTime HD Camera"
@@ -47,38 +44,20 @@ impl PlatformEnumerator {
                                 || lower_line.contains("screen") && lower_line.contains("capture")
                             {
                                 // This is a screen capture device, stop counting cameras
-                                println!(
-                                    "[CameraDetection] Found first screen device, camera count: {}",
-                                    camera_count
-                                );
                                 break;
                             } else {
                                 // This is a camera device
                                 camera_count += 1;
-                                println!(
-                                    "[CameraDetection] Found camera device #{}: {}",
-                                    camera_count, line
-                                );
                             }
                         }
                     }
                 }
-
-                println!(
-                    "[CameraDetection] Total camera devices detected: {}",
-                    camera_count
-                );
                 return camera_count;
-            } else {
-                println!("[CameraDetection] Failed to run FFmpeg for device detection");
             }
-        } else {
-            println!("[CameraDetection] FFmpeg not found for device detection");
         }
 
         // Fallback: return 0 if detection fails
         // This means screens will start at device index 0
-        println!("[CameraDetection] Using fallback camera count: 0");
         0
     }
 
@@ -133,12 +112,7 @@ impl PlatformEnumerator {
         }
 
         // Check if file was created
-        if !std::path::Path::new(&temp_path).exists() {
-            println!(
-                "[WindowThumbnail] Thumbnail file not created for window {}",
-                window_id
-            );
-            return None;
+        if !std::path::Path::new(&temp_path).exists() {            return None;
         }
 
         // Resize the image using sips (built-in macOS image tool)
@@ -149,12 +123,7 @@ impl PlatformEnumerator {
             .output()
             .ok()?;
 
-        if !resize_output.status.success() {
-            println!(
-                "[WindowThumbnail] Failed to resize thumbnail for window {}",
-                window_id
-            );
-        }
+        if !resize_output.status.success() {        }
 
         // Read PNG file and base64 encode
         let png_data = fs::read(&temp_path).ok()?;

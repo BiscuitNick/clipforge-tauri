@@ -9,9 +9,6 @@ use tokio::task::JoinHandle;
 mod screen_capture;
 use screen_capture::ScreenCaptureSession;
 
-// Re-export FFmpeg input and encoding modes for external use
-pub use screen_capture::{EncodingMode, InputMode};
-
 // ============================================================================
 // Data Structures
 // ============================================================================
@@ -80,6 +77,7 @@ impl Default for RecordingConfig {
 
 impl RecordingConfig {
     /// Create a new configuration builder
+    #[allow(dead_code)]
     pub fn builder() -> RecordingConfigBuilder {
         RecordingConfigBuilder::new()
     }
@@ -199,18 +197,21 @@ impl RecordingConfig {
 
     /// Apply platform-specific adjustments
     #[cfg(target_os = "macos")]
+    #[allow(dead_code)]
     pub fn apply_platform_adjustments(&mut self) {
         // macOS works well with h264/aac in MP4
         // No specific adjustments needed for now
     }
 
     #[cfg(target_os = "windows")]
+    #[allow(dead_code)]
     pub fn apply_platform_adjustments(&mut self) {
         // Windows may prefer certain codecs
         // Adjust if needed based on platform capabilities
     }
 
     #[cfg(target_os = "linux")]
+    #[allow(dead_code)]
     pub fn apply_platform_adjustments(&mut self) {
         // Linux may have different codec availability
         // Adjust based on what's commonly available
@@ -219,10 +220,12 @@ impl RecordingConfig {
 
 /// Builder for RecordingConfig
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RecordingConfigBuilder {
     config: RecordingConfig,
 }
 
+#[allow(dead_code)]
 impl RecordingConfigBuilder {
     pub fn new() -> Self {
         Self {
@@ -446,6 +449,7 @@ impl RecordingState {
     }
 
     /// Check if transition to a new status is valid
+    #[allow(dead_code)]
     pub fn can_transition_to(&self, new_status: &RecordingStatus) -> Result<(), String> {
         use RecordingStatus::*;
 
@@ -471,6 +475,7 @@ impl RecordingState {
     }
 
     /// Validate that recording can be started
+    #[allow(dead_code)]
     pub fn validate_can_start(&self) -> Result<(), String> {
         if self.status != RecordingStatus::Idle {
             return Err(format!(
@@ -504,6 +509,7 @@ impl RecordingState {
     }
 
     /// Validate that recording can be stopped
+    #[allow(dead_code)]
     pub fn validate_can_stop(&self) -> Result<(), String> {
         match &self.status {
             RecordingStatus::Recording | RecordingStatus::Paused => Ok(()),
@@ -878,19 +884,8 @@ impl TempFileManager {
         Ok(filepath)
     }
 
-    /// Mark a file as completed (move it from temp to final location)
-    pub fn finalize_file(&mut self, temp_path: &Path, final_path: &Path) -> Result<(), String> {
-        // Move the file to final location
-        fs::rename(temp_path, final_path)
-            .map_err(|e| format!("Failed to finalize recording: {}", e))?;
-
-        // Remove from active files list
-        self.active_files.retain(|p| p != temp_path);
-
-        Ok(())
-    }
-
     /// Clean up a specific temporary file
+    #[allow(dead_code)]
     pub fn cleanup_file(&mut self, path: &Path) -> Result<(), String> {
         if path.exists() {
             fs::remove_file(path).map_err(|e| format!("Failed to remove temp file: {}", e))?;
@@ -958,7 +953,7 @@ impl TempFileManager {
     }
 
     /// Check available disk space
-    pub fn check_disk_space(&self, required_mb: u64) -> Result<(), RecordingError> {
+    pub fn check_disk_space(&self, _required_mb: u64) -> Result<(), RecordingError> {
         // This is a simplified check - in production you'd use platform-specific APIs
         // For now, we'll just check if temp dir is writable
         let test_file = self.temp_dir.join(".diskcheck");
@@ -990,27 +985,13 @@ impl Drop for TempFileManager {
 }
 
 /// Wrapper for recording resources that need cleanup
+#[allow(dead_code)]
 pub struct RecordingResources {
     temp_file: Option<PathBuf>,
     temp_manager: Arc<Mutex<TempFileManager>>,
 }
 
-impl RecordingResources {
-    pub fn new(temp_manager: Arc<Mutex<TempFileManager>>) -> Self {
-        Self {
-            temp_file: None,
-            temp_manager,
-        }
-    }
-
-    pub fn set_temp_file(&mut self, path: PathBuf) {
-        self.temp_file = Some(path);
-    }
-
-    pub fn take_temp_file(&mut self) -> Option<PathBuf> {
-        self.temp_file.take()
-    }
-}
+impl RecordingResources {}
 
 impl Drop for RecordingResources {
     fn drop(&mut self) {
@@ -1185,124 +1166,6 @@ pub async fn validate_device_availability(
 }
 
 // ============================================================================
-// Cleanup Registry for Resource Tracking
-// ============================================================================
-
-/// Registry entry for tracking resources that need cleanup
-#[derive(Debug, Clone)]
-struct CleanupEntry {
-    resource_type: String,
-    resource_path: PathBuf,
-    created_at: std::time::SystemTime,
-    recording_id: Option<String>,
-}
-
-/// Comprehensive cleanup registry for tracking all recording resources
-pub struct CleanupRegistry {
-    entries: Vec<CleanupEntry>,
-    max_age_hours: u64,
-}
-
-impl CleanupRegistry {
-    pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            max_age_hours: 24, // Default: cleanup files older than 24 hours
-        }
-    }
-
-    /// Register a resource for cleanup
-    pub fn register(&mut self, resource_type: String, path: PathBuf, recording_id: Option<String>) {
-        self.entries.push(CleanupEntry {
-            resource_type,
-            resource_path: path,
-            created_at: std::time::SystemTime::now(),
-            recording_id,
-        });
-    }
-
-    /// Remove a resource from the registry (when successfully moved/processed)
-    pub fn unregister(&mut self, path: &PathBuf) {
-        self.entries.retain(|e| &e.resource_path != path);
-    }
-
-    /// Clean up all registered resources
-    pub fn cleanup_all(&mut self) -> Result<usize, String> {
-        let mut cleaned = 0;
-        let mut errors = Vec::new();
-
-        self.entries.retain(|entry| {
-            if entry.resource_path.exists() {
-                match fs::remove_file(&entry.resource_path) {
-                    Ok(_) => {
-                        println!("[CleanupRegistry] Removed: {:?}", entry.resource_path);
-                        cleaned += 1;
-                        false // Remove from registry
-                    }
-                    Err(e) => {
-                        errors.push(format!("Failed to remove {:?}: {}", entry.resource_path, e));
-                        true // Keep in registry for retry
-                    }
-                }
-            } else {
-                // File doesn't exist, remove from registry
-                false
-            }
-        });
-
-        if !errors.is_empty() {
-            eprintln!("[CleanupRegistry] Errors during cleanup: {:?}", errors);
-        }
-
-        Ok(cleaned)
-    }
-
-    /// Clean up old resources based on age
-    pub fn cleanup_old(&mut self) -> Result<usize, String> {
-        let now = std::time::SystemTime::now();
-        let max_age = std::time::Duration::from_secs(self.max_age_hours * 3600);
-        let mut cleaned = 0;
-
-        self.entries.retain(|entry| {
-            if let Ok(age) = now.duration_since(entry.created_at) {
-                if age > max_age && entry.resource_path.exists() {
-                    match fs::remove_file(&entry.resource_path) {
-                        Ok(_) => {
-                            println!(
-                                "[CleanupRegistry] Removed old file: {:?}",
-                                entry.resource_path
-                            );
-                            cleaned += 1;
-                            return false;
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "[CleanupRegistry] Failed to remove old file {:?}: {}",
-                                entry.resource_path, e
-                            );
-                        }
-                    }
-                }
-            }
-            true
-        });
-
-        Ok(cleaned)
-    }
-
-    /// Get count of tracked resources
-    pub fn count(&self) -> usize {
-        self.entries.len()
-    }
-}
-
-impl Default for CleanupRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
 // Long Recording Memory Management
 // ============================================================================
 
@@ -1362,9 +1225,6 @@ pub async fn validate_long_recording_config(config: LongRecordingConfig) -> Resu
 #[cfg(target_os = "macos")]
 pub fn cleanup_stuck_ffmpeg_processes() {
     use std::process::Command;
-
-    println!("[StartupCleanup] Checking for stuck FFmpeg processes from previous sessions");
-
     // Kill any FFmpeg processes that might be recording for ClipForge
     let result = Command::new("pkill")
         .arg("-9")
@@ -1374,47 +1234,29 @@ pub fn cleanup_stuck_ffmpeg_processes() {
 
     match result {
         Ok(output) => {
-            if output.status.success() {
-                println!("[StartupCleanup] Successfully cleaned up stuck FFmpeg processes");
-            } else {
+            if output.status.success() {            } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                if stderr.contains("No matching processes") {
-                    println!("[StartupCleanup] No stuck FFmpeg processes found");
-                } else {
-                    println!("[StartupCleanup] pkill output: {}", stderr);
-                }
+                if stderr.contains("No matching processes") {                } else {                }
             }
         }
-        Err(e) => {
-            println!("[StartupCleanup] Failed to run pkill: {}", e);
-        }
+        Err(e) => {        }
     }
 
     // Also clean up temporary files older than 1 hour
     if let Ok(count) = TempFileManager::cleanup_orphaned_files() {
-        if count > 0 {
-            println!(
-                "[StartupCleanup] Cleaned up {} orphaned temporary files",
-                count
-            );
-        }
+        if count > 0 {        }
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 pub fn cleanup_stuck_ffmpeg_processes() {
     // Implement for other platforms as needed
-    println!("[StartupCleanup] Process cleanup not implemented for this platform");
 }
 
 /// Initialize the recording module and perform startup cleanup
 pub fn initialize_recording_module() {
-    println!("[RecordingModule] Initializing recording module");
-
     // Clean up any stuck processes from previous sessions
     cleanup_stuck_ffmpeg_processes();
-
-    println!("[RecordingModule] Recording module initialized");
 }
 
 // ============================================================================
@@ -1478,7 +1320,7 @@ pub async fn start_recording(
 
     // Create temporary file for recording
     let temp_path = {
-        let mut manager = state.lock().map_err(|e| e.to_string())?;
+        let manager = state.lock().map_err(|e| e.to_string())?;
         let temp_manager = manager.get_temp_manager();
         let mut temp = temp_manager.lock().map_err(|e| e.to_string())?;
         temp.create_temp_file(&id)
@@ -1491,7 +1333,7 @@ pub async fn start_recording(
 
     // If recording a window, get window bounds and determine which screen it's on
     if source_id.starts_with("window_") {
-        if let Some(window_id) = source_id
+        if let Some(_window_id) = source_id
             .strip_prefix("window_")
             .and_then(|s| s.parse::<u32>().ok())
         {
@@ -1499,11 +1341,6 @@ pub async fn start_recording(
             use super::screen_sources::{PlatformEnumerator, SourceEnumerator};
             if let Ok(windows) = PlatformEnumerator::enumerate_windows() {
                 if let Some(window) = windows.iter().find(|w| w.id == source_id) {
-                    println!(
-                        "[RecordingManager] Window position: x={}, y={}, w={}, h={}",
-                        window.x, window.y, window.width, window.height
-                    );
-
                     // Get all screens to find which one contains the window
                     if let Ok(screens) = PlatformEnumerator::enumerate_screens() {
                         // Find which screen contains the window center point
@@ -1529,26 +1366,18 @@ pub async fn start_recording(
                                 && window_center_x < screen_right
                                 && window_center_y >= screen.y
                                 && window_center_y < screen_bottom
-                            {
-                                println!("[RecordingManager] Window is on screen: {}", screen.id);
-                                found_screen = Some(screen);
+                            {                                found_screen = Some(screen);
                                 break;
                             }
                         }
 
                         if let Some(screen) = found_screen {
                             // Extract device number from screen ID (e.g., "screen_4" -> "4")
-                            if let Some(device_num) = screen.id.strip_prefix("screen_") {
-                                println!("[RecordingManager] Using screen device: {}", device_num);
-                                capture_session.set_screen_device(device_num.to_string());
+                            if let Some(device_num) = screen.id.strip_prefix("screen_") {                                capture_session.set_screen_device(device_num.to_string());
 
                                 // Adjust crop coordinates to be relative to screen origin
                                 let relative_x = window.x - screen.x;
                                 let relative_y = window.y - screen.y;
-
-                                println!("[RecordingManager] Relative crop coordinates: x={}, y={}, w={}, h={}",
-                                    relative_x, relative_y, window.width, window.height);
-
                                 capture_session.set_window_bounds(
                                     relative_x,
                                     relative_y,
@@ -1556,9 +1385,7 @@ pub async fn start_recording(
                                     window.height,
                                 );
                             }
-                        } else {
-                            println!("[RecordingManager] Warning: Could not determine which screen contains the window, using absolute coordinates");
-                            capture_session.set_window_bounds(
+                        } else {                            capture_session.set_window_bounds(
                                 window.x,
                                 window.y,
                                 window.width,
@@ -1643,7 +1470,7 @@ pub async fn pause_recording(
     recording_state.validate_can_pause()?;
 
     // Pause the capture session
-    if let Some(session) = manager.get_capture_session_mut() {
+    if let Some(_session) = manager.get_capture_session_mut() {
         // Note: stop() in FFmpeg session, pause() in Swift via FFI
         // For now we just track the pause state - actual pausing will be
         // implemented when we connect the Swift FFI bridge
@@ -1654,12 +1481,6 @@ pub async fn pause_recording(
     recording_state.pause();
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:paused");
-
-    println!(
-        "[Recording] Recording paused - duration: {:.2}s, total pause: {}ms",
-        recording_state.duration, recording_state.pause_time
-    );
-
     Ok(recording_state)
 }
 
@@ -1679,7 +1500,7 @@ pub async fn resume_recording(
     recording_state.validate_can_resume()?;
 
     // Resume the capture session
-    if let Some(session) = manager.get_capture_session_mut() {
+    if let Some(_session) = manager.get_capture_session_mut() {
         // Note: For now we just track the resume state - actual resuming will be
         // implemented when we connect the Swift FFI bridge
         // In the future this will call the Swift bridge start method
@@ -1690,12 +1511,6 @@ pub async fn resume_recording(
     recording_state.resume();
     manager.set_current_recording(Some(recording_state.clone()));
     manager.emit_state_change(&app_handle, "recording:resumed");
-
-    println!(
-        "[Recording] Recording resumed - cumulative pause time: {}ms",
-        recording_state.pause_time
-    );
-
     Ok(recording_state)
 }
 
@@ -2237,9 +2052,7 @@ pub async fn save_webcam_recording(
         .map_err(|e| format!("Failed to run FFmpeg: {}", e))?;
 
     if !ffmpeg_output.status.success() {
-        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
-        println!("FFmpeg stderr: {}", stderr);
-        // If FFmpeg fails, use the original file anyway
+        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);        // If FFmpeg fails, use the original file anyway
         fs::rename(&temp_file_path, &final_file_path)
             .map_err(|e| format!("Failed to rename temp file: {}", e))?;
     } else {

@@ -56,14 +56,6 @@ export function usePiPRecording() {
 
       // Store webcam stream reference
       webcamStreamRef.current = webcamStream;
-
-      console.log('[PiPRecording] Starting PiP recording:', {
-        recordingId,
-        startTime,
-        screenSource: screenSource.id,
-        pipConfig
-      });
-
       // Step 1: Start screen recording via Tauri backend
       const screenRecording = await invoke('start_recording', {
         recordingType: 'screen',
@@ -73,12 +65,8 @@ export function usePiPRecording() {
       });
 
       screenFilePathRef.current = screenRecording.file_path;
-      console.log('[PiPRecording] Screen recording started:', screenFilePathRef.current);
-
       // Step 2: Start webcam recording via MediaRecorder
       await startWebcamRecording(webcamStream);
-      console.log('[PiPRecording] Webcam recording started');
-
       // Step 3: Start duration timer
       timerIntervalRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -92,7 +80,6 @@ export function usePiPRecording() {
         screenRecording,
       };
     } catch (err) {
-      console.error('[PiPRecording] Failed to start recording:', err);
       setError(err.message || 'Failed to start recording');
       // Cleanup on error
       await cleanup();
@@ -155,22 +142,12 @@ export function usePiPRecording() {
 
       // Calculate final duration
       const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
-
-      console.log('[PiPRecording] Stopping recording...', {
-        recordingId: recordingIdRef.current,
-        duration
-      });
-
       // Step 1: Stop screen recording
       const screenResult = await invoke('stop_recording');
       screenFilePathRef.current = screenResult.file_path;
-      console.log('[PiPRecording] Screen recording stopped:', screenFilePathRef.current);
-
       // Step 2: Stop webcam recording and save
       const webcamFilePath = await stopWebcamRecording(duration);
       webcamFilePathRef.current = webcamFilePath;
-      console.log('[PiPRecording] Webcam recording stopped:', webcamFilePathRef.current);
-
       // Step 3: Create metadata
       const metadata = {
         id: recordingIdRef.current,
@@ -203,9 +180,8 @@ export function usePiPRecording() {
           webcamHeight: webcamDimensions.height,
         });
         metadata.compositedFilePath = compositedFilePath;
-        console.log('[PiPRecording] PiP composite created:', compositedFilePath);
-      } catch (compositeErr) {
-        console.error('[PiPRecording] Failed to composite PiP recording:', compositeErr);
+      } catch {
+        // Failed to composite PiP recording
       }
 
       const screenPath = screenFilePathRef.current;
@@ -218,9 +194,6 @@ export function usePiPRecording() {
 
       setIsRecording(false);
       setRecordingDuration(0);
-
-      console.log('[PiPRecording] Recording completed successfully:', metadata);
-
       return {
         metadata,
         screenFilePath: screenPath,
@@ -229,7 +202,6 @@ export function usePiPRecording() {
         compositeSucceeded,
       };
     } catch (err) {
-      console.error('[PiPRecording] Failed to stop recording:', err);
       setError(err.message || 'Failed to stop recording');
       throw err;
     }
@@ -289,8 +261,7 @@ export function usePiPRecording() {
       await invoke('save_pip_metadata', {
         metadata: JSON.stringify(metadata, null, 2)
       });
-    } catch (err) {
-      console.error('[PiPRecording] Failed to save metadata:', err);
+    } catch {
       // Don't throw here - metadata save failure shouldn't fail the whole recording
     }
   };

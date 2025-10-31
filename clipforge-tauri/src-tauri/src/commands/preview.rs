@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 // ============================================================================
 // Event Payload Structures
@@ -162,6 +162,7 @@ impl PreviewState {
     }
 
     /// Records a dropped frame
+    #[allow(dead_code)]
     pub fn record_dropped_frame(&mut self) {
         self.metrics.dropped_frames += 1;
     }
@@ -237,9 +238,6 @@ pub async fn start_preview(
         queue_size: 0,
         avg_frame_size: 0,
     };
-
-    println!("[Preview] Started preview streaming");
-
     // Emit initial status
     app_handle
         .emit("preview-started", ())
@@ -263,12 +261,6 @@ pub async fn stop_preview(
     }
 
     preview_state.is_active = false;
-
-    println!(
-        "[Preview] Stopped preview streaming - Total frames: {}, Dropped: {}",
-        preview_state.metrics.total_frames, preview_state.metrics.dropped_frames
-    );
-
     // Emit final metrics
     let final_metrics = preview_state.metrics.clone();
     app_handle
@@ -292,12 +284,6 @@ pub async fn update_preview_settings(
     preview_state.update_target_fps(settings.target_fps);
     preview_state.settings.jpeg_quality = settings.jpeg_quality;
     preview_state.settings.enable_backpressure = settings.enable_backpressure;
-
-    println!(
-        "[Preview] Updated settings - FPS: {}, Quality: {}, Backpressure: {}",
-        settings.target_fps, settings.jpeg_quality, settings.enable_backpressure
-    );
-
     Ok(())
 }
 
@@ -434,9 +420,6 @@ pub async fn start_preview_for_source(
 
     // Start capture
     bridge.start_capture()?;
-
-    println!("[PreviewCapture] Capture started successfully");
-
     // Update preview state
     {
         let mut state = preview_state
@@ -478,8 +461,6 @@ pub async fn start_preview_for_source(
 
     // Spawn background task to poll frames from Swift queue
     let polling_task = tokio::spawn(async move {
-        println!("[PreviewCapture] Frame polling task started");
-
         let mut frame_count = 0u64;
         let mut last_metrics_emit = std::time::Instant::now();
 
@@ -561,8 +542,8 @@ pub async fn start_preview_for_source(
                 }
 
                 // Emit frame to frontend
-                if let Err(e) = emit_preview_frame(&app_handle_clone, preview_frame.clone()) {
-                    eprintln!("[PreviewCapture] Failed to emit frame: {}", e);
+                if let Err(_e) = emit_preview_frame(&app_handle_clone, preview_frame.clone()) {
+                    // Error emitting frame
                 }
 
                 // Update metrics
@@ -573,8 +554,8 @@ pub async fn start_preview_for_source(
                 // Emit metrics every second
                 if last_metrics_emit.elapsed().as_secs() >= 1 {
                     let metrics = state.metrics.clone();
-                    if let Err(e) = emit_preview_metrics(&app_handle_clone, metrics) {
-                        eprintln!("[PreviewCapture] Failed to emit metrics: {}", e);
+                    if let Err(_e) = emit_preview_metrics(&app_handle_clone, metrics) {
+                        // Error emitting metrics
                     }
                     last_metrics_emit = std::time::Instant::now();
                 }
@@ -596,10 +577,7 @@ pub async fn start_preview_for_source(
             .lock()
             .map_err(|e| format!("Failed to lock capture session: {}", e))?;
         session.polling_task = Some(polling_task);
-    }
-
-    println!("[PreviewCapture] Preview session initialized successfully");
-    Ok(())
+    }    Ok(())
 }
 
 /// Stops the preview capture session
@@ -609,8 +587,6 @@ pub async fn stop_preview_for_source(
     preview_state: tauri::State<'_, SharedPreviewState>,
     capture_session: tauri::State<'_, SharedPreviewCaptureSession>,
 ) -> Result<(), String> {
-    println!("[PreviewCapture] Stopping preview");
-
     // Stop the capture session
     {
         let mut session = capture_session
@@ -630,12 +606,6 @@ pub async fn stop_preview_for_source(
         }
 
         state.is_active = false;
-
-        println!(
-            "[PreviewCapture] Preview stopped - Total frames: {}, Dropped: {}",
-            state.metrics.total_frames, state.metrics.dropped_frames
-        );
-
         // Emit final metrics
         let final_metrics = state.metrics.clone();
         app_handle

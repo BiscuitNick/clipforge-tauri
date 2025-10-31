@@ -32,11 +32,10 @@ function App() {
   const [pipConfig, setPipConfig] = React.useState(null); // Track PiP configuration
   const [isPiPRecording, setIsPiPRecording] = React.useState(false); // Track if PiP recording is active
 
-  // Panel visibility state - flexible panel system (2-4 panels)
+  // Panel visibility state - flexible panel system (2-3 panels)
   const [panelVisibility, setPanelVisibility] = React.useState({
     mediaLibrary: true,      // Always visible
     videoPreview1: true,     // Always visible
-    videoPreview2: false,    // Can be hidden (starts collapsed)
     timelineClips: true      // Can be hidden
   });
 
@@ -82,14 +81,11 @@ function App() {
 
   // Handle media import from Media Library Panel
   const handleMediaImport = (videoMetadataArray) => {
-    console.log("App - Media imported:", videoMetadataArray);
     mediaLibrary.addMediaItems(videoMetadataArray);
   };
 
   // Handle media selection from Media Library
   const handleMediaSelect = (mediaItem) => {
-    console.log("[App] Media selected:", mediaItem);
-    console.log("[App] Setting previewMode to: library");
     setSelectedMedia(mediaItem);
     setPreviewMode("library");
     setIsLibraryPlaying(false); // Reset playback state when selecting new media
@@ -97,20 +93,16 @@ function App() {
 
   // Handle PiP config changes from Media Library
   const handlePiPConfigChange = (config) => {
-    console.log("[App] PiP config changed:", config);
     setPipConfig(config);
   };
 
   // Handle PiP recording state changes
   const handlePiPRecordingChange = (isRecording) => {
-    console.log("[App] PiP recording state changed:", isRecording);
     setIsPiPRecording(isRecording);
   };
 
   // Handle recording state changes (source selection, start, and complete)
   const handleRecordingStateChange = (state) => {
-    console.log("[App] Recording state changed:", state);
-
     if (state.type === 'source-selected') {
       // User selected a screen/window - show live preview
       setRecordingState({
@@ -122,7 +114,6 @@ function App() {
       setSelectedMedia(null);
 
       // Start live preview with ScreenCaptureKit
-      console.log("[App] Starting live preview for source:", state.source.id);
       invoke('start_preview_for_source', {
         sourceId: state.source.id,
         width: state.config.width,
@@ -130,12 +121,10 @@ function App() {
         frameRate: 15 // 15fps for preview
       })
         .then(() => {
-          console.log("[App] Live preview started successfully");
-          // Auto-show preview window
-          setIsPreviewWindowVisible(true);
+          // Preview started successfully
         })
-        .catch((error) => {
-          console.error("[App] Failed to start live preview:", error);
+        .catch(() => {
+          // Failed to start preview
         });
     } else if (state.isRecording) {
       // Recording just started - update to recording state but keep source info
@@ -155,15 +144,9 @@ function App() {
       // Recording completed - stop preview and import the video
       invoke('stop_preview_for_source')
         .then(() => {
-          console.log("[App] Preview stopped after recording completed");
         })
-        .catch((error) => {
-          const message = error?.message || String(error);
-          if (message.includes("Preview is not active")) {
-            console.log("[App] Preview was already inactive after recording");
-          } else {
-            console.error("[App] Failed to stop preview:", error);
-          }
+        .catch(() => {
+          // Preview stop errors are expected in some flows
         });
 
       setRecordingState(null);
@@ -172,15 +155,14 @@ function App() {
       setPipConfig(null);
       invoke("import_video", { paths: [state.file_path] })
         .then((result) => {
-          console.log("[App] Recording imported:", result);
           mediaLibrary.addMediaItems(result);
           // Select the newly imported recording
           if (result && result.length > 0) {
             setSelectedMedia(result[0]);
           }
         })
-        .catch((error) => {
-          console.error("[App] Failed to import recording:", error);
+        .catch(() => {
+          // Failed to import recording
         });
     }
   };
@@ -190,26 +172,23 @@ function App() {
     try {
       try {
         await invoke('stop_preview_for_source');
-        console.log("[App] Preview stopped prior to recording shutdown");
       } catch (previewError) {
         const message = previewError?.message || String(previewError);
         if (message.includes("Preview is not active")) {
-          console.log("[App] Preview already inactive when stopping recording");
+          // Expected during normal flow
         } else {
-          console.warn("[App] Preview stop before recording returned:", previewError);
+          // Unexpected error, but don't show it
         }
       }
       const result = await invoke('stop_recording');
-      console.log("[App] Recording stopped:", result);
       handleRecordingStateChange(result);
-    } catch (error) {
-      console.error("[App] Failed to stop recording:", error);
+    } catch {
+      // Failed to stop recording
     }
   };
 
   // Handle play/pause toggle from Media Library
   const handlePlayPauseMedia = () => {
-    console.log("[App] Play/Pause media from library, current state:", isLibraryPlaying);
     if (isLibraryPlaying) {
       setLibraryPlaybackCommand('pause');
       setIsLibraryPlaying(false);
@@ -222,7 +201,6 @@ function App() {
 
   // Handle stop media from Media Library
   const handleStopMedia = () => {
-    console.log("[App] Stop media from library");
     setLibraryPlaybackCommand('stop');
     setIsLibraryPlaying(false);
     setTimeout(() => setLibraryPlaybackCommand(null), 100); // Reset after command is processed
@@ -230,7 +208,6 @@ function App() {
 
   // Handle webcam stream changes
   const handleWebcamStreamChange = (stream) => {
-    console.log("[App] Webcam stream changed:", stream);
     setWebcamStream(stream);
 
     // Update preview mode to webcam-recording when stream is active
@@ -320,7 +297,6 @@ function App() {
     // Get the dragged media item data
     const mediaData = active.data.current;
     if (mediaData && mediaData.type === 'media-item') {
-      console.log("Dropped media on timeline at position:", dropTimePosition);
       // Use insertClipWithShift to automatically handle overlaps
       timeline.insertClipWithShift(mediaData, dropTimePosition);
 
@@ -390,7 +366,6 @@ function App() {
 
       alert('Export completed successfully!');
     } catch (error) {
-      console.error('Export failed:', error);
       alert(`Export failed: ${error}`);
     } finally {
       setIsExporting(false);
@@ -412,7 +387,6 @@ function App() {
   // Listen for recording duration updates
   React.useEffect(() => {
     const unlisten = listen('recording:duration-update', (event) => {
-      console.log("[App] Recording duration update:", event.payload);
       // Merge duration update with existing state to preserve type and source info
       setRecordingState(prev => ({
         ...prev,
@@ -494,25 +468,6 @@ function App() {
           />
         )}
 
-        {/* Video Preview Panel 2 - Can be hidden */}
-        {panelVisibility.videoPreview2 && (
-          <VideoPreviewPanel
-            selectedMedia={selectedMedia}
-            mode={previewMode}
-            timelineState={timelineState}
-            recordingState={recordingState}
-            onStopRecording={handleStopRecording}
-            libraryPlaybackCommand={libraryPlaybackCommand}
-            webcamStream={webcamStream}
-            webcamRecordingDuration={webcamRecordingDuration}
-            isWebcamPaused={isWebcamPaused}
-            panelLabel="Preview 2"
-            onCollapse={() => togglePanel('videoPreview2')}
-            pipConfig={pipConfig}
-            isPiPRecording={isPiPRecording}
-          />
-        )}
-
         {/* Timeline Clips Panel - Can be hidden */}
         {panelVisibility.timelineClips && (
           <TimelineClipsPanel
@@ -530,16 +485,6 @@ function App() {
 
       {/* Floating toggle buttons for hidden panels */}
       <div className="floating-panel-toggles">
-        {!panelVisibility.videoPreview2 && (
-          <button
-            className="panel-toggle preview-2-toggle"
-            onClick={() => togglePanel('videoPreview2')}
-            aria-label="Show Preview 2 panel"
-            title="Show Preview 2 panel"
-          >
-            ◀ Preview 2
-          </button>
-        )}
         {!panelVisibility.timelineClips && (
           <button
             className="panel-toggle clips-toggle"
@@ -558,7 +503,7 @@ function App() {
             aria-label="Show Preview Window"
             title="Show Preview Window (Cmd/Ctrl+P)"
           >
-            👁 Preview
+            Preview
           </button>
         )}
       </div>
@@ -644,11 +589,17 @@ function App() {
         </div>
       )}
 
-      {/* Preview Window - Floating overlay for real-time screen capture preview */}
+      {/* Preview Window - Floating overlay for real-time preview with source selection */}
       <PreviewWindow
         isVisible={isPreviewWindowVisible}
         onToggleVisibility={() => setIsPreviewWindowVisible(prev => !prev)}
         isPictureInPicture={false}
+        webcamStream={webcamStream}
+        pipConfig={pipConfig}
+        isPiPRecording={isPiPRecording}
+        timelineState={timelineState}
+        selectedMedia={selectedMedia}
+        previewMode={previewMode}
       />
     </div>
     </DndContext>

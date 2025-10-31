@@ -61,24 +61,10 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   );
 
   // Debug: Log props changes
-  useEffect(() => {
-    console.log("[VideoPreview] Props changed:", {
-      mode,
-      selectedMedia: selectedMedia ? {
-        id: selectedMedia.id,
-        filename: selectedMedia.filename,
-        filepath: selectedMedia.filepath
-      } : null,
-      hasTimelineState: !!timelineState,
-      isPiPConfigured,
-      compositeEnabled
-    });
-  }, [selectedMedia, mode, timelineState, isPiPConfigured, compositeEnabled]);
+  useEffect(() => {  }, [selectedMedia, mode, timelineState, isPiPConfigured, compositeEnabled]);
 
   // Debug: Log videoSrc changes
-  useEffect(() => {
-    console.log("[VideoPreview] videoSrc changed to:", videoSrc);
-  }, [videoSrc]);
+  useEffect(() => {  }, [videoSrc]);
 
   // Handle webcam stream changes
   useEffect(() => {
@@ -98,13 +84,9 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     const video = webcamVideoRef.current;
     if (!video) return;
 
-    if (webcamStream) {
-      console.log("[VideoPreview] Setting webcam stream for mode:", mode);
-      video.srcObject = webcamStream;
+    if (webcamStream) {      video.srcObject = webcamStream;
       video.play().catch(err => console.error("[VideoPreview] Webcam play failed:", err));
-    } else {
-      console.log("[VideoPreview] Clearing webcam stream");
-      video.srcObject = null;
+    } else {      video.srcObject = null;
     }
   }, [webcamStream, mode, isPiPConfigured]);
 
@@ -115,15 +97,9 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     const video = videoRef.current;
     if (!video) return;
 
-    if (libraryPlaybackCommand === 'play') {
-      console.log("[VideoPreview] Library command: Play");
-      video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
-    } else if (libraryPlaybackCommand === 'pause') {
-      console.log("[VideoPreview] Library command: Pause");
-      video.pause();
-    } else if (libraryPlaybackCommand === 'stop') {
-      console.log("[VideoPreview] Library command: Stop");
-      video.pause();
+    if (libraryPlaybackCommand === 'play') {      video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+    } else if (libraryPlaybackCommand === 'pause') {      video.pause();
+    } else if (libraryPlaybackCommand === 'stop') {      video.pause();
       video.currentTime = 0;
       setCurrentTime(0);
     }
@@ -131,20 +107,14 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Handle timeline playback mode
   useEffect(() => {
-    if (mode !== "timeline" || !timelineState) {
-      console.log("[VideoPreview] Timeline mode check failed - mode:", mode, "hasTimelineState:", !!timelineState);
-      setCurrentClipId(null);
+    if (mode !== "timeline" || !timelineState) {      setCurrentClipId(null);
       return;
     }
 
     const { playheadPosition, getClipAtTime, isPlaying: timelinePlaying } = timelineState;
     const activeClipData = getClipAtTime(playheadPosition);
-    console.log("[VideoPreview] Timeline - playhead at", playheadPosition, "activeClip:", activeClipData);
-
     if (!activeClipData) {
-      // In a gap - show black screen
-      console.log("[VideoPreview] Timeline - No clip at playhead, showing black screen");
-      setShowBlackScreen(true);
+      // In a gap - show black screen      setShowBlackScreen(true);
       setVideoSrc(null);
       setCurrentClipId(null);
       if (videoRef.current) {
@@ -153,24 +123,12 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       return;
     }
 
-    const { clip, sourceTime } = activeClipData;
-    console.log("[VideoPreview] Timeline - Found clip:", {
-      filename: clip.filename,
-      videoPath: clip.videoPath,
-      sourceTime,
-      duration: clip.duration
-    });
-    setShowBlackScreen(false);
+    const { clip, sourceTime } = activeClipData;    setShowBlackScreen(false);
 
     // Load the clip's video if not already loaded
     const assetUrl = convertFileSrc(clip.videoPath);
     const isClipChange = currentClipId !== clip.id;
-
-    console.log("[VideoPreview] Timeline - Current clip:", currentClipId, "New clip:", clip.id, "Changed:", isClipChange);
-
-    if (isClipChange) {
-      console.log("[VideoPreview] Timeline - Loading new clip:", clip.filename);
-      setVideoSrc(assetUrl);
+    if (isClipChange) {      setVideoSrc(assetUrl);
       setCurrentClipId(clip.id);
 
       // Set duration from clip
@@ -181,9 +139,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       // When video loads, seek to correct position
       const video = videoRef.current;
       if (video) {
-        const handleCanPlayTimeline = () => {
-          console.log("[VideoPreview] Timeline - Video ready, seeking to:", sourceTime);
-          video.currentTime = sourceTime;
+        const handleCanPlayTimeline = () => {          video.currentTime = sourceTime;
           setCurrentTime(sourceTime);
 
           // Start playback if timeline is playing
@@ -216,12 +172,8 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
         }
 
         // Sync play/pause state
-        if (timelinePlaying && video.paused) {
-          console.log("[VideoPreview] Timeline - Starting playback");
-          video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
-        } else if (!timelinePlaying && !video.paused) {
-          console.log("[VideoPreview] Timeline - Pausing playback");
-          video.pause();
+        if (timelinePlaying && video.paused) {          video.play().catch(err => console.error("[VideoPreview] Play failed:", err));
+        } else if (!timelinePlaying && !video.paused) {          video.pause();
         }
       }
     }
@@ -229,19 +181,13 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Load video when selectedMedia changes (library mode)
   useEffect(() => {
-    console.log("[VideoPreview] useEffect triggered - mode:", mode, "selectedMedia:", selectedMedia);
-
-    if (mode !== "library") {
-      console.log("[VideoPreview] Not in library mode, skipping");
-      return;
+    if (mode !== "library") {      return;
     }
 
     // Clear clip tracking when in library mode
     setCurrentClipId(null);
 
-    if (!selectedMedia) {
-      console.log("[VideoPreview] No selectedMedia, clearing video");
-      setVideoSrc(null);
+    if (!selectedMedia) {      setVideoSrc(null);
       setDuration(0);
       setCurrentTime(0);
       setIsPlaying(false);
@@ -251,12 +197,8 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
     // Convert filepath to Tauri asset URL
     const assetUrl = convertFileSrc(selectedMedia.filepath);
-    console.log("[VideoPreview] Loading video:", selectedMedia.filepath, "->", assetUrl);
-
     // Set duration from media metadata (FFprobe) immediately
-    if (selectedMedia.duration) {
-      console.log("[VideoPreview] Setting duration from selectedMedia:", selectedMedia.duration);
-      setDuration(selectedMedia.duration);
+    if (selectedMedia.duration) {      setDuration(selectedMedia.duration);
     }
 
     setVideoSrc(assetUrl);
@@ -271,18 +213,8 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     if (!video) return;
 
     const handleLoadedMetadata = () => {
-      console.log("[VideoPreview] Video metadata loaded");
-      console.log("[VideoPreview] Duration:", video.duration);
-      console.log("[VideoPreview] ReadyState:", video.readyState);
-      console.log("[VideoPreview] VideoWidth:", video.videoWidth);
-      console.log("[VideoPreview] VideoHeight:", video.videoHeight);
-
       if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
-        setDuration(video.duration);
-        console.log("[VideoPreview] Duration set to:", video.duration);
-      } else {
-        console.warn("[VideoPreview] Invalid duration:", video.duration);
-      }
+        setDuration(video.duration);      } else {      }
 
       setCurrentTime(0);
       video.currentTime = 0;
@@ -298,24 +230,16 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       console.error("[VideoPreview] Video error message:", video.error?.message);
     };
 
-    const handleLoadStart = () => {
-      console.log("[VideoPreview] Video load started, src:", video.src);
-    };
+    const handleLoadStart = () => {    };
 
-    const handleCanPlay = () => {
-      console.log("[VideoPreview] Video can play");
-      // Sometimes duration is only available after canplay
+    const handleCanPlay = () => {      // Sometimes duration is only available after canplay
       if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
-        if (duration === 0) {
-          console.log("[VideoPreview] Setting duration from canplay:", video.duration);
-          setDuration(video.duration);
+        if (duration === 0) {          setDuration(video.duration);
         }
       }
     };
 
-    const handleDurationChange = () => {
-      console.log("[VideoPreview] Duration changed:", video.duration);
-      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+    const handleDurationChange = () => {      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
         setDuration(video.duration);
       }
     };

@@ -52,9 +52,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
     opacity: isDragging ? 0.5 : 1,
   } : undefined;
 
-  const handleClick = (e) => {
-    console.log("[MediaLibraryPanel] Media item clicked:", item);
-    // Stop event propagation to prevent drag handlers from interfering
+  const handleClick = (e) => {    // Stop event propagation to prevent drag handlers from interfering
     e.stopPropagation();
     if (onSelect) {
       onSelect(item);
@@ -261,9 +259,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   useEffect(() => {
     const appWindow = getCurrentWindow();
 
-    const dropHandler = appWindow.listen("tauri://drag-drop", (event) => {
-      console.log("Media Library - File drop event:", event);
-      setIsDragging(false);
+    const dropHandler = appWindow.listen("tauri://drag-drop", (event) => {      setIsDragging(false);
 
       if (event.payload && event.payload.paths) {
         handleFileImport(event.payload.paths);
@@ -330,8 +326,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
       setMessage(`Successfully imported ${result.length} file(s) to Media Library!`);
       setMessageType("success");
-      console.log("Media Library - Import result:", result);
-
       // Call onMediaImport callback with the imported video metadata
       if (onMediaImport && result.length > 0) {
         onMediaImport(result);
@@ -384,9 +378,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
   };
 
   // Handle source selection from modal
-  const handleSourceSelect = (selection) => {
-    console.log("[MediaLibraryPanel] Source selected:", selection);
-    setSelectedRecordingSource(selection);
+  const handleSourceSelect = (selection) => {    setSelectedRecordingSource(selection);
 
     // Notify parent to show live preview of selected source
     if (onRecordingStateChange) {
@@ -492,9 +484,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         config: selectedRecordingSource.config,
         includeAudio: selectedRecordingSource.includeAudio
       });
-
-      console.log('[MediaLibraryPanel] Recording started:', result);
-
       // Notify parent about recording start with source information
       if (onRecordingStateChange) {
         onRecordingStateChange({
@@ -560,9 +549,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setMessage("Resuming recording...");
         setMessageType("loading");
 
-        const result = await invoke('resume_recording');
-        console.log('[MediaLibraryPanel] Recording resumed:', result);
-        setIsPaused(false);
+        const result = await invoke('resume_recording');        setIsPaused(false);
         setMessage("");
         setMessageType("");
       } else {
@@ -571,9 +558,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setMessage("Pausing recording...");
         setMessageType("loading");
 
-        const result = await invoke('pause_recording');
-        console.log('[MediaLibraryPanel] Recording paused:', result);
-        setIsPaused(true);
+        const result = await invoke('pause_recording');        setIsPaused(true);
         setMessage("");
         setMessageType("");
       }
@@ -606,9 +591,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
           screenDimensions: session.screenDimensions,
           webcamDimensions: session.webcamDimensions,
         });
-
-        console.log('[MediaLibraryPanel] PiP recording stopped:', result);
-
         setIsPiPActive(false);
         pipSessionRef.current = null;
         setIsPaused(false);
@@ -646,8 +628,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       }
 
       const result = await invoke('stop_recording');
-      console.log('[MediaLibraryPanel] Recording stopped:', result);
-
       // Reset state
       setIsPaused(false);
       setSelectedRecordingSource(null);
@@ -918,18 +898,11 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       webcamMediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          console.log('[MediaLibraryPanel] Data chunk received, size:', event.data.size, 'total chunks:', webcamRecordedChunksRef.current.length + 1);
-          webcamRecordedChunksRef.current.push(event.data);
-        } else {
-          console.warn('[MediaLibraryPanel] Received empty data chunk');
-        }
+        if (event.data && event.data.size > 0) {          webcamRecordedChunksRef.current.push(event.data);
+        } else {        }
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('[MediaLibraryPanel] Webcam recording stopped, saving...');
-        console.log('[MediaLibraryPanel] Chunks collected:', webcamRecordedChunksRef.current.length);
-
         // Stop timer
         if (webcamRecordingTimerRef.current) {
           clearInterval(webcamRecordingTimerRef.current);
@@ -938,15 +911,10 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
         // Use the captured final duration
         const finalDuration = webcamFinalDurationRef.current;
-        console.log('[MediaLibraryPanel] Using final duration:', finalDuration);
-
         // Create blob from recorded chunks
         const blob = new Blob(webcamRecordedChunksRef.current, {
           type: 'video/webm'
         });
-
-        console.log('[MediaLibraryPanel] Blob size:', blob.size, 'bytes');
-
         if (blob.size === 0) {
           console.error('[MediaLibraryPanel] Blob is empty! No data recorded.');
           setMessage("Recording failed: No data captured");
@@ -965,26 +933,17 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
           // Convert to array of numbers (required for Tauri serialization)
           const dataArray = [...uint8Array];
-
-          console.log('[MediaLibraryPanel] Saving webcam recording, size:', dataArray.length, 'bytes, duration:', finalDuration);
-
           // Save the recording
           const result = await invoke('save_webcam_recording', {
             data: dataArray,
             mimeType: 'video/webm',
             duration: finalDuration
           });
-
-          console.log('[MediaLibraryPanel] Webcam recording saved:', result);
-
           // Import the saved recording by fetching its path
           // The result is the file path, so we need to import it
           const importResult = await invoke('import_video', {
             paths: [result]
           });
-
-          console.log('[MediaLibraryPanel] Webcam recording imported:', importResult);
-
           // Add to media library
           if (onMediaImport && importResult && importResult.length > 0) {
             onMediaImport(importResult);
@@ -1022,8 +981,6 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
       // Start recording
       mediaRecorder.start(1000); // Collect data every second
-      console.log('[MediaLibraryPanel] Webcam recording started');
-
       // Start timer
       webcamRecordingStartTimeRef.current = Date.now();
       setWebcamRecordingDuration(0);
@@ -1076,9 +1033,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         if (onWebcamRecordingDurationChange) {
           onWebcamRecordingDurationChange(elapsed);
         }
-      }, 100);
-      console.log('[MediaLibraryPanel] Webcam recording resumed');
-    } else {
+      }, 100);    } else {
       // Pause recording and timer
       recorder.pause();
       setIsWebcamPaused(true);
@@ -1088,9 +1043,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       if (webcamRecordingTimerRef.current) {
         clearInterval(webcamRecordingTimerRef.current);
         webcamRecordingTimerRef.current = null;
-      }
-      console.log('[MediaLibraryPanel] Webcam recording paused');
-    }
+      }    }
   };
 
   // Handle stopping webcam recording
@@ -1101,18 +1054,14 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
     // Capture final duration before stopping
     if (webcamRecordingStartTimeRef.current) {
       const finalDuration = (Date.now() - webcamRecordingStartTimeRef.current) / 1000;
-      webcamFinalDurationRef.current = finalDuration;
-      console.log('[MediaLibraryPanel] Capturing final duration:', finalDuration);
-    }
+      webcamFinalDurationRef.current = finalDuration;    }
 
     if (recorder.state !== 'inactive') {
       recorder.stop();
     }
 
     setIsWebcamRecording(false);
-    setIsWebcamPaused(false);
-    console.log('[MediaLibraryPanel] Webcam recording stopped');
-  };
+    setIsWebcamPaused(false);  };
 
   return (
     <div className="media-library-panel">

@@ -241,9 +241,6 @@ function ScreenRecordingModal({ isOpen, onClose, onSourceSelect }) {
       audio_codec: "aac",
       output_format: "mp4"
     };
-
-    console.log('[ScreenRecordingModal] Source selected with config:', config);
-
     // Pass selection to parent
     if (onSourceSelect) {
       onSourceSelect({

@@ -35,14 +35,9 @@ struct FFprobeOutput {
 
 #[tauri::command]
 pub async fn extract_metadata(file_path: String) -> Result<VideoMetadata, String> {
-    println!("Extracting metadata for: {}", file_path);
-
     // Find ffprobe executable
     let ffprobe_path =
         find_ffprobe().ok_or_else(|| "ffprobe not found. Please install FFmpeg.".to_string())?;
-
-    println!("Using ffprobe at: {:?}", ffprobe_path);
-
     // Execute ffprobe with JSON output
     let output = Command::new(ffprobe_path)
         .args([

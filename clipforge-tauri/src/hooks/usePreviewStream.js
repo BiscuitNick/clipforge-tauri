@@ -68,8 +68,8 @@ export function usePreviewStream(enabled = true) {
       }
     };
 
-    pendingImage.onerror = (err) => {
-      console.error('[usePreviewStream] Failed to decode preview frame', err);
+    pendingImage.onerror = () => {
+      // Failed to decode preview frame
     };
 
     pendingImage.src = `data:image/jpeg;base64,${imageData}`;

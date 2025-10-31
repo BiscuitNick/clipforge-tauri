@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // FFI bridge to Swift ScreenCaptureKit implementation
 //
 // This module provides safe Rust wrappers around the Swift ScreenCaptureKit
@@ -220,7 +222,6 @@ impl ScreenCaptureBridge {
     pub fn new() -> Option<Self> {
         // Check if ScreenCaptureKit is available
         if !Self::is_available() {
-            eprintln!("[ScreenCapture FFI] ScreenCaptureKit is not available on this system");
             return None;
         }
 
@@ -228,12 +229,8 @@ impl ScreenCaptureBridge {
         let bridge_ptr = unsafe { screen_capture_bridge_create() };
 
         if bridge_ptr.is_null() {
-            eprintln!("[ScreenCapture FFI] Failed to create Swift bridge instance");
             return None;
         }
-
-        println!("[ScreenCapture FFI] Bridge created successfully");
-
         Some(Self {
             bridge_ptr: SwiftBridgePtr(bridge_ptr),
             frame_queue: Arc::new(Mutex::new(VecDeque::with_capacity(60))), // 2 seconds at 30fps
@@ -261,13 +258,11 @@ impl ScreenCaptureBridge {
         let result = unsafe { screen_capture_bridge_start(self.bridge_ptr.0) };
 
         if result == 1 {
-            println!("[ScreenCapture FFI] Capture started successfully");
             Ok(())
         } else {
             let error_msg = self.take_last_error().unwrap_or_else(|| {
                 "Failed to start capture - check configuration and permissions".to_string()
             });
-            eprintln!("[ScreenCapture FFI] {}", error_msg);
             Err(error_msg)
         }
     }
@@ -276,18 +271,14 @@ impl ScreenCaptureBridge {
     ///
     /// Safe to call even if capture is not running
     pub fn stop_capture(&self) {
-        unsafe { screen_capture_bridge_stop(self.bridge_ptr.0) };
-        println!("[ScreenCapture FFI] Capture stopped");
-    }
+        unsafe { screen_capture_bridge_stop(self.bridge_ptr.0) };    }
 
     /// Pauses screen capture
     ///
     /// Note: Current implementation stops the stream. True pause/resume
     /// will be implemented in a future task.
     pub fn pause_capture(&self) {
-        unsafe { screen_capture_bridge_pause(self.bridge_ptr.0) };
-        println!("[ScreenCapture FFI] Capture paused");
-    }
+        unsafe { screen_capture_bridge_pause(self.bridge_ptr.0) };    }
 
     /// Gets reference to the frame queue
     ///
@@ -323,9 +314,7 @@ impl ScreenCaptureBridge {
     /// Clears all frames from the queue
     pub fn clear_frames(&self) {
         if let Ok(mut queue) = self.frame_queue.lock() {
-            queue.clear();
-            println!("[ScreenCapture FFI] Frame queue cleared");
-        }
+            queue.clear();        }
     }
 
     /// Dequeues a JPEG-compressed frame from the Swift queue
@@ -391,9 +380,7 @@ impl ScreenCaptureBridge {
     pub fn clear_jpeg_frames(&self) {
         unsafe {
             screen_capture_bridge_clear_frame_queue(self.bridge_ptr.0);
-        }
-        println!("[ScreenCapture FFI] JPEG frame queue cleared");
-    }
+        }    }
 
     /// Retrieves and clears the last error message from Swift bridge
     fn take_last_error(&self) -> Option<String> {
@@ -419,24 +406,14 @@ impl ScreenCaptureBridge {
                 frame_rate as i32,
                 if capture_audio { 1 } else { 0 },
             );
-        }
-        println!(
-            "[ScreenCapture FFI] Stream configured: {}x{} @ {}fps, audio: {}",
-            width, height, frame_rate, capture_audio
-        );
-    }
+        }    }
 
     /// Configures to capture a specific display
     pub fn configure_display(&self, display_id: u32) -> Result<(), String> {
         let result =
             unsafe { screen_capture_bridge_configure_display(self.bridge_ptr.0, display_id) };
 
-        if result == 1 {
-            println!(
-                "[ScreenCapture FFI] Display filter configured: {}",
-                display_id
-            );
-            Ok(())
+        if result == 1 {            Ok(())
         } else {
             let error_msg = self.take_last_error().unwrap_or_else(|| {
                 format!(
@@ -453,12 +430,7 @@ impl ScreenCaptureBridge {
         let result =
             unsafe { screen_capture_bridge_configure_window(self.bridge_ptr.0, window_id) };
 
-        if result == 1 {
-            println!(
-                "[ScreenCapture FFI] Window filter configured: {}",
-                window_id
-            );
-            Ok(())
+        if result == 1 {            Ok(())
         } else {
             let error_msg = self.take_last_error().unwrap_or_else(|| {
                 format!("Failed to configure window filter for window {}", window_id)
@@ -470,18 +442,13 @@ impl ScreenCaptureBridge {
 
 impl Drop for ScreenCaptureBridge {
     fn drop(&mut self) {
-        println!("[ScreenCapture FFI] Dropping bridge instance");
-
         // Stop capture if still running
         self.stop_capture();
 
         // Destroy Swift bridge instance
         unsafe {
             screen_capture_bridge_destroy(self.bridge_ptr.0);
-        }
-
-        println!("[ScreenCapture FFI] Bridge destroyed");
-    }
+        }    }
 }
 
 // ============================================================================
@@ -627,13 +594,7 @@ pub fn capture_display_thumbnail(display_id: u32, max_width: i32) -> Result<Stri
         let base64_string = base64::engine::general_purpose::STANDARD.encode(png_data);
 
         // Free the Swift-allocated buffer
-        screen_capture_free_array(data_ptr as *mut c_void);
-
-        println!(
-            "[ScreenCapture Thumbnail] Captured display {} thumbnail: {} bytes",
-            display_id, length
-        );
-        Ok(base64_string)
+        screen_capture_free_array(data_ptr as *mut c_void);        Ok(base64_string)
     }
 }
 
@@ -670,13 +631,7 @@ pub fn capture_window_thumbnail(window_id: u32, max_width: i32) -> Result<String
         let base64_string = base64::engine::general_purpose::STANDARD.encode(png_data);
 
         // Free the Swift-allocated buffer
-        screen_capture_free_array(data_ptr as *mut c_void);
-
-        println!(
-            "[ScreenCapture Thumbnail] Captured window {} thumbnail: {} bytes",
-            window_id, length
-        );
-        Ok(base64_string)
+        screen_capture_free_array(data_ptr as *mut c_void);        Ok(base64_string)
     }
 }
 
@@ -712,17 +667,14 @@ pub unsafe extern "C" fn screen_capture_push_frame(
 ) -> i32 {
     // Validate inputs
     if bridge_ptr.is_null() {
-        eprintln!("[ScreenCapture FFI] push_frame: null bridge pointer");
         return 0;
     }
 
     if pixel_data.is_null() {
-        eprintln!("[ScreenCapture FFI] push_frame: null pixel data");
         return 0;
     }
 
     if data_len == 0 {
-        eprintln!("[ScreenCapture FFI] push_frame: empty pixel data");
         return 0;
     }
 
@@ -756,7 +708,6 @@ pub unsafe extern "C" fn screen_capture_push_frame(
         return 1; // Success
     }
 
-    eprintln!("[ScreenCapture FFI] push_frame: failed to lock frame queue");
     0 // Failure
 }
 
@@ -786,8 +737,6 @@ mod tests {
     fn test_availability_check() {
         // This should work on macOS 12.3+
         let is_available = ScreenCaptureBridge::is_available();
-        println!("ScreenCaptureKit available: {}", is_available);
-
         // On macOS 15, this should be true
         #[cfg(target_os = "macos")]
         assert!(
@@ -799,9 +748,7 @@ mod tests {
     #[test]
     fn test_bridge_creation() {
         if let Some(bridge) = ScreenCaptureBridge::new() {
-            assert_eq!(bridge.frame_count(), 0);
-            println!("Bridge created successfully");
-        } else {
+            assert_eq!(bridge.frame_count(), 0);        } else {
             // On non-macOS or old macOS versions, this is expected
             println!("Bridge creation skipped (ScreenCaptureKit not available)");
         }

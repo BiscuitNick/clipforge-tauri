@@ -26,10 +26,9 @@ export function usePiPConfig() {
         if (!error) {
           return parsed;
         }
-        console.warn('[usePiPConfig] Invalid stored config, using default:', error);
       }
-    } catch (err) {
-      console.error('[usePiPConfig] Failed to load config from storage:', err);
+    } catch {
+      // Failed to load config from storage
     }
     return DefaultPiPConfiguration;
   });
@@ -38,8 +37,8 @@ export function usePiPConfig() {
   useEffect(() => {
     try {
       localStorage.setItem(PIP_CONFIG_STORAGE_KEY, JSON.stringify(config));
-    } catch (err) {
-      console.error('[usePiPConfig] Failed to save config to storage:', err);
+    } catch {
+      // Failed to save config to storage
     }
   }, [config]);
 
@@ -99,7 +98,6 @@ export function usePiPConfig() {
   const updateConfig = useCallback((newConfig) => {
     const error = validatePiPConfiguration(newConfig);
     if (error) {
-      console.error('[usePiPConfig] Invalid configuration:', error);
       return false;
     }
     setConfig(newConfig);

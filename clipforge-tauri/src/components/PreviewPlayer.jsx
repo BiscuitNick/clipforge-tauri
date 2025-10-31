@@ -21,11 +21,7 @@ function PreviewPlayer({ videoSrc, onTimeUpdate, playheadPosition, trimStart = 0
   }, [clipStartTime, effectiveTrimStart]);
 
   // Debug: Log the videoSrc prop
-  useEffect(() => {
-    console.log("PreviewPlayer received videoSrc:", videoSrc);
-    if (videoRef.current && videoSrc) {
-      console.log("Video element src attribute:", videoRef.current.src);
-    }
+  useEffect(() => {    if (videoRef.current && videoSrc) {    }
   }, [videoSrc]);
 
   // Handle play/pause toggle

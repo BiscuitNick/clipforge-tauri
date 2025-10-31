@@ -1,5 +1,5 @@
 use super::ffmpeg_utils::find_ffmpeg;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// Generate a thumbnail image from a video file at a specific timestamp
@@ -9,8 +9,6 @@ pub async fn generate_thumbnail(
     video_path: String,
     timestamp: Option<f64>, // Timestamp in seconds, defaults to 1.0
 ) -> Result<String, String> {
-    println!("[Thumbnail] Generating thumbnail for: {}", video_path);
-
     // Find ffmpeg executable
     let ffmpeg_path =
         find_ffmpeg().ok_or_else(|| "FFmpeg not found. Please install FFmpeg.".to_string())?;
@@ -68,9 +66,6 @@ pub async fn generate_thumbnail(
     if !thumbnail_path.exists() {
         return Err("Thumbnail file was not created".to_string());
     }
-
-    println!("[Thumbnail] Successfully generated thumbnail");
-
     // Return absolute path
     thumbnail_path
         .to_str()
@@ -113,8 +108,5 @@ pub async fn cleanup_old_thumbnails(max_age_hours: Option<u64>) -> Result<usize,
                 }
             }
         }
-    }
-
-    println!("[Thumbnail] Cleaned up {} old thumbnails", cleaned);
-    Ok(cleaned)
+    }    Ok(cleaned)
 }

@@ -137,11 +137,6 @@ fn composite_pip_recording(
     metadata: &PiPMetadata,
     output_path: &std::path::Path,
 ) -> Result<(), String> {
-    println!(
-        "Compositing PiP recording: {} + {}",
-        metadata.screen_file_path, metadata.webcam_file_path
-    );
-
     // Calculate overlay coordinates
     let coordinates = calculate_pip_coordinates(
         &metadata.pip_config,
@@ -213,9 +208,6 @@ pub async fn export_timeline(
     // Find ffmpeg executable
     let ffmpeg_path =
         find_ffmpeg().ok_or_else(|| "ffmpeg not found. Please install FFmpeg.".to_string())?;
-
-    println!("Using ffmpeg at: {:?}", ffmpeg_path);
-
     // Get first clip's resolution and framerate to use for the output
     let target_width = clips[0].width;
     let target_height = clips[0].height;
@@ -252,16 +244,10 @@ pub async fn export_timeline(
 
         // Determine the actual video path - composite PiP if needed
         let actual_video_path: String;
-        let composite_temp_file: Option<std::path::PathBuf>;
 
         if clip.media_type.as_deref() == Some("pip") && clip.pip_metadata_path.is_some() {
             // This is a PiP recording - composite it first
             let metadata_path = clip.pip_metadata_path.as_ref().unwrap();
-            println!(
-                "Detected PiP clip, loading metadata from: {}",
-                metadata_path
-            );
-
             let _ = app.emit(
                 "export-progress",
                 ExportProgress {
@@ -280,11 +266,9 @@ pub async fn export_timeline(
                 .to_str()
                 .ok_or_else(|| "Failed to convert composite path to string".to_string())?
                 .to_string();
-            composite_temp_file = Some(composite_output);
         } else {
             // Regular video clip
             actual_video_path = clip.video_path.clone();
-            composite_temp_file = None;
         }
 
         let temp_output = temp_dir.join(format!("segment_{:03}.mp4", segment_files.len()));
@@ -343,14 +327,6 @@ pub async fn export_timeline(
                         message: format!("Creating gap ({:.1}s)", gap_duration),
                     },
                 );
-
-                println!(
-                    "Creating gap of {:.2}s between clips {} and {}",
-                    gap_duration,
-                    i,
-                    i + 1
-                );
-
                 // Create black video for the gap
                 let black_output = temp_dir.join(format!("segment_{:03}.mp4", segment_files.len()));
                 let output = Command::new(&ffmpeg_path)
@@ -432,8 +408,5 @@ pub async fn export_timeline(
     }
 
     // Clean up temp files
-    fs::remove_dir_all(&temp_dir).map_err(|e| format!("Failed to clean up temp files: {}", e))?;
-
-    println!("Export completed successfully: {}", output_path);
-    Ok(())
+    fs::remove_dir_all(&temp_dir).map_err(|e| format!("Failed to clean up temp files: {}", e))?;    Ok(())
 }

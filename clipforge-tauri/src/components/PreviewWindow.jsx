@@ -2,12 +2,13 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './PreviewWindow.css';
 import usePreviewStream from '../hooks/usePreviewStream';
+import useCompositePreview from '../hooks/useCompositePreview';
 
 /**
- * PreviewWindow - Real-time screen capture preview component
+ * PreviewWindow - Real-time preview component with source selection
  *
  * Features:
- * - Listens for preview-frame events from Tauri backend
+ * - Multiple preview sources (Screen, Webcam, Screen+Webcam, Timeline)
  * - Canvas-based rendering for low-latency previews
  * - Floating overlay with drag and resize functionality
  * - FPS counter and recording indicator
@@ -16,9 +17,18 @@ import usePreviewStream from '../hooks/usePreviewStream';
 const PreviewWindow = React.memo(({
   isVisible = false,
   onToggleVisibility,
-  isPictureInPicture = false
+  isPictureInPicture = false,
+  // Additional props for different preview sources
+  webcamStream = null,
+  pipConfig = null,
+  isPiPRecording = false,
+  timelineState = null,
+  selectedMedia = null,
+  previewMode = 'library'
 }) => {
   const containerRef = useRef(null);
+  const webcamVideoRef = useRef(null);
+  const timelineVideoRef = useRef(null);
 
   // State
   const [isDragging, setIsDragging] = useState(false);
@@ -27,56 +37,74 @@ const PreviewWindow = React.memo(({
   const [size, setSize] = useState({ width: 320, height: 180 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const { canvasRef, fps, actualFps, metrics, isRecording } = usePreviewStream(isVisible);
+  const [selectedSource, setSelectedSource] = useState('screen'); // 'screen', 'webcam', 'composite', 'timeline'
 
-  /**
-   * Start preview stream
-   */
-  const startPreview = useCallback(async () => {
-    try {
-      await invoke('start_preview');
-      console.log('[PreviewWindow] Preview started via invoke');
-    } catch (error) {
-      console.error('[PreviewWindow] Failed to start preview:', error);
-    }
-  }, []);
+  // Preview streams for different sources
+  // Enable screen preview when showing screen OR composite (composite needs screen as input)
+  const { canvasRef: screenCanvasRef, fps, actualFps, metrics, isRecording, hasFrame: hasPreviewFrame } = usePreviewStream(
+    isVisible && (selectedSource === 'screen' || selectedSource === 'composite')
+  );
 
-  /**
-   * Stop preview stream
-   */
-  const stopPreview = useCallback(async () => {
-    try {
-      await invoke('stop_preview');
-      console.log('[PreviewWindow] Preview stopped via invoke');
-    } catch (error) {
-      console.error('[PreviewWindow] Failed to stop preview:', error);
-    }
-  }, []);
+  // Composite preview (Screen + Webcam) - needs both screen canvas and webcam video
+  const isPiPConfigured = pipConfig && pipConfig.cameraId && webcamStream;
+  const compositeEnabled = isVisible && selectedSource === 'composite' && isPiPConfigured && hasPreviewFrame && webcamStream;
 
-  /**
-   * Get current preview settings
-   */
-  const getPreviewSettings = useCallback(async () => {
-    try {
-      const settings = await invoke('get_preview_settings');
-      console.log('[PreviewWindow] Preview settings:', settings);
-      return settings;
-    } catch (error) {
-      console.error('[PreviewWindow] Failed to get preview settings:', error);
-      return null;
-    }
-  }, []);
+  const { compositeCanvasRef } = useCompositePreview(
+    screenCanvasRef.current,
+    webcamVideoRef.current,
+    pipConfig,
+    compositeEnabled
+  );
 
-  /**
-   * Update preview settings
-   */
-  const updatePreviewSettings = useCallback(async (settings) => {
-    try {
-      await invoke('update_preview_settings', { settings });
-      console.log('[PreviewWindow] Preview settings updated:', settings);
-    } catch (error) {
-      console.error('[PreviewWindow] Failed to update preview settings:', error);
+  // Set up webcam video element when webcam stream is available
+  useEffect(() => {
+    const shouldShowWebcam =
+      isVisible && (selectedSource === 'webcam' || selectedSource === 'composite');
+
+    const video = webcamVideoRef.current;
+    if (!video) return;
+
+    if (shouldShowWebcam && webcamStream) {
+      video.srcObject = webcamStream;
+      video.play().catch(() => {
+        // Webcam play failed
+      });
+    } else {
+      video.srcObject = null;
     }
+  }, [webcamStream, selectedSource, isVisible]);
+
+  // Set up timeline video playback
+  useEffect(() => {
+    if (selectedSource === 'timeline' && timelineVideoRef.current && timelineState) {
+      const clip = timelineState.getClipAtTime(timelineState.playheadPosition);
+      if (clip) {
+        // Update video source if clip changed
+        if (timelineVideoRef.current.src !== clip.videoPath) {
+          timelineVideoRef.current.src = clip.videoPath;
+        }
+
+        // Calculate time within the clip
+        const timeInClip = timelineState.playheadPosition - clip.startTime + clip.trimStart;
+
+        // Sync video time if needed
+        if (Math.abs(timelineVideoRef.current.currentTime - timeInClip) > 0.1) {
+          timelineVideoRef.current.currentTime = timeInClip;
+        }
+
+        // Play/pause based on timeline state
+        if (timelineState.isPlaying && timelineVideoRef.current.paused) {
+          timelineVideoRef.current.play();
+        } else if (!timelineState.isPlaying && !timelineVideoRef.current.paused) {
+          timelineVideoRef.current.pause();
+        }
+      }
+    }
+  }, [selectedSource, timelineState]);
+
+  // Handle source selection change
+  const handleSourceChange = useCallback((e) => {
+    setSelectedSource(e.target.value);
   }, []);
 
   /**
@@ -155,6 +183,18 @@ const PreviewWindow = React.memo(({
       {/* Drag Handle */}
       <div className="preview-drag-handle" onMouseDown={handleMouseDown}>
         <span className="preview-title">Preview</span>
+        <select
+          className="preview-source-selector"
+          value={selectedSource}
+          onChange={handleSourceChange}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <option value="screen">Selected Screen</option>
+          <option value="webcam" disabled={!webcamStream}>Webcam</option>
+          <option value="composite" disabled={!webcamStream || !pipConfig}>Screen + Webcam</option>
+          <option value="timeline" disabled={!timelineState}>Timeline</option>
+        </select>
         <div className="preview-controls">
           {!isPictureInPicture && (
             <button
@@ -168,12 +208,59 @@ const PreviewWindow = React.memo(({
         </div>
       </div>
 
-      {/* Canvas Container */}
+      {/* Canvas/Video Container */}
       <div className="preview-canvas-container">
-        <canvas
-          ref={canvasRef}
-          className="preview-canvas"
-        />
+        {/* Selected Screen - ScreenCaptureKit preview */}
+        {selectedSource === 'screen' && (
+          <canvas
+            ref={screenCanvasRef}
+            className="preview-canvas"
+          />
+        )}
+
+        {/* Webcam only */}
+        {selectedSource === 'webcam' && (
+          <video
+            ref={webcamVideoRef}
+            className="preview-video"
+            autoPlay
+            playsInline
+            muted
+          />
+        )}
+
+        {/* Screen + Webcam composite */}
+        {selectedSource === 'composite' && (
+          <>
+            {/* Hidden screen canvas for composite source */}
+            <canvas
+              ref={screenCanvasRef}
+              style={{ display: 'none' }}
+            />
+            {/* Hidden webcam video for composite source */}
+            <video
+              ref={webcamVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ display: 'none' }}
+            />
+            {/* Visible composite canvas */}
+            <canvas
+              ref={compositeCanvasRef}
+              className="preview-canvas"
+            />
+          </>
+        )}
+
+        {/* Timeline playback */}
+        {selectedSource === 'timeline' && (
+          <video
+            ref={timelineVideoRef}
+            className="preview-video"
+            playsInline
+          />
+        )}
       </div>
 
       {/* Overlay Information */}

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // Frame timing utilities for maintaining consistent frame rates
 
 use std::time::{Duration, Instant};

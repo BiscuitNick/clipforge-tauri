@@ -815,8 +815,6 @@ extension ScreenCaptureKitBridge: @preconcurrency SCStreamOutput {
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
 
-        print("[ScreenCaptureKit Output] 🎬 Processing frame: \(width)x\(height), format: \(fourCCToString(pixelFormat))")
-
         // Extract pixel data from the pixel buffer
         guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
             print("[ScreenCaptureKit Output] ⚠️ Failed to get pixel buffer base address")
