@@ -114,9 +114,10 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     const { playheadPosition, getClipAtTime, isPlaying: timelinePlaying } = timelineState;
     const activeClipData = getClipAtTime(playheadPosition);
     if (!activeClipData) {
-      // In a gap - show black screen      setShowBlackScreen(true);
-      setVideoSrc(null);
-      setCurrentClipId(null);
+      // In a gap - show black screen but keep video element loaded
+      setShowBlackScreen(true);
+      // Don't clear videoSrc - keep the last loaded video in memory
+      // setCurrentClipId is NOT cleared so we can resume the same clip
       if (videoRef.current) {
         videoRef.current.pause();
       }
@@ -473,21 +474,29 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                   </div>
                 )}
               </div>
-            ) : showBlackScreen ? (
-              <div className="black-screen"></div>
-            ) : videoSrc ? (
-              <video
-                ref={videoRef}
-                key={videoSrc}
-                className="video-element"
-                src={videoSrc}
-                preload="metadata"
-                playsInline
-              >
-                Your browser does not support the video tag.
-              </video>
             ) : (
-              <div className="preview-placeholder"></div>
+              <>
+                {/* Always render video element to maintain ref and event listeners */}
+                {videoSrc && (
+                  <video
+                    ref={videoRef}
+                    key={videoSrc}
+                    className="video-element"
+                    src={videoSrc}
+                    style={{ display: showBlackScreen ? 'none' : 'block' }}
+                    preload="metadata"
+                    playsInline
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+
+                {/* Show black screen overlay when in gap */}
+                {showBlackScreen && <div className="black-screen"></div>}
+
+                {/* Show placeholder when no video loaded */}
+                {!videoSrc && !showBlackScreen && <div className="preview-placeholder"></div>}
+              </>
             )}
           </div>
 
