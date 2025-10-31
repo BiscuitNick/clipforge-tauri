@@ -131,7 +131,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange, onPiPConfigChange, onPiPRecordingChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -211,6 +211,13 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       setPipAudioDeviceId(selectedAudioId);
     }
   }, [selectedAudioId, setPipAudioDeviceId]);
+
+  // Notify parent when pipConfig changes
+  useEffect(() => {
+    if (isPiPEnabled && onPiPConfigChange) {
+      onPiPConfigChange(pipConfig);
+    }
+  }, [pipConfig, isPiPEnabled, onPiPConfigChange]);
 
   useEffect(() => {
     if (pipError) {
@@ -461,10 +468,16 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setMessage("");
         setMessageType("");
 
+        // Notify parent that PiP recording has started
+        if (onPiPRecordingChange) {
+          onPiPRecordingChange(true);
+        }
+
         if (onRecordingStateChange) {
           onRecordingStateChange({
             ...screenRecording,
             isRecording: true,
+            isPiPRecording: true,
             source: selectedRecordingSource.source,
             config: selectedRecordingSource.config,
           });
@@ -601,6 +614,11 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         setIsPaused(false);
         setSelectedRecordingSource(null);
 
+        // Notify parent that PiP recording has stopped
+        if (onPiPRecordingChange) {
+          onPiPRecordingChange(false);
+        }
+
         if (onWebcamStreamChange) {
           onWebcamStreamChange(null);
         }
@@ -653,6 +671,9 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
       if (isPiPActive) {
         setIsPiPActive(false);
         pipSessionRef.current = null;
+        if (onPiPRecordingChange) {
+          onPiPRecordingChange(false);
+        }
         if (onWebcamStreamChange) {
           onWebcamStreamChange(null);
         }

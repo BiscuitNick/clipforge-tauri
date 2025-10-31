@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import "./VideoPreviewPanel.css";
 import usePreviewStream from "../hooks/usePreviewStream";
+import useCompositePreview from "../hooks/useCompositePreview";
 
 /**
  * Format time in seconds to MM:SS format
@@ -22,8 +23,9 @@ function formatTime(seconds) {
  * - timeline: Play back the timeline with clips and gaps
  * - recording: Show live recording preview and controls
  * - webcam-recording: Show live webcam stream during recording
+ * - pip-recording: Show combined screen + webcam overlay preview
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null, pipConfig = null, isPiPRecording = false }) {
   const videoRef = useRef(null);
   const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -33,13 +35,22 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   const [videoSrc, setVideoSrc] = useState(null);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
   const [currentClipId, setCurrentClipId] = useState(null); // Track currently loaded clip
-  const previewEnabled = mode === "recording" || mode === "recording-preview";
+  const previewEnabled = mode === "recording" || mode === "recording-preview" || (mode === "pip-recording" && isPiPRecording);
   const {
     canvasRef: previewCanvasRef,
     hasFrame: hasPreviewFrame,
     actualFps: previewActualFps,
     isRecording: previewIsRecording,
   } = usePreviewStream(previewEnabled);
+
+  // Composite preview for PiP recording (screen + webcam overlay)
+  const compositeEnabled = mode === "pip-recording" && isPiPRecording && webcamStream && hasPreviewFrame;
+  const { compositeCanvasRef } = useCompositePreview(
+    previewCanvasRef.current,
+    webcamVideoRef.current,
+    pipConfig,
+    compositeEnabled
+  );
 
   // Debug: Log props changes
   useEffect(() => {
@@ -61,8 +72,8 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Handle webcam stream changes
   useEffect(() => {
-    if (mode !== "webcam-recording") {
-      // Clear webcam stream when not in webcam recording mode
+    if (mode !== "webcam-recording" && mode !== "pip-recording") {
+      // Clear webcam stream when not in webcam or pip recording mode
       if (webcamVideoRef.current) {
         webcamVideoRef.current.srcObject = null;
       }
@@ -73,7 +84,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     if (!video) return;
 
     if (webcamStream) {
-      console.log("[VideoPreview] Setting webcam stream");
+      console.log("[VideoPreview] Setting webcam stream for mode:", mode);
       video.srcObject = webcamStream;
       video.play().catch(err => console.error("[VideoPreview] Webcam play failed:", err));
     } else {
@@ -396,6 +407,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
   // Get mode display text
   const getModeText = () => {
     if (mode === "recording") return "Recording";
+    if (mode === "pip-recording") return "Recording (Screen + Webcam)";
     if (mode === "recording-preview") return "Ready to Record";
     if (mode === "webcam-recording") return "Webcam Recording";
     if (mode === "timeline") return "Timeline";
@@ -421,6 +433,20 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       <div className="panel-content">
         <div className="video-player">
           <div className="video-container">
+            {/* Hidden webcam video for composite preview */}
+            {mode === "pip-recording" && webcamStream && (
+              <video
+                ref={webcamVideoRef}
+                style={{ display: 'none' }}
+                autoPlay
+                playsInline
+                muted
+                onLoadedMetadata={() => console.log("[VideoPreview] Webcam video loaded for composite")}
+              >
+                Your browser does not support the video tag.
+              </video>
+            )}
+
             {mode === "webcam-recording" ? (
               <>
                 <video
@@ -443,6 +469,34 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                   </>
                 )}
               </>
+            ) : mode === "pip-recording" && compositeEnabled ? (
+              <div className="live-preview-container">
+                {/* Hidden screen preview canvas (used by composite) */}
+                <canvas
+                  ref={previewCanvasRef}
+                  style={{ display: 'none' }}
+                />
+                {/* Composite preview canvas (screen + webcam overlay) */}
+                <canvas
+                  ref={compositeCanvasRef}
+                  className="video-element preview-stream-canvas"
+                />
+                {mode === "pip-recording" && recordingState && (
+                  <>
+                    <div className="recording-indicator-bottom-left">
+                      <div className="recording-dot-pulse"></div>
+                    </div>
+                    <div className="recording-timer-bottom-right">
+                      {formatTime(recordingState.duration)}
+                    </div>
+                  </>
+                )}
+                {previewIsRecording && (
+                  <div className="preview-fps-pill">
+                    {previewActualFps > 0 ? `${previewActualFps.toFixed(1)} FPS` : '-- FPS'}
+                  </div>
+                )}
+              </div>
             ) : previewEnabled ? (
               <div className="live-preview-container">
                 <canvas
@@ -496,7 +550,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
           </div>
 
           {/* Hide scrubber in recording modes */}
-          {mode !== "recording" && mode !== "webcam-recording" && mode !== "recording-preview" && (
+          {mode !== "recording" && mode !== "webcam-recording" && mode !== "recording-preview" && mode !== "pip-recording" && (
             <div className="video-scrubber-container">
               <input
                 type="range"

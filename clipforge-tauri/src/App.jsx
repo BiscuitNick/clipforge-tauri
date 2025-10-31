@@ -29,6 +29,8 @@ function App() {
   const [webcamRecordingDuration, setWebcamRecordingDuration] = React.useState(0); // Track webcam recording duration
   const [isWebcamPaused, setIsWebcamPaused] = React.useState(false); // Track webcam recording paused state
   const [isPreviewWindowVisible, setIsPreviewWindowVisible] = React.useState(false); // Track preview window visibility
+  const [pipConfig, setPipConfig] = React.useState(null); // Track PiP configuration
+  const [isPiPRecording, setIsPiPRecording] = React.useState(false); // Track if PiP recording is active
 
   // Panel visibility state - flexible panel system (2-4 panels)
   const [panelVisibility, setPanelVisibility] = React.useState({
@@ -93,6 +95,18 @@ function App() {
     setIsLibraryPlaying(false); // Reset playback state when selecting new media
   };
 
+  // Handle PiP config changes from Media Library
+  const handlePiPConfigChange = (config) => {
+    console.log("[App] PiP config changed:", config);
+    setPipConfig(config);
+  };
+
+  // Handle PiP recording state changes
+  const handlePiPRecordingChange = (isRecording) => {
+    console.log("[App] PiP recording state changed:", isRecording);
+    setIsPiPRecording(isRecording);
+  };
+
   // Handle recording state changes (source selection, start, and complete)
   const handleRecordingStateChange = (state) => {
     console.log("[App] Recording state changed:", state);
@@ -125,15 +139,18 @@ function App() {
         });
     } else if (state.isRecording) {
       // Recording just started - update to recording state but keep source info
+      const isPiP = state.isPiPRecording || false;
       setRecordingState(prev => ({
         ...state,
         type: 'recording',
         // Preserve source info from preview state
         source: prev?.source,
-        config: prev?.config
+        config: prev?.config,
+        isPiPRecording: isPiP
       }));
-      setPreviewMode("recording");
+      setPreviewMode(isPiP ? "pip-recording" : "recording");
       setSelectedMedia(null);
+      setIsPiPRecording(isPiP);
     } else if (state.file_path) {
       // Recording completed - stop preview and import the video
       invoke('stop_preview_for_source')
@@ -151,6 +168,8 @@ function App() {
 
       setRecordingState(null);
       setPreviewMode("library");
+      setIsPiPRecording(false);
+      setPipConfig(null);
       invoke("import_video", { paths: [state.file_path] })
         .then((result) => {
           console.log("[App] Recording imported:", result);
@@ -447,6 +466,8 @@ function App() {
             onWebcamStreamChange={handleWebcamStreamChange}
             onWebcamRecordingDurationChange={handleWebcamRecordingDurationChange}
             onWebcamPausedChange={handleWebcamPausedChange}
+            onPiPConfigChange={handlePiPConfigChange}
+            onPiPRecordingChange={handlePiPRecordingChange}
           />
         )}
 
@@ -463,6 +484,8 @@ function App() {
             webcamRecordingDuration={webcamRecordingDuration}
             isWebcamPaused={isWebcamPaused}
             panelLabel="Preview 1"
+            pipConfig={pipConfig}
+            isPiPRecording={isPiPRecording}
           />
         )}
 
@@ -480,6 +503,8 @@ function App() {
             isWebcamPaused={isWebcamPaused}
             panelLabel="Preview 2"
             onCollapse={() => togglePanel('videoPreview2')}
+            pipConfig={pipConfig}
+            isPiPRecording={isPiPRecording}
           />
         )}
 
