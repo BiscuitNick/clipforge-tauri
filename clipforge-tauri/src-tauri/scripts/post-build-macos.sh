@@ -44,4 +44,13 @@ else
     exit 1
 fi
 
+# Create DMG with hdiutil for CI compatibility
+DMG_DIR="./src-tauri/target/release/bundle/dmg"
+DMG_PATH="${DMG_DIR}/ClipForge_25.10.30_aarch64.dmg"
+mkdir -p "${DMG_DIR}"
+
+echo "Creating DMG with hdiutil..."
+hdiutil create -volname "ClipForge" -srcfolder "${APP_BUNDLE}" -ov -format UDZO "${DMG_PATH}"
+echo "✓ Created DMG at ${DMG_PATH}"
+
 echo "✓ Post-build complete!"
