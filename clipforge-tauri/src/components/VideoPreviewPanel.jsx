@@ -43,8 +43,16 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
     isRecording: previewIsRecording,
   } = usePreviewStream(previewEnabled);
 
-  // Composite preview for PiP recording (screen + webcam overlay)
-  const compositeEnabled = mode === "pip-recording" && isPiPRecording && webcamStream && hasPreviewFrame;
+  // Composite preview for PiP - show during recording AND during preview (when PiP is configured)
+  // Enable composite when:
+  // 1. Currently recording with PiP (mode === "pip-recording")
+  // 2. Ready to record with PiP (mode === "recording-preview" and pipConfig exists)
+  const isPiPConfigured = pipConfig && pipConfig.cameraId && webcamStream;
+  const compositeEnabled = (
+    (mode === "pip-recording" && isPiPRecording) ||
+    (mode === "recording-preview" && isPiPConfigured)
+  ) && hasPreviewFrame && webcamStream;
+
   const { compositeCanvasRef } = useCompositePreview(
     previewCanvasRef.current,
     webcamVideoRef.current,
@@ -61,9 +69,11 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
         filename: selectedMedia.filename,
         filepath: selectedMedia.filepath
       } : null,
-      hasTimelineState: !!timelineState
+      hasTimelineState: !!timelineState,
+      isPiPConfigured,
+      compositeEnabled
     });
-  }, [selectedMedia, mode, timelineState]);
+  }, [selectedMedia, mode, timelineState, isPiPConfigured, compositeEnabled]);
 
   // Debug: Log videoSrc changes
   useEffect(() => {
@@ -72,8 +82,13 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
 
   // Handle webcam stream changes
   useEffect(() => {
-    if (mode !== "webcam-recording" && mode !== "pip-recording") {
-      // Clear webcam stream when not in webcam or pip recording mode
+    const shouldShowWebcam =
+      mode === "webcam-recording" ||
+      mode === "pip-recording" ||
+      (mode === "recording-preview" && isPiPConfigured);
+
+    if (!shouldShowWebcam) {
+      // Clear webcam stream when not needed
       if (webcamVideoRef.current) {
         webcamVideoRef.current.srcObject = null;
       }
@@ -91,7 +106,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
       console.log("[VideoPreview] Clearing webcam stream");
       video.srcObject = null;
     }
-  }, [webcamStream, mode]);
+  }, [webcamStream, mode, isPiPConfigured]);
 
   // Handle library playback commands (from Media Library controls)
   useEffect(() => {
@@ -434,7 +449,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
         <div className="video-player">
           <div className="video-container">
             {/* Hidden webcam video for composite preview */}
-            {mode === "pip-recording" && webcamStream && (
+            {(mode === "pip-recording" || (mode === "recording-preview" && isPiPConfigured)) && webcamStream && (
               <video
                 ref={webcamVideoRef}
                 style={{ display: 'none' }}
@@ -469,7 +484,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                   </>
                 )}
               </>
-            ) : mode === "pip-recording" && compositeEnabled ? (
+            ) : compositeEnabled ? (
               <div className="live-preview-container">
                 {/* Hidden screen preview canvas (used by composite) */}
                 <canvas
@@ -490,6 +505,9 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                       {formatTime(recordingState.duration)}
                     </div>
                   </>
+                )}
+                {mode === "recording-preview" && !hasPreviewFrame && (
+                  <div className="preview-status-badge">Preparing preview…</div>
                 )}
                 {previewIsRecording && (
                   <div className="preview-fps-pill">

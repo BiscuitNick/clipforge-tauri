@@ -234,9 +234,14 @@ function App() {
     setWebcamStream(stream);
 
     // Update preview mode to webcam-recording when stream is active
+    // BUT: Don't change mode if we're in recording-preview (PiP composite preview)
     if (stream) {
-      setPreviewMode("webcam-recording");
-      setSelectedMedia(null);
+      // Only switch to webcam-recording if we're not preparing to record screen with PiP
+      if (previewMode !== "recording-preview" && previewMode !== "pip-recording") {
+        setPreviewMode("webcam-recording");
+        setSelectedMedia(null);
+      }
+      // If we're in recording-preview, keep that mode to show composite preview
     } else {
       // Stream stopped, go back to library mode
       if (previewMode === "webcam-recording") {
