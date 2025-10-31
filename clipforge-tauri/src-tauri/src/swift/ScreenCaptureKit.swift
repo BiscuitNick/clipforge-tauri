@@ -46,26 +46,23 @@ struct ProcessedAudioBuffer {
 
 /// Cache for SCShareableContent to avoid redundant async calls
 @available(macOS 12.3, *)
-class ContentCache {
+actor ContentCache {
     static let shared = ContentCache()
 
     private var cachedContent: SCShareableContent?
     private var cacheTimestamp: Date?
     private let cacheTTL: TimeInterval = 1.0 // 1 second TTL
-    private let lock = NSLock()
 
     private init() {}
 
     /// Gets cached content if valid, otherwise fetches fresh content
     func getContent(excludeDesktopWindows: Bool = false) async throws -> SCShareableContent {
-        lock.lock()
-        defer { lock.unlock() }
-
-        // Check if cache is valid
         if let cached = cachedContent,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheTTL {
-            print("[ContentCache] Using cached content (age: \(String(format: "%.2f", Date().timeIntervalSince(timestamp)))s)")
+            let age = Date().timeIntervalSince(timestamp)
+            let formattedAge = String(format: "%.2f", age)
+            print("[ContentCache] Using cached content (age: \(formattedAge)s)")
             return cached
         }
 
@@ -82,9 +79,6 @@ class ContentCache {
 
     /// Invalidates the cache
     func invalidate() {
-        lock.lock()
-        defer { lock.unlock() }
-
         cachedContent = nil
         cacheTimestamp = nil
         print("[ContentCache] Cache invalidated")
@@ -596,34 +590,36 @@ class ScreenCaptureKitBridge: NSObject {
 // MARK: - SCStreamDelegate Protocol Implementation
 
 @available(macOS 12.3, *)
-@MainActor
-extension ScreenCaptureKitBridge: @preconcurrency SCStreamDelegate {
+extension ScreenCaptureKitBridge: SCStreamDelegate {
 
     /// Called when the stream encounters an error and stops
     /// - Parameters:
     ///   - stream: The stream that stopped
     ///   - error: The error that caused the stream to stop
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
-        print("[ScreenCaptureKit Delegate] ⚠️ Stream stopped with error: \(error.localizedDescription)")
+    nonisolated func stream(_ stream: SCStream, didStopWithError error: Error) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
-        // Update capture state
-        isCapturing = false
+            print("[ScreenCaptureKit Delegate] ⚠️ Stream stopped with error: \(error.localizedDescription)")
 
-        // Log detailed error information
-        let nsError = error as NSError
-        print("[ScreenCaptureKit Delegate] Error domain: \(nsError.domain)")
-        print("[ScreenCaptureKit Delegate] Error code: \(nsError.code)")
-        print("[ScreenCaptureKit Delegate] Error info: \(nsError.userInfo)")
+            // Update capture state
+            self.isCapturing = false
 
-        // TODO: In future subtask, call Rust callback to notify error state
+            // Log detailed error information
+            let nsError = error as NSError
+            print("[ScreenCaptureKit Delegate] Error domain: \(nsError.domain)")
+            print("[ScreenCaptureKit Delegate] Error code: \(nsError.code)")
+            print("[ScreenCaptureKit Delegate] Error info: \(nsError.userInfo)")
+
+            // TODO: In future subtask, call Rust callback to notify error state
+        }
     }
 }
 
 // MARK: - SCStreamOutput Protocol Implementation
 
 @available(macOS 12.3, *)
-@MainActor
-extension ScreenCaptureKitBridge: @preconcurrency SCStreamOutput {
+extension ScreenCaptureKitBridge: SCStreamOutput {
 
     /// Called when the stream outputs a sample buffer
     /// This is the primary method for receiving video and audio frames
@@ -631,20 +627,24 @@ extension ScreenCaptureKitBridge: @preconcurrency SCStreamOutput {
     ///   - stream: The stream that output the buffer
     ///   - sampleBuffer: The sample buffer containing frame data
     ///   - outputType: The type of output (screen or audio)
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
-        // Guard to ensure buffer is valid
-        guard CMSampleBufferIsValid(sampleBuffer) else {
-            print("[ScreenCaptureKit Output] ⚠️ Received invalid sample buffer")
-            return
-        }
+    nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
-        switch outputType {
-        case .screen:
-            handleVideoFrame(sampleBuffer)
-        case .audio, .microphone:
-            handleAudioBuffer(sampleBuffer)
-        @unknown default:
-            print("[ScreenCaptureKit Output] ⚠️ Unknown output type: \(outputType)")
+            // Guard to ensure buffer is valid
+            guard CMSampleBufferIsValid(sampleBuffer) else {
+                print("[ScreenCaptureKit Output] ⚠️ Received invalid sample buffer")
+                return
+            }
+
+            switch outputType {
+            case .screen:
+                self.handleVideoFrame(sampleBuffer)
+            case .audio, .microphone:
+                self.handleAudioBuffer(sampleBuffer)
+            @unknown default:
+                print("[ScreenCaptureKit Output] ⚠️ Unknown output type: \(outputType)")
+            }
         }
     }
 
@@ -1064,53 +1064,63 @@ extension ScreenCaptureKitBridge: @preconcurrency SCStreamOutput {
 // These functions are exposed to Objective-C/C for FFI with Rust
 
 @available(macOS 12.3, *)
+private final class MutableBox<T>: @unchecked Sendable {
+    var value: T
+
+    init(_ value: T) {
+        self.value = value
+    }
+}
+
+@available(macOS 12.3, *)
 private func runOnMainActorSync<T>(_ work: @escaping @MainActor () -> T) -> T {
     if Thread.isMainThread {
-        return MainActor.assumeIsolated {
-            work()
-        }
+        return MainActor.assumeIsolated { work() }
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var result: T!
+    let resultBox = MutableBox<T?>(nil)
 
-    Task { @MainActor in
-        result = work()
+    DispatchQueue.main.async {
+        let value = MainActor.assumeIsolated { work() }
+        resultBox.value = value
         semaphore.signal()
     }
 
     semaphore.wait()
-    return result
+    // Force unwrap is safe because closure always assigns before signalling.
+    return resultBox.value!
 }
 
 @available(macOS 12.3, *)
 private func runOnMainActorAsync<T>(_ work: @escaping @MainActor () async -> T) -> T {
     if Thread.isMainThread {
-        var result: T!
-        var isDone = false
+        let resultBox = MutableBox<T?>(nil)
+        let isDoneBox = MutableBox(false)
 
         Task { @MainActor in
-            result = await work()
-            isDone = true
+            resultBox.value = await work()
+            isDoneBox.value = true
         }
 
-        while !isDone {
-            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        let runLoop = RunLoop.current
+        while !isDoneBox.value {
+            runLoop.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
         }
 
-        return result
+        return resultBox.value!
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var result: T!
+    let resultBox = MutableBox<T?>(nil)
 
     Task { @MainActor in
-        result = await work()
+        resultBox.value = await work()
         semaphore.signal()
     }
 
     semaphore.wait()
-    return result
+    return resultBox.value!
 }
 
 /// Creates a new ScreenCaptureKit bridge instance
@@ -1509,10 +1519,11 @@ public func screen_capture_enumerate_displays(
     if #available(macOS 12.3, *) {
         // Use a semaphore to make async call synchronous for FFI
         let semaphore = DispatchSemaphore(value: 0)
-        var displays: [CDisplayInfo] = []
-        var success = false
+        let displaysBox = MutableBox<[CDisplayInfo]>([])
+        let successBox = MutableBox(false)
 
         Task {
+            defer { semaphore.signal() }
             do {
                 // Get shareable content (cached)
                 let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
@@ -1521,7 +1532,7 @@ public func screen_capture_enumerate_displays(
                 let mainDisplayID = CGMainDisplayID()
 
                 // Map SCDisplay to CDisplayInfo
-                displays = content.displays.map { display in
+                let mappedDisplays = content.displays.map { display in
                     let isPrimary = display.displayID == mainDisplayID
 
                     // Get display bounds
@@ -1537,17 +1548,20 @@ public func screen_capture_enumerate_displays(
                     )
                 }
 
-                print("[ScreenCaptureKit Enum] Found \(displays.count) displays")
-                success = true
+                print("[ScreenCaptureKit Enum] Found \(mappedDisplays.count) displays")
+                displaysBox.value = mappedDisplays
+                successBox.value = true
             } catch {
                 print("[ScreenCaptureKit Enum] ERROR: Failed to get shareable content: \(error.localizedDescription)")
-                success = false
+                successBox.value = false
             }
-            semaphore.signal()
         }
 
         // Wait for async operation to complete
         semaphore.wait()
+
+        let displays = displaysBox.value
+        let success = successBox.value
 
         if success && !displays.isEmpty {
             // Allocate memory for display array
@@ -1590,16 +1604,17 @@ public func screen_capture_enumerate_windows(
     if #available(macOS 12.3, *) {
         // Use a semaphore to make async call synchronous for FFI
         let semaphore = DispatchSemaphore(value: 0)
-        var windows: [CWindowInfo] = []
-        var success = false
+        let windowsBox = MutableBox<[CWindowInfo]>([])
+        let successBox = MutableBox(false)
 
         Task {
+            defer { semaphore.signal() }
             do {
                 // Get shareable content (cached)
                 let content = try await ContentCache.shared.getContent(excludeDesktopWindows: true)
 
                 // Map SCWindow to CWindowInfo
-                windows = content.windows.map { window in
+                let mappedWindows = content.windows.map { window in
                     let frame = window.frame
 
                     return CWindowInfo(
@@ -1614,17 +1629,20 @@ public func screen_capture_enumerate_windows(
                     )
                 }
 
-                print("[ScreenCaptureKit Enum] Found \(windows.count) windows")
-                success = true
+                print("[ScreenCaptureKit Enum] Found \(mappedWindows.count) windows")
+                windowsBox.value = mappedWindows
+                successBox.value = true
             } catch {
                 print("[ScreenCaptureKit Enum] ERROR: Failed to get shareable content: \(error.localizedDescription)")
-                success = false
+                successBox.value = false
             }
-            semaphore.signal()
         }
 
         // Wait for async operation to complete
         semaphore.wait()
+
+        let windows = windowsBox.value
+        let success = successBox.value
 
         if success && !windows.isEmpty {
             // Allocate memory for window array
@@ -1670,30 +1688,35 @@ public func screen_capture_get_window_metadata(
 
     if #available(macOS 12.3, *) {
         let semaphore = DispatchSemaphore(value: 0)
-        var title = ""
-        var owner = ""
-        var success = false
+        let titleBox = MutableBox("")
+        let ownerBox = MutableBox("")
+        let successBox = MutableBox(false)
 
         Task {
+            defer { semaphore.signal() }
             do {
                 // Get shareable content (cached)
                 let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
 
                 if let window = content.windows.first(where: { $0.windowID == windowID }) {
-                    title = window.title ?? ""
-                    owner = window.owningApplication?.applicationName ?? ""
-                    success = true
-                    print("[ScreenCaptureKit Metadata] Window \(windowID): '\(title)' owned by '\(owner)'")
+                    let resolvedTitle = window.title ?? ""
+                    let resolvedOwner = window.owningApplication?.applicationName ?? ""
+                    titleBox.value = resolvedTitle
+                    ownerBox.value = resolvedOwner
+                    successBox.value = true
+                    print("[ScreenCaptureKit Metadata] Window \(windowID): '\(resolvedTitle)' owned by '\(resolvedOwner)'")
                 }
             } catch {
                 print("[ScreenCaptureKit Metadata] ERROR: \(error.localizedDescription)")
             }
-            semaphore.signal()
         }
 
         semaphore.wait()
 
-        if success {
+        let title = titleBox.value
+        let owner = ownerBox.value
+
+        if successBox.value {
             // Copy strings to output buffers
             let titleBytes = Array(title.utf8CString)
             let ownerBytes = Array(owner.utf8CString)
@@ -1728,7 +1751,12 @@ public func screen_capture_free_array(_ ptr: UnsafeMutableRawPointer?) {
 @_cdecl("screen_capture_invalidate_cache")
 public func screen_capture_invalidate_cache() {
     if #available(macOS 12.3, *) {
-        ContentCache.shared.invalidate()
+        let semaphore = DispatchSemaphore(value: 0)
+        Task {
+            await ContentCache.shared.invalidate()
+            semaphore.signal()
+        }
+        semaphore.wait()
     }
 }
 
@@ -1755,10 +1783,11 @@ public func screen_capture_display_thumbnail(
 
     if #available(macOS 12.3, *) {
         let semaphore = DispatchSemaphore(value: 0)
-        var pngData: Data?
-        var success = false
+        let pngDataBox = MutableBox<Data?>(nil)
+        let successBox = MutableBox(false)
 
         Task {
+            defer { semaphore.signal() }
             do {
                 // Get shareable content (cached)
                 let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
@@ -1766,7 +1795,6 @@ public func screen_capture_display_thumbnail(
                 // Find the display
                 guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
                     print("[ScreenCaptureKit Thumbnail] Display \(displayID) not found")
-                    semaphore.signal()
                     return
                 }
 
@@ -1794,20 +1822,20 @@ public func screen_capture_display_thumbnail(
                    let destination = CGImageDestinationCreateWithData(mutableData, "public.png" as CFString, 1, nil) {
                     CGImageDestinationAddImage(destination, image, nil)
                     if CGImageDestinationFinalize(destination) {
-                        pngData = mutableData as Data
-                        success = true
-                        print("[ScreenCaptureKit Thumbnail] Captured display \(displayID) thumbnail: \(pngData?.count ?? 0) bytes")
+                        let data = mutableData as Data
+                        pngDataBox.value = data
+                        successBox.value = true
+                        print("[ScreenCaptureKit Thumbnail] Captured display \(displayID) thumbnail: \(data.count) bytes")
                     }
                 }
             } catch {
                 print("[ScreenCaptureKit Thumbnail] ERROR: \(error.localizedDescription)")
             }
-            semaphore.signal()
         }
 
         semaphore.wait()
 
-        if success, let data = pngData {
+        if successBox.value, let data = pngDataBox.value {
             // Allocate buffer and copy data
             let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
             data.copyBytes(to: buffer, count: data.count)
@@ -1844,10 +1872,11 @@ public func screen_capture_window_thumbnail(
 
     if #available(macOS 12.3, *) {
         let semaphore = DispatchSemaphore(value: 0)
-        var pngData: Data?
-        var success = false
+        let pngDataBox = MutableBox<Data?>(nil)
+        let successBox = MutableBox(false)
 
         Task {
+            defer { semaphore.signal() }
             do {
                 // Get shareable content (cached)
                 let content = try await ContentCache.shared.getContent(excludeDesktopWindows: false)
@@ -1855,14 +1884,12 @@ public func screen_capture_window_thumbnail(
                 // Find the window
                 guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
                     print("[ScreenCaptureKit Thumbnail] Window \(windowID) not found")
-                    semaphore.signal()
                     return
                 }
 
                 // Get a display for the filter (required by SCContentFilter)
                 guard let display = content.displays.first else {
                     print("[ScreenCaptureKit Thumbnail] No displays available")
-                    semaphore.signal()
                     return
                 }
 
@@ -1892,20 +1919,20 @@ public func screen_capture_window_thumbnail(
                    let destination = CGImageDestinationCreateWithData(mutableData, "public.png" as CFString, 1, nil) {
                     CGImageDestinationAddImage(destination, image, nil)
                     if CGImageDestinationFinalize(destination) {
-                        pngData = mutableData as Data
-                        success = true
-                        print("[ScreenCaptureKit Thumbnail] Captured window \(windowID) thumbnail: \(pngData?.count ?? 0) bytes")
+                        let data = mutableData as Data
+                        pngDataBox.value = data
+                        successBox.value = true
+                        print("[ScreenCaptureKit Thumbnail] Captured window \(windowID) thumbnail: \(data.count) bytes")
                     }
                 }
             } catch {
                 print("[ScreenCaptureKit Thumbnail] ERROR: \(error.localizedDescription)")
             }
-            semaphore.signal()
         }
 
         semaphore.wait()
 
-        if success, let data = pngData {
+        if successBox.value, let data = pngDataBox.value {
             // Allocate buffer and copy data
             let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
             data.copyBytes(to: buffer, count: data.count)
