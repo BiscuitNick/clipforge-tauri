@@ -25,7 +25,7 @@ function formatTime(seconds) {
  * - webcam-recording: Show live webcam stream during recording
  * - pip-recording: Show combined screen + webcam overlay preview
  */
-function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null, pipConfig = null, isPiPRecording = false }) {
+function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = null, recordingState = null, onStopRecording, libraryPlaybackCommand = null, webcamStream = null, webcamRecordingDuration = 0, isWebcamPaused = false, panelLabel = "Video Preview", onCollapse = null, pipConfig = null, isPiPRecording = false, isPiPPaused = false }) {
   const videoRef = useRef(null);
   const webcamVideoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -423,7 +423,7 @@ function VideoPreviewPanel({ selectedMedia, mode = "library", timelineState = nu
                 {mode === "pip-recording" && recordingState && (
                   <>
                     <div className="recording-indicator-bottom-left">
-                      <div className="recording-dot-pulse"></div>
+                      <div className={isPiPPaused ? "recording-dot-paused" : "recording-dot-pulse"}></div>
                     </div>
                     <div className="recording-timer-bottom-right">
                       {formatTime(recordingState.duration)}

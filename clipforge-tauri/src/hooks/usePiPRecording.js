@@ -269,51 +269,66 @@ export function usePiPRecording() {
   /**
    * Pause the recording
    */
-  const pauseRecording = useCallback(() => {
+  const pauseRecording = useCallback(async () => {
     if (!isRecording || isPaused) {
       return;
     }
 
-    // Pause webcam recording
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.pause();
+    try {
+      // Pause screen recording (backend)
+      await invoke('pause_recording');
+
+      // Pause webcam recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.pause();
+      }
+
+      // Pause timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+
+      setIsPaused(true);
+    } catch (err) {
+      console.error('Failed to pause PiP recording:', err);
+      setError(err.message || 'Failed to pause recording');
+      throw err;
     }
-
-    // Note: Screen recording pause would need to be implemented in backend
-    // For now, we'll just pause the webcam and timer
-
-    // Pause timer
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-
-    setIsPaused(true);
   }, [isRecording, isPaused]);
 
   /**
    * Resume the recording
    */
-  const resumeRecording = useCallback(() => {
+  const resumeRecording = useCallback(async () => {
     if (!isRecording || !isPaused) {
       return;
     }
 
-    // Resume webcam recording
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
-      mediaRecorderRef.current.resume();
+    try {
+      // Resume screen recording (backend)
+      await invoke('resume_recording');
+
+      // Resume webcam recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+        mediaRecorderRef.current.resume();
+      }
+
+      // Resume timer
+      const pausedDuration = recordingDuration;
+      startTimeRef.current = Date.now() - (pausedDuration * 1000);
+
+      timerIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setRecordingDuration(elapsed);
+      }, 1000);
+
+      setIsPaused(false);
+    } catch (err) {
+      console.error('Failed to resume PiP recording:', err);
+      setError(err.message || 'Failed to resume recording');
+      throw err;
     }
-
-    // Resume timer
-    const pausedDuration = recordingDuration;
-    startTimeRef.current = Date.now() - (pausedDuration * 1000);
-
-    timerIntervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      setRecordingDuration(elapsed);
-    }, 1000);
-
-    setIsPaused(false);
   }, [isRecording, isPaused, recordingDuration]);
 
   /**

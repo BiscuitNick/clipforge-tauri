@@ -31,6 +31,7 @@ function App() {
   const [isPreviewWindowVisible, setIsPreviewWindowVisible] = React.useState(false); // Track preview window visibility
   const [pipConfig, setPipConfig] = React.useState(null); // Track PiP configuration
   const [isPiPRecording, setIsPiPRecording] = React.useState(false); // Track if PiP recording is active
+  const [isPiPPaused, setIsPiPPaused] = React.useState(false); // Track if PiP recording is paused
 
   // Panel visibility state - flexible panel system (2-3 panels)
   const [panelVisibility, setPanelVisibility] = React.useState({
@@ -237,6 +238,11 @@ function App() {
   // Handle webcam recording paused state changes
   const handleWebcamPausedChange = (isPaused) => {
     setIsWebcamPaused(isPaused);
+  };
+
+  // Handle PiP recording paused state changes
+  const handlePiPPausedChange = (isPaused) => {
+    setIsPiPPaused(isPaused);
   };
 
   // Handle drag move - track position for drop calculation
@@ -447,6 +453,7 @@ function App() {
             onWebcamPausedChange={handleWebcamPausedChange}
             onPiPConfigChange={handlePiPConfigChange}
             onPiPRecordingChange={handlePiPRecordingChange}
+            onPiPPausedChange={handlePiPPausedChange}
           />
         )}
 
@@ -465,6 +472,7 @@ function App() {
             panelLabel="Preview 1"
             pipConfig={pipConfig}
             isPiPRecording={isPiPRecording}
+            isPiPPaused={isPiPPaused}
           />
         )}
 

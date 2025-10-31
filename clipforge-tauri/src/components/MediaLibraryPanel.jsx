@@ -129,7 +129,7 @@ function DraggableMediaItem({ item, isSelected, onSelect }) {
  * Media Library Panel - Staging area for imported media
  * Users import files here, which can then be added to the timeline multiple times
  */
-function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange, onPiPConfigChange, onPiPRecordingChange }) {
+function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, selectedMediaId, onRecordingStateChange, isRecording, onPlayPauseMedia, onStopMedia, isLibraryPlaying = false, onWebcamStreamChange, onWebcamRecordingDurationChange, onWebcamPausedChange, onPiPConfigChange, onPiPRecordingChange, onPiPPausedChange }) {
   const [isDragging, setIsDragging] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success", "error", "loading"
@@ -521,23 +521,35 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
 
     if (isPiPActive) {
       try {
+        setIsLoading(true);
+        setMessage(pipIsPaused ? "Resuming recording..." : "Pausing recording...");
+        setMessageType("loading");
+
         if (pipIsPaused) {
-          resumePiPRecording();
+          await resumePiPRecording();
           setIsPaused(false);
+          if (onPiPPausedChange) {
+            onPiPPausedChange(false);
+          }
         } else {
-          pausePiPRecording();
+          await pausePiPRecording();
           setIsPaused(true);
+          if (onPiPPausedChange) {
+            onPiPPausedChange(true);
+          }
         }
         setMessage("");
         setMessageType("");
       } catch (err) {
         console.error('[MediaLibraryPanel] Failed to toggle PiP pause:', err);
-        setMessage(`Failed to toggle overlay recording: ${err}`);
+        setMessage(`Failed to ${pipIsPaused ? 'resume' : 'pause'} overlay recording: ${err}`);
         setMessageType('error');
         setTimeout(() => {
           setMessage('');
           setMessageType('');
         }, 5000);
+      } finally {
+        setIsLoading(false);
       }
       return;
     }
@@ -600,6 +612,9 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         if (onPiPRecordingChange) {
           onPiPRecordingChange(false);
         }
+        if (onPiPPausedChange) {
+          onPiPPausedChange(false);
+        }
 
         if (onWebcamStreamChange) {
           onWebcamStreamChange(null);
@@ -653,6 +668,9 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
         pipSessionRef.current = null;
         if (onPiPRecordingChange) {
           onPiPRecordingChange(false);
+        }
+        if (onPiPPausedChange) {
+          onPiPPausedChange(false);
         }
         if (onWebcamStreamChange) {
           onWebcamStreamChange(null);
@@ -1439,7 +1457,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             <button
               className="control-btn stop-btn"
               onClick={handleStopRecording}
-              disabled={!isRecording}
+              disabled={!isRecording || isLoading}
               title="Stop Recording"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -1449,7 +1467,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             <button
               className="control-btn record-btn"
               onClick={isRecording ? handlePauseResumeRecording : handleStartRecording}
-              disabled={(!selectedRecordingSource && !isRecording) || (isPiPEnabled && !selectedCameraId)}
+              disabled={(!selectedRecordingSource && !isRecording) || (isPiPEnabled && !selectedCameraId) || isLoading}
               title={isRecording ? (isPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
             >
               {isRecording ? (
@@ -1475,7 +1493,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
             <button
               className="control-btn stop-btn"
               onClick={handleStopWebcamRecording}
-              disabled={!isWebcamRecording}
+              disabled={!isWebcamRecording || isLoading}
               title="Stop Recording"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -1491,7 +1509,7 @@ function MediaLibraryPanel({ mediaItems = [], onMediaImport, onMediaSelect, sele
                   handleStartWebcamRecording();
                 }
               }}
-              disabled={!webcamStream && !isWebcamRecording}
+              disabled={(!webcamStream && !isWebcamRecording) || isLoading}
               title={isWebcamRecording ? (isWebcamPaused ? "Resume Recording" : "Pause Recording") : "Start Recording"}
             >
               {isWebcamRecording ? (
