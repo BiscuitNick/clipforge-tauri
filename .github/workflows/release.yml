@@ -16,30 +16,35 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
+    # Windows and Linux builds disabled - only macOS is currently verified to work
+    # The application uses macOS-specific frameworks (ScreenCaptureKit) for screen recording
+    # Future releases may include cross-platform support
+    #   - platform: 'ubuntu-22.04'
+    #     args: ''
+    #   - platform: 'windows-latest'
+    #     args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf ffmpeg
-
+      # Platform-specific dependencies (currently macOS only)
       - name: Install FFmpeg (macOS)
         if: matrix.platform == 'macos-latest'
         run: brew install ffmpeg
 
-      - name: Install FFmpeg (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          choco install ffmpeg -y
+      # Commented out - Windows and Linux builds disabled
+      # - name: Install dependencies (Ubuntu only)
+      #   if: matrix.platform == 'ubuntu-22.04'
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf ffmpeg
+      #
+      # - name: Install FFmpeg (Windows)
+      #   if: matrix.platform == 'windows-latest'
+      #   run: |
+      #     choco install ffmpeg -y
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -73,23 +78,31 @@ jobs:
           releaseBody: |
             ## What's New in ClipForge v__VERSION__
 
-            ### Features
-            - Timeline-based video editing with drag-and-drop
-            - Real-time preview and playback
-            - Professional export with FFmpeg
+            ### Platform Support
+            **✅ macOS Only** - This release is verified to work on macOS (Apple Silicon and Intel)
 
-            ### Installation
-            - **macOS**: Download the `.dmg` file
-            - **Windows**: Download the `.msi` installer
-            - **Linux**: Download the `.AppImage` or `.deb` package
+            Windows and Linux builds are not included in this release as they have not been tested. The application uses macOS-specific frameworks (ScreenCaptureKit) for optimal recording performance.
+
+            ### Latest Updates
+            - **Fixed**: Timeline video playback black screen bug
+              - Video preview now correctly resumes playback after clip ends
+              - Playback works reliably when moving between clips and gaps
+              - Video element properly maintains state during timeline navigation
+            - Native screen recording with ScreenCaptureKit
+            - Picture-in-Picture webcam support
+            - Professional timeline editing with keyboard shortcuts
+
+            ### Installation (macOS)
+            1. Download the `.dmg` file below
+            2. Open the DMG and drag ClipForge to Applications
+            3. Install FFmpeg: `brew install ffmpeg`
+            4. Launch ClipForge from Applications
 
             ### Requirements
-            - FFmpeg must be installed on your system
-              - macOS: `brew install ffmpeg`
-              - Windows: Download from https://ffmpeg.org/download.html
-              - Linux: `sudo apt install ffmpeg` or `sudo dnf install ffmpeg`
+            - macOS 11.0 (Big Sur) or later
+            - FFmpeg installed via Homebrew: `brew install ffmpeg`
 
-            See the [README](https://github.com/BiscuitNick/clipforge-tauri/blob/main/README.md) for full build instructions.
+            See the [README](https://github.com/BiscuitNick/clipforge-tauri/blob/main/clipforge-tauri/README.md) for full documentation and keyboard shortcuts.
           releaseDraft: true
           prerelease: false
           includeRelease: true
@@ -99,19 +112,10 @@ jobs:
 
       - name: List built artifacts (debug)
         run: |
-          echo "=== Checking bundle directory ==="
+          echo "=== Checking macOS bundle directory ==="
           ls -la clipforge-tauri/src-tauri/target/release/bundle/ || echo "Bundle directory not found"
-          if [ "${{ matrix.platform }}" == "macos-latest" ]; then
-            echo "=== macOS bundles ==="
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/dmg/ || echo "DMG not found"
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/macos/ || echo "App bundle not found"
-          elif [ "${{ matrix.platform }}" == "windows-latest" ]; then
-            echo "=== Windows bundles ==="
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/msi/ || echo "MSI not found"
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/nsis/ || echo "NSIS not found"
-          else
-            echo "=== Linux bundles ==="
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/deb/ || echo "DEB not found"
-            ls -la clipforge-tauri/src-tauri/target/release/bundle/appimage/ || echo "AppImage not found"
-          fi
+          echo "=== macOS DMG ==="
+          ls -la clipforge-tauri/src-tauri/target/release/bundle/dmg/ || echo "DMG not found"
+          echo "=== macOS App Bundle ==="
+          ls -la clipforge-tauri/src-tauri/target/release/bundle/macos/ || echo "App bundle not found"
         shell: bash
