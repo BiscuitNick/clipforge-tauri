@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+          - platform: 'macos-14'  # arm64 runner
+            args: '--target aarch64-apple-darwin'
     # Windows and Linux builds disabled - only macOS is currently verified to work
     # The application uses macOS-specific frameworks (ScreenCaptureKit) for screen recording
     # Future releases may include cross-platform support
@@ -31,7 +31,7 @@ jobs:
 
       # Platform-specific dependencies (currently macOS only)
       - name: Install FFmpeg (macOS)
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-14'
         run: brew install ffmpeg
 
       # Commented out - Windows and Linux builds disabled
@@ -54,7 +54,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
