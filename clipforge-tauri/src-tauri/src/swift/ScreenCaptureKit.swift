@@ -640,10 +640,11 @@ extension ScreenCaptureKitBridge: SCStreamOutput {
             switch outputType {
             case .screen:
                 self.handleVideoFrame(sampleBuffer)
-            case .audio, .microphone:
+            case .audio:
                 self.handleAudioBuffer(sampleBuffer)
             @unknown default:
-                print("[ScreenCaptureKit Output] ⚠️ Unknown output type: \(outputType)")
+                // Treat future audio-like cases (e.g., microphone-only) as audio
+                self.handleAudioBuffer(sampleBuffer)
             }
         }
     }
